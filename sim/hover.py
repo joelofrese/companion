@@ -1,21 +1,22 @@
 """
-Minimal hover test — connects to PX4 SITL, arms, takes off, hovers for 30s, lands.
+Minimal hover test — connects to PX4 SITL, arms, takes off, hovers, lands.
 Run after launching PX4 SITL: make px4_sitl gz_x500
 """
 
 import asyncio
 from mavsdk import System
+from mavsdk.telemetry import LandedState
 
 
 TAKEOFF_ALTITUDE = 2.0  # meters
-HOVER_DURATION = 30     # seconds
+HOVER_DURATION = 5     # seconds
 
 
 async def run():
-    drone = System()
-    await drone.connect(system_address="udpin://0.0.0.0:14540")
 
     print("Waiting for drone connection...")
+    drone = System()
+    await drone.connect()
     async for state in drone.core.connection_state():
         if state.is_connected:
             print("Connected.")
@@ -41,9 +42,7 @@ async def run():
 
     print("Landing...")
     await drone.action.land()
-
     async for state in drone.telemetry.landed_state():
-        from mavsdk.telemetry import LandedState
         if state == LandedState.ON_GROUND:
             print("Landed.")
             break

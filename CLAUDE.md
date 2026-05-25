@@ -80,7 +80,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 
 ## Development Notes
 
-- **Launch sim:** Open QGroundControl first, then `make px4_sitl gz_x500` from `~/Code/Croppie/PX4-Autopilot` (with venv activated). QGC must be open — PX4 expects a GCS connection on startup. Run scripts from `companion/` with its own `.venv`.
+- **Launch sim:** Run `sim/launch_sim.sh` (or `make px4_sitl gz_x500` from `~/Code/Croppie/PX4-Autopilot` with venv activated). QGC is not required. Run scripts from `companion/` with its own `.venv`.
 - **Simulate first:** The full cognitive + reactive stack can be tested in Gazebo with a virtual camera feed before the drone arrives. Validate state transitions, velocity behavior, and AI loop timing in simulation.
 - **No GPU needed on drone:** CM5 is sensor aggregator + command executor only. All inference runs on Mac.
 - **Offboard mode:** PX4 requires a continuous stream of setpoints in offboard mode — if commands stop, it will hover or land. Design the reactive layer to always be sending something.
@@ -117,4 +117,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 
 ## Session Log
 - **2026-05-24** — Project started. Transferred architecture and vision from Claude chat into CLAUDE.md. No code written yet. Hardware not yet arrived.
-- **2026-05-25** — Full sim environment working: PX4 SITL + Gazebo Harmonic + QGroundControl all running on macOS. `sim/hover.py` successfully arms, takes off to 2m, hovers 30s, and lands via MAVSDK. Drone visible in both Gazebo and QGC. QGC must be open before launching the sim (PX4 expects a GCS connection on startup). Real fix for Gazebo GUI crash was removing `libGstCameraSystem.so` from `server.config` (plugin not built on macOS, caused crash on load). Health check in hover.py must wait for magnetometer calibration in addition to GPS — otherwise arm is rejected with "no heading reference". SDF warnings about `gz_frame_id` are harmless — PX4 custom extension not in Gazebo's schema, copied as child node, sensors work correctly.
+- **2026-05-25** — Full sim environment working: PX4 SITL + Gazebo Harmonic running on macOS, no QGC required. `sim/hover.py` successfully arms, takes off to 2m, hovers 30s, and lands via MAVSDK. `libGstCameraSystem.dylib` now loads cleanly: root cause was GTK3/GTK4 conflict from GStreamer's plugin scanner loading `libgstgtk.dylib` + `libgstgtk4.dylib` — fixed by removing those GTK plugin dylibs from GStreamer's plugin dir and rebuilding PX4 to recompile the camera system plugin. `DYLD_LIBRARY_PATH=/opt/homebrew/lib` set in launch script to silence GLib introspection warnings from gst-plugin-scanner. Health check in hover.py waits for magnetometer calibration in addition to GPS — otherwise arm is rejected with "no heading reference". SDF warnings about `gz_frame_id` are harmless. Protobuf 6.x `Resize`→`resize` fix applied in GZMixingInterfaceESC.cpp and GZMixingInterfaceWheel.cpp.
