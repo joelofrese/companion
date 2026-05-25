@@ -80,7 +80,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 
 ## Development Notes
 
-- **Launch sim:** `PX4_GZ_SIM_RENDER_ENGINE=ogre make px4_sitl gz_x500` from `~/Code/Croppie/PX4-Autopilot` (with venv activated). Open QGroundControl first — it auto-connects on port 14550. Run scripts from `companion/` with its own `.venv`.
+- **Launch sim:** Open QGroundControl first, then `make px4_sitl gz_x500` from `~/Code/Croppie/PX4-Autopilot` (with venv activated). QGC must be open — PX4 expects a GCS connection on startup. Run scripts from `companion/` with its own `.venv`.
 - **Simulate first:** The full cognitive + reactive stack can be tested in Gazebo with a virtual camera feed before the drone arrives. Validate state transitions, velocity behavior, and AI loop timing in simulation.
 - **No GPU needed on drone:** CM5 is sensor aggregator + command executor only. All inference runs on Mac.
 - **Offboard mode:** PX4 requires a continuous stream of setpoints in offboard mode — if commands stop, it will hover or land. Design the reactive layer to always be sending something.
@@ -117,4 +117,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 
 ## Session Log
 - **2026-05-24** — Project started. Transferred architecture and vision from Claude chat into CLAUDE.md. No code written yet. Hardware not yet arrived.
-- **2026-05-25** — Full sim environment working: PX4 SITL + Gazebo Harmonic + QGroundControl all running on macOS. `sim/hover.py` successfully arms, takes off to 2m, hovers 30s, and lands via MAVSDK. Drone visible in both Gazebo and QGC. Launch command: `PX4_GZ_SIM_RENDER_ENGINE=ogre make px4_sitl gz_x500` (ogre1 required — ogre2/default crashes the Gazebo GUI on macOS 26 due to Qt5/Metal incompatibility). QGC auto-connects on port 14550. Health check in hover.py must wait for magnetometer calibration in addition to GPS — otherwise arm is rejected with "no heading reference".
+- **2026-05-25** — Full sim environment working: PX4 SITL + Gazebo Harmonic + QGroundControl all running on macOS. `sim/hover.py` successfully arms, takes off to 2m, hovers 30s, and lands via MAVSDK. Drone visible in both Gazebo and QGC. QGC must be open before launching the sim (PX4 expects a GCS). Real fix for Gazebo GUI crash was removing `libGstCameraSystem.so` from `server.config` (plugin not built on macOS, caused crash on load). Health check in hover.py must wait for magnetometer calibration in addition to GPS — otherwise arm is rejected with "no heading reference".
