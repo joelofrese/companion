@@ -9,7 +9,7 @@ from mavsdk.telemetry import LandedState
 
 
 TAKEOFF_ALTITUDE = 2.0  # meters
-HOVER_DURATION = 5     # seconds
+HOVER_DURATION = 15     # seconds
 
 
 async def run():
