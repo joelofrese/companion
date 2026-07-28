@@ -1,11 +1,16 @@
 """CM5-side safety envelope for commands received from the Mac."""
 
 import math
+from numbers import Real
 from typing import Optional
 
 from control.command_packet import CommandPacket
 from control.state_machine import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
+
+
+MAX_HORIZONTAL_SPEED_M_S = 0.5
+MAX_VERTICAL_SPEED_M_S = 0.3
 
 
 class OnboardSafetyEnvelope:
@@ -61,4 +66,22 @@ class OnboardSafetyEnvelope:
                 return VelocityCommand()
             if obstacle_distance_m < OBSTACLE_STOP_M:
                 return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
+        if not self._command_is_safe(self._command):
+            return VelocityCommand()
         return self._command
+
+    @staticmethod
+    def _command_is_safe(command: VelocityCommand) -> bool:
+        values = (
+            command.north_m_s,
+            command.east_m_s,
+            command.down_m_s,
+            command.yaw_deg,
+        )
+        if any(isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value) for value in values):
+            return False
+        return (
+            abs(command.north_m_s) <= MAX_HORIZONTAL_SPEED_M_S
+            and abs(command.east_m_s) <= MAX_HORIZONTAL_SPEED_M_S
+            and abs(command.down_m_s) <= MAX_VERTICAL_SPEED_M_S
+        )

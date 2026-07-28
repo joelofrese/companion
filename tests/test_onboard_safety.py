@@ -33,6 +33,20 @@ class OnboardSafetyEnvelopeTests(unittest.TestCase):
         self.assertEqual(envelope.tick(1.2, obstacle_distance_m=float("inf")), VelocityCommand())
         self.assertEqual(envelope.tick(1.3, obstacle_distance_m="unknown"), VelocityCommand())
 
+    def test_fresh_command_is_bounded_locally(self):
+        envelope = OnboardSafetyEnvelope()
+        envelope.receive(1.0, VelocityCommand(north_m_s=0.5, east_m_s=-0.5, down_m_s=0.3))
+        self.assertEqual(
+            envelope.tick(1.1),
+            VelocityCommand(north_m_s=0.5, east_m_s=-0.5, down_m_s=0.3),
+        )
+
+        envelope.receive(1.2, VelocityCommand(north_m_s=0.51))
+        self.assertEqual(envelope.tick(1.3), VelocityCommand())
+
+        envelope.receive(1.4, VelocityCommand(down_m_s=-0.31))
+        self.assertEqual(envelope.tick(1.5), VelocityCommand())
+
     def test_out_of_order_commands_and_ticks_are_rejected(self):
         envelope = OnboardSafetyEnvelope()
         envelope.receive(2.0, VelocityCommand())
