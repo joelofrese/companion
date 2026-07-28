@@ -1,11 +1,17 @@
 """YOLOv8n adapter that emits the tracker’s narrow person-observation type."""
 
+import math
+from numbers import Real
 from typing import Any, Optional
 
 from control.tracking import Detection
 
 
 PERSON_CLASS_ID = 0
+
+
+def _finite(value: object) -> bool:
+    return not isinstance(value, bool) and isinstance(value, Real) and math.isfinite(value)
 
 
 def _scalar(value: Any) -> float:
@@ -32,7 +38,7 @@ class YoloPersonDetector:
     """Return the highest-confidence person center from each image."""
 
     def __init__(self, model_path: str = "yolov8n.pt", confidence_threshold: float = 0.5, model=None):
-        if not 0.0 <= confidence_threshold <= 1.0:
+        if not _finite(confidence_threshold) or not 0.0 <= confidence_threshold <= 1.0:
             raise ValueError("confidence threshold must be between 0 and 1")
         if model is None:
             from ultralytics import YOLO
@@ -48,12 +54,26 @@ class YoloPersonDetector:
         best = None
         for result in results:
             for box in result.boxes:
-                class_id = int(_scalar(box.cls[0]))
-                confidence = _scalar(box.conf[0])
+                try:
+                    class_id = int(_scalar(box.cls[0]))
+                    confidence = _scalar(box.conf[0])
+                    coordinates = _box_coordinates(box.xyxy)
+                except (IndexError, TypeError, ValueError):
+                    continue
+                if (
+                    not _finite(confidence)
+                    or not 0.0 <= confidence <= 1.0
+                    or len(coordinates) != 4
+                    or any(not _finite(coordinate) for coordinate in coordinates)
+                ):
+                    continue
+                x1, y1, x2, y2 = coordinates
+                if x2 <= x1 or y2 <= y1:
+                    continue
                 if class_id != PERSON_CLASS_ID or confidence < self.confidence_threshold:
                     continue
                 if best is None or confidence > best[0]:
-                    best = (confidence, _box_coordinates(box.xyxy))
+                    best = (confidence, coordinates)
 
         if best is None:
             return None

@@ -52,6 +52,18 @@ class YoloPersonDetectorTests(unittest.TestCase):
     def test_invalid_threshold_is_rejected(self):
         with self.assertRaises(ValueError):
             YoloPersonDetector(model=FakeModel([]), confidence_threshold=1.1)
+        with self.assertRaises(ValueError):
+            YoloPersonDetector(model=FakeModel([]), confidence_threshold=float("nan"))
+        with self.assertRaises(ValueError):
+            YoloPersonDetector(model=FakeModel([]), confidence_threshold=True)
+
+    def test_malformed_model_boxes_are_ignored(self):
+        model = FakeModel([FakeResult([
+            FakeBox(0, float("nan"), [0, 0, 10, 10]),
+            FakeBox(0, 0.9, [10, 10, 5, 20]),
+            FakeBox(0, 0.8, [0, 0, float("inf"), 10]),
+        ])])
+        self.assertIsNone(YoloPersonDetector(model=model).detect("frame", 1.0))
 
 
 if __name__ == "__main__":
