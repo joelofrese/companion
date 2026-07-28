@@ -4,7 +4,7 @@
 
 ## Code Quality
 
-Keep every change as simple, minimal, and readable as possible.
+Keep every change as simple, minimal, readable, and maintainable as possible. These qualities take priority over feature speed and breadth. Working behavior is only the first completion gate; the final implementation must also be the simplest coherent design.
 
 - Optimize for the simplest final codebase, not the smallest immediate diff.
 - Write the smallest clear solution that fully solves the current problem.
@@ -42,6 +42,18 @@ Use Git as a recovery mechanism, not as a reason to avoid worthwhile refactoring
 - Push stable checkpoints to the feature branch when remote access is available, but never force-push or rewrite shared history.
 - Keep commits understandable and reversible; avoid both sprawling mixed-purpose commits and noisy microcommits.
 - Run the relevant tests or simulator before calling a milestone complete. If an approach fails, return to the last known-good checkpoint rather than accumulating workarounds.
+
+## Testing and Simulation
+
+Develop and run the relevant tests and simulated scenarios autonomously as part of implementation.
+
+- Use focused automated tests for deterministic logic and PX4 SITL/Gazebo for integrated flight behavior.
+- Treat test and simulation code as production code: keep it small, readable, deterministic, and free of unnecessary harnesses, mocks, fixtures, and configuration.
+- Test observable behavior and safety properties rather than internal implementation details so refactoring remains easy.
+- Extend the simulation setup only when a current behavior needs it; reuse the existing launch and verification paths when they remain clear.
+- Validate flight behavior in simulation before hardware testing. Confirm expected events and outcomes from actual output or telemetry rather than process survival.
+- Fix failures at their source. Do not weaken assertions, skip checks, or add retries merely to make a test pass.
+- Consider a change complete only after the relevant checks pass and the implementation and its tests have both received a simplification pass.
 
 ## Vision
 Build a companion drone that operates like a living thing — the AI sets high-level intent (like a brain deciding to look at something), while lower layers handle the automatic execution (like reflexes and muscle memory). The goal is natural, creature-like behavior rather than robotic point-to-point movement.
@@ -170,3 +182,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-26** — Ruled out a physical power tether and custom power electronics. Development will remain simulation-first, with short stock-battery flights used only when hardware validation is necessary.
 - **2026-07-26** — Re-ran the complete PX4 SITL/Gazebo hover test successfully: MAVSDK connected, the simulated x500 armed, took off to 2 m, hovered for 15 seconds, landed, and disarmed. The documented SDF and missing-GCS warnings remained harmless, and the simulator shut down cleanly afterward.
 - **2026-07-28** — Completed the project-guide migration from `CLAUDE.md` to `AGENTS.md` and established autonomous development: make aligned product and technical decisions without interruption, refactor toward the simplest final system, originate useful new capabilities, use verified Git checkpoints, favor safe and reversible choices, and continue with other valuable work when an individual task is blocked.
+- **2026-07-28** — Made simplicity, readability, and maintainability higher priorities than feature throughput, and made autonomous, maintainable automated testing plus SITL/Gazebo verification part of the definition of done.
