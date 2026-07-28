@@ -50,6 +50,10 @@ class VoiceTests(unittest.TestCase):
     def test_stop_takes_precedence_over_follow(self):
         self.assertIs(parse_intent("stop following"), State.HOVERING)
 
+    def test_conflicting_non_safety_intents_are_rejected(self):
+        self.assertIsNone(parse_intent("follow me and turn to me"))
+        self.assertIsNone(parse_intent("follow me then sleep"))
+
     def test_unknown_or_empty_transcript_is_rejected(self):
         self.assertIsNone(parse_intent("what is the weather"))
         self.assertIsNone(parse_intent(""))

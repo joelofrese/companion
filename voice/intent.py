@@ -27,10 +27,15 @@ def parse_intent(transcript: str) -> Optional[State]:
 
     if any(_contains_phrase(words, phrase) for phrase in ("stop", "hover", "hold", "wait", "stay")):
         return State.HOVERING
-    if any(_contains_phrase(words, phrase) for phrase in ("follow", "come with me", "come along")):
-        return State.FOLLOWING
-    if any(_contains_phrase(words, phrase) for phrase in ("respond", "face me", "turn to me", "look at me")):
-        return State.RESPONDING
-    if any(_contains_phrase(words, phrase) for phrase in ("idle", "sleep")):
-        return State.IDLE
-    return None
+
+    intents = {
+        State.FOLLOWING: ("follow", "come with me", "come along"),
+        State.RESPONDING: ("respond", "face me", "turn to me", "look at me"),
+        State.IDLE: ("idle", "sleep"),
+    }
+    matches = [
+        state
+        for state, phrases in intents.items()
+        if any(_contains_phrase(words, phrase) for phrase in phrases)
+    ]
+    return matches[0] if len(matches) == 1 else None
