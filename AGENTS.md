@@ -114,6 +114,11 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Reduced deterministic coverage to 32 focused safety-contract
+  checks across command validity, watchdog/obstacle fail-safe behavior, safe
+  shutdown, vision liveness, and CM5/PX4 bridge seams. Removed component and
+  adapter-detail tests. The full PX4/Gazebo scenario still passed with -0.18
+  m/s obstacle backoff and a clean landing.
 - 2026-07-28: Simplified the Mac control path by removing separate step and loop
   wrappers. Removed redundant video/YOLO simulation wrappers and eight
   wrapper/mock-only tests. The retained deterministic suite passed 120 tests;

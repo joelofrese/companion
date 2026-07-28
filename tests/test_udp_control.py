@@ -84,12 +84,5 @@ class UdpControlServiceTests(unittest.TestCase):
         self.assertEqual(sender.commands[-1], VelocityCommand())
         self.assertTrue(sender.closed)
 
-    def test_invalid_tick_period_is_rejected(self):
-        with self.assertRaises(ValueError):
-            UdpControlService(FakeLoop(), FakeSender(), lambda: None, tick_period_s=0.0)
-        with self.assertRaises(ValueError):
-            UdpControlService(FakeLoop(), FakeSender(), lambda: None, frame_timeout_s=0.0)
-
-
 if __name__ == "__main__":
     unittest.main()

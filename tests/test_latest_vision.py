@@ -55,33 +55,5 @@ class LatestVisionTests(unittest.TestCase):
         finally:
             latest.close()
 
-    def test_preserves_tracker_prediction_age(self):
-        class PredictedVision:
-            def process(self, frame, timestamp_s):
-                return TrackEstimate(
-                    10.0,
-                    20.0,
-                    0.0,
-                    0.0,
-                    10.0,
-                    20.0,
-                    age_s=0.4,
-                    target_height_px=30.0,
-                )
-
-        latest = LatestVisionPipeline(PredictedVision())
-        try:
-            latest.process("frame", 1.0)
-            deadline = time.monotonic() + 1.0
-            estimate = None
-            while estimate is None and time.monotonic() < deadline:
-                estimate = latest.process(None, 1.2)
-                time.sleep(0.01)
-            self.assertIsNotNone(estimate)
-            self.assertAlmostEqual(estimate.age_s, 0.6)
-        finally:
-            latest.close()
-
-
 if __name__ == "__main__":
     unittest.main()

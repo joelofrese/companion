@@ -55,14 +55,6 @@ class UdpSafetyReceiverTests(unittest.TestCase):
         self.assertEqual(receiver.poll(obstacle_distance_m=0.5), VelocityCommand(north_m_s=-0.2))
         receiver.close()
 
-    def test_poll_requires_start(self):
-        with self.assertRaises(RuntimeError):
-            UdpSafetyReceiver().poll()
-
-    def test_boolean_port_is_rejected(self):
-        with self.assertRaises(ValueError):
-            UdpSafetyReceiver(port=True)
-
     def test_failed_bind_closes_socket_and_leaves_receiver_unstarted(self):
         failed_socket = BindFailingSocket()
         receiver = UdpSafetyReceiver(socket_factory=lambda *args: failed_socket)

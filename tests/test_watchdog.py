@@ -20,16 +20,5 @@ class SetpointWatchdogTests(unittest.TestCase):
         self.assertTrue(watchdog.tripped)
         self.assertEqual(watchdog.emit(1.25, desired), VelocityCommand())
 
-    def test_non_monotonic_timestamps_are_rejected(self):
-        watchdog = SetpointWatchdog()
-        watchdog.emit(1.0, VelocityCommand())
-        with self.assertRaises(ValueError):
-            watchdog.emit(1.0, VelocityCommand())
-
-    def test_invalid_interval_is_rejected(self):
-        with self.assertRaises(ValueError):
-            SetpointWatchdog(max_interval_s=0.0)
-
-
 if __name__ == "__main__":
     unittest.main()

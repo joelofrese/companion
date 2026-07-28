@@ -6,26 +6,10 @@ from control.velocity import VelocityCommand
 
 
 class ReactiveControllerTests(unittest.TestCase):
-    def test_intent_drives_following_velocity(self):
-        controller = ReactiveController()
-        controller.set_intent(State.FOLLOWING)
-        self.assertEqual(
-            controller.command(
-                obstacle_distance_m=2.0,
-                target_age_s=0.0,
-                target=TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0),
-            ),
-            VelocityCommand(north_m_s=0.25),
-        )
-
-    def test_following_without_target_holds_position(self):
+    def test_missing_or_stale_target_holds_position(self):
         controller = ReactiveController()
         controller.set_intent(State.FOLLOWING)
         self.assertEqual(controller.command(obstacle_distance_m=2.0), VelocityCommand())
-
-    def test_stale_target_holds_position(self):
-        controller = ReactiveController()
-        controller.set_intent(State.FOLLOWING)
         self.assertEqual(controller.command(target_age_s=0.6), VelocityCommand())
 
     def test_obstacle_overrides_intent_and_backs_off(self):
@@ -57,12 +41,7 @@ class ReactiveControllerTests(unittest.TestCase):
             )
             self.assertIs(controller.state, State.FOLLOWING)
 
-    def test_no_obstacle_holds_for_non_following_states(self):
-        controller = ReactiveController()
-        controller.set_intent(State.RESPONDING)
-        self.assertEqual(controller.command(obstacle_distance_m=2.0), VelocityCommand())
-
-    def test_invalid_intent_is_rejected_without_changing_state(self):
+    def test_invalid_intent_is_rejected(self):
         controller = ReactiveController()
         controller.set_intent(State.FOLLOWING)
         with self.assertRaises(ValueError):

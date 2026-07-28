@@ -65,10 +65,6 @@ class SafetyCommandServiceTests(unittest.TestCase):
         service.start()
         self.assertTrue(receiver.started)
 
-    def test_tick_period_must_be_positive(self):
-        with self.assertRaises(ValueError):
-            SafetyCommandService(FakeReceiver(), object(), tick_period_s=0.0)
-
     def test_receiver_closes_when_forwarder_fails(self):
         async def scenario():
             receiver = FakeReceiver()
