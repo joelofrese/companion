@@ -23,6 +23,7 @@ Work autonomously without waiting for user input. Make product, architecture, pr
 
 Refactor freely when the existing structure would make a change less clear. Preserve required behavior, safety properties, and architectural boundaries—not incidental implementation details.
 
+- Reread the root `AGENTS.md` before selecting each new milestone, after every meaningful Git checkpoint, and immediately after modifying it. Incorporate the latest guidance without pausing for user confirmation.
 - Take initiative beyond the current checklist. Identify and implement aligned capabilities that would make the companion meaningfully more capable, natural, or useful without waiting for preapproval.
 - Prefer changing, consolidating, or deleting existing code over layering new code around it.
 - Rewrite modules, change internal interfaces, and update all callers together when that produces a simpler whole.
@@ -223,3 +224,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added `onboard/safety.py`, the transport-independent CM5 safety envelope. Fresh Mac commands pass through, stale or absent commands become zero velocity, and a local forward TOF reading overrides a fresh command with the bounded backoff. Seventy-two tests pass, and the existing offboard SITL regression observed `0.32 m/s` forward and `-0.17 m/s` backoff before a clean landing. The remaining hardware task is wiring this envelope to the DEXI-OS MAVLink/PX4 forwarding process.
 - **2026-07-28** — Added `control/command_packet.py` and connected packet receipt to the CM5 safety envelope. The dependency-free version-1 codec validates finite velocity fields, bounds packet size, and prevents reordered packets from refreshing the local heartbeat. Seventy-eight tests pass; the remaining hardware task is wiring packet reception and safe-command forwarding into DEXI-OS.
 - **2026-07-28** — Added `onboard/command_receiver.py` and `sim/command_loopback.py`. The non-blocking UDP receiver drains Mac packets, ignores malformed/reordered data, and exposes only envelope-approved velocity; the real localhost verifier passed fresh `0.3 m/s` forwarding and `-0.2 m/s` obstacle override. Eighty-one tests pass; Wi-Fi, CM5, and PX4-forwarding validation remain hardware-gated.
+- **2026-07-28** — Required long-running development to reread `AGENTS.md` at milestone and Git-checkpoint boundaries and immediately after editing it, so updated project guidance takes effect without stopping for user confirmation.
