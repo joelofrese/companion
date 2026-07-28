@@ -14,9 +14,9 @@ class VisualFollowerTests(unittest.TestCase):
         follower = VisualFollower()
         self.assertEqual(follower.command(target(320.0, 60.0)), VelocityCommand(north_m_s=0.25))
 
-    def test_large_target_backs_off(self):
+    def test_large_target_holds_instead_of_reversing(self):
         follower = VisualFollower()
-        self.assertEqual(follower.command(target(320.0, 240.0)), VelocityCommand(north_m_s=-0.5))
+        self.assertEqual(follower.command(target(320.0, 240.0)), VelocityCommand())
 
     def test_right_of_center_moves_east_and_is_bounded(self):
         follower = VisualFollower(FollowConfig(frame_width_px=640.0))

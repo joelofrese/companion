@@ -57,6 +57,6 @@ class VisualFollower:
             target.predicted_x_px - self.config.frame_width_px / 2.0
         ) / (self.config.frame_width_px / 2.0)
         return VelocityCommand(
-            north_m_s=_clamp(distance_error) * self.config.max_forward_speed_m_s,
+            north_m_s=max(0.0, _clamp(distance_error)) * self.config.max_forward_speed_m_s,
             east_m_s=_clamp(horizontal_error) * self.config.max_lateral_speed_m_s,
         )
