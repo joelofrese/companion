@@ -33,6 +33,28 @@ class PersonTrackerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             PersonTracker(prediction_horizon_s=-0.1)
 
+    def test_non_finite_tracker_configuration_is_rejected(self):
+        with self.assertRaises(ValueError):
+            PersonTracker(prediction_horizon_s=float("nan"))
+        with self.assertRaises(ValueError):
+            PersonTracker(max_prediction_age_s=float("inf"))
+
+    def test_malformed_detection_is_rejected_before_state_update(self):
+        tracker = PersonTracker()
+        with self.assertRaises(ValueError):
+            tracker.update(Detection(float("nan"), 20.0, 0.0))
+        with self.assertRaises(ValueError):
+            tracker.update(Detection(10.0, 20.0, True))
+        with self.assertRaises(ValueError):
+            tracker.update(Detection(10.0, 20.0, 0.0, height_px=-1.0))
+        self.assertIsNone(tracker.predict(0.0))
+
+    def test_non_finite_prediction_timestamp_is_rejected(self):
+        tracker = PersonTracker()
+        tracker.update(Detection(10.0, 20.0, 0.0))
+        with self.assertRaises(ValueError):
+            tracker.predict(float("nan"))
+
     def test_prediction_bridges_a_short_detection_gap(self):
         tracker = PersonTracker(max_prediction_age_s=0.5)
         tracker.update(Detection(0.0, 20.0, 0.0))

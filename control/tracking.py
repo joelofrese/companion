@@ -1,6 +1,8 @@
 """Lightweight constant-velocity Kalman tracker for detector measurements."""
 
+import math
 from dataclasses import dataclass
+from numbers import Real
 from typing import Optional
 
 
@@ -29,6 +31,10 @@ class TrackEstimate:
     age_s: float = 0.0
     target_width_px: float = 0.0
     target_height_px: float = 0.0
+
+
+def _finite(value: object) -> bool:
+    return not isinstance(value, bool) and isinstance(value, Real) and math.isfinite(value)
 
 
 class _AxisFilter:
@@ -77,10 +83,10 @@ class PersonTracker:
     """Track a detected person's center and predict a short time into the future."""
 
     def __init__(self, prediction_horizon_s: float = 0.3, max_prediction_age_s: float = 0.5):
-        if prediction_horizon_s < 0.0:
-            raise ValueError("prediction horizon must not be negative")
-        if max_prediction_age_s < 0.0:
-            raise ValueError("maximum prediction age must not be negative")
+        if not _finite(prediction_horizon_s) or prediction_horizon_s < 0.0:
+            raise ValueError("prediction horizon must be finite and non-negative")
+        if not _finite(max_prediction_age_s) or max_prediction_age_s < 0.0:
+            raise ValueError("maximum prediction age must be finite and non-negative")
         self.prediction_horizon_s = prediction_horizon_s
         self.max_prediction_age_s = max_prediction_age_s
         self._x = _AxisFilter(process_noise=1.0, measurement_noise=4.0)
@@ -92,6 +98,22 @@ class PersonTracker:
 
     def update(self, detection: Detection) -> TrackEstimate:
         """Consume one detector measurement and return its filtered estimate."""
+
+        values = (
+            detection.x_px,
+            detection.y_px,
+            detection.timestamp_s,
+            detection.confidence,
+            detection.width_px,
+            detection.height_px,
+        )
+        if (
+            any(not _finite(value) for value in values)
+            or not 0.0 <= detection.confidence <= 1.0
+            or detection.width_px < 0.0
+            or detection.height_px < 0.0
+        ):
+            raise ValueError("detection fields must be finite and within bounds")
 
         if self._state_timestamp_s is None:
             self._x.initialize(detection.x_px)
@@ -114,6 +136,8 @@ class PersonTracker:
     def predict(self, timestamp_s: float) -> Optional[TrackEstimate]:
         """Advance without a measurement, expiring the track after a bounded gap."""
 
+        if not _finite(timestamp_s):
+            raise ValueError("prediction timestamp must be finite")
         if self._state_timestamp_s is None:
             return None
         age_s = timestamp_s - self._last_measurement_timestamp_s
