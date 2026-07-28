@@ -1,11 +1,11 @@
-"""Small, deterministic reactive velocity profile for SITL and hardware bring-up."""
+"""Deterministic cognitive intent profile for SITL bring-up."""
 
-from control.velocity import VelocityCommand
+from control.state_machine import State
 
 
-def demo_velocity(elapsed_s: float) -> VelocityCommand:
-    """Move forward slowly for four seconds, then hold a zero-velocity hover."""
+def demo_state(elapsed_s: float) -> State:
+    """Follow for four seconds, then ask the reactive layer to hover."""
 
     if 0.0 <= elapsed_s < 4.0:
-        return VelocityCommand(north_m_s=0.5)
-    return VelocityCommand()
+        return State.FOLLOWING
+    return State.HOVERING

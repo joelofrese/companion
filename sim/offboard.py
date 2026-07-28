@@ -7,7 +7,8 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError, VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
-from sim.offboard_control import demo_velocity
+from control.state_machine import ReactiveController
+from sim.offboard_control import demo_state
 
 
 SETPOINT_PERIOD_S = 0.05
@@ -54,7 +55,9 @@ async def run():
     await _wait_until_in_air(drone)
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
-    await drone.offboard.set_velocity_ned(_mavsdk_velocity(demo_velocity(0.0)))
+    controller = ReactiveController()
+    controller.set_intent(demo_state(0.0))
+    await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command()))
     await drone.offboard.start()
     print("Offboard started.")
 
@@ -69,10 +72,12 @@ async def run():
     started_at = time.monotonic()
     try:
         while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
-            await drone.offboard.set_velocity_ned(_mavsdk_velocity(demo_velocity(elapsed)))
+            controller.set_intent(demo_state(elapsed))
+            await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command()))
             await asyncio.sleep(SETPOINT_PERIOD_S)
     finally:
-        await drone.offboard.set_velocity_ned(_mavsdk_velocity(demo_velocity(PROFILE_DURATION_S)))
+        controller.set_intent(demo_state(PROFILE_DURATION_S))
+        await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command()))
         telemetry_task.cancel()
         await asyncio.gather(telemetry_task, return_exceptions=True)
         try:
