@@ -62,6 +62,13 @@ class ReactiveControllerTests(unittest.TestCase):
         controller.set_intent(State.RESPONDING)
         self.assertEqual(controller.command(obstacle_distance_m=2.0), VelocityCommand())
 
+    def test_invalid_intent_is_rejected_without_changing_state(self):
+        controller = ReactiveController()
+        controller.set_intent(State.FOLLOWING)
+        with self.assertRaises(ValueError):
+            controller.set_intent("following")
+        self.assertIs(controller.state, State.FOLLOWING)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -32,6 +32,8 @@ class ReactiveController:
     def set_intent(self, state: State):
         """Apply cognitive intent; obstacle safety is evaluated when commanding."""
 
+        if not isinstance(state, State):
+            raise ValueError("intent must be a State")
         self._intent_state = state
         self.state = state
 
