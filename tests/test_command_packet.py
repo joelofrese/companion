@@ -28,6 +28,10 @@ class CommandPacketTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             CommandPacket(1, VelocityCommand(north_m_s=float("inf"))).encode()
 
+    def test_encode_rejects_boolean_velocity(self):
+        with self.assertRaises(ValueError):
+            CommandPacket(1, VelocityCommand(north_m_s=True)).encode()
+
 
 if __name__ == "__main__":
     unittest.main()
