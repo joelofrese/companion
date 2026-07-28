@@ -35,6 +35,7 @@ class LatestDistanceSensor:
             isinstance(distance_m, bool)
             or not isinstance(distance_m, Real)
             or not math.isfinite(distance_m)
+            or distance_m < 0.0
             or (
                 minimum_m is not None
                 and (isinstance(minimum_m, bool) or not isinstance(minimum_m, Real)

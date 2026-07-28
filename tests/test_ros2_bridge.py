@@ -93,6 +93,8 @@ class Ros2DistanceSensorTests(unittest.TestCase):
         self.assertTrue(math.isnan(sensor.read()))
         sensor.update(FakeDistance(True, min_distance=0.2, max_distance=4.0))
         self.assertTrue(math.isnan(sensor.read()))
+        sensor.update(FakeDistance(-1.0))
+        self.assertTrue(math.isnan(sensor.read()))
 
 
 class Ros2SafetyBridgeTests(unittest.TestCase):

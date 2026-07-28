@@ -66,6 +66,8 @@ class OnboardSafetyEnvelope:
                     return VelocityCommand()
             except TypeError:
                 return VelocityCommand()
+            if obstacle_distance_m < 0.0:
+                return VelocityCommand()
             if obstacle_distance_m < OBSTACLE_STOP_M:
                 return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
         if not self._command_is_safe(self._command):
