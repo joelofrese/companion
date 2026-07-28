@@ -53,6 +53,9 @@ class VoiceTests(unittest.TestCase):
     def test_unknown_or_empty_transcript_is_rejected(self):
         self.assertIsNone(parse_intent("what is the weather"))
         self.assertIsNone(parse_intent(""))
+        self.assertIsNone(parse_intent("stopwatch"))
+        self.assertIsNone(parse_intent("don't follow me"))
+        self.assertIsNone(parse_intent(None))
 
     def test_pipeline_passes_audio_to_transcriber(self):
         transcriber = FakeTranscriber("follow me")
