@@ -28,7 +28,7 @@ class LatestVisionPipeline:
 
         if self._estimate is None or self._estimate_timestamp_s is None:
             return None
-        age_s = max(0.0, timestamp_s - self._estimate_timestamp_s)
+        age_s = self._estimate.age_s + max(0.0, timestamp_s - self._estimate_timestamp_s)
         return replace(self._estimate, age_s=age_s)
 
     def _collect(self):
