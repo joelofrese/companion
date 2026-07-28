@@ -8,6 +8,7 @@ from mavsdk.offboard import OffboardError, VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
 from control.step import CompanionControlStep
+from control.watchdog import SetpointWatchdog
 from sim.offboard_control import DemoVision, demo_obstacle_distance_m, demo_state
 
 
@@ -56,15 +57,15 @@ async def run():
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
     control_step = CompanionControlStep(DemoVision())
+    watchdog = SetpointWatchdog()
     now = time.monotonic()
-    await drone.offboard.set_velocity_ned(_mavsdk_velocity(
-        control_step.process(
+    command = control_step.process(
             frame=None,
             timestamp_s=now,
             intent=demo_state(0.0),
             obstacle_distance_m=demo_obstacle_distance_m(0.0),
         )
-    ))
+    await drone.offboard.set_velocity_ned(_mavsdk_velocity(watchdog.emit(now, command)))
     await drone.offboard.start()
     print("Offboard started.")
 
@@ -89,25 +90,28 @@ async def run():
                 obstacle_active = True
             elif obstacle_distance_m >= 0.6:
                 obstacle_active = False
-            await drone.offboard.set_velocity_ned(_mavsdk_velocity(
-                control_step.process(
+            command = control_step.process(
                     frame=None,
                     timestamp_s=now,
                     intent=demo_state(elapsed),
                     obstacle_distance_m=obstacle_distance_m,
                 )
-            ))
+            safe_command = watchdog.emit(now, command)
+            if watchdog.tripped:
+                print("Setpoint watchdog tripped; sending zero velocity and landing.")
+                await drone.offboard.set_velocity_ned(_mavsdk_velocity(safe_command))
+                break
+            await drone.offboard.set_velocity_ned(_mavsdk_velocity(safe_command))
             await asyncio.sleep(SETPOINT_PERIOD_S)
     finally:
         now = time.monotonic()
-        await drone.offboard.set_velocity_ned(_mavsdk_velocity(
-            control_step.process(
+        command = control_step.process(
                 frame=None,
                 timestamp_s=now,
                 intent=demo_state(PROFILE_DURATION_S),
                 obstacle_distance_m=demo_obstacle_distance_m(PROFILE_DURATION_S),
             )
-        ))
+        await drone.offboard.set_velocity_ned(_mavsdk_velocity(watchdog.emit(now, command)))
         telemetry_task.cancel()
         await asyncio.gather(telemetry_task, return_exceptions=True)
         try:
