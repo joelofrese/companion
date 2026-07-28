@@ -130,8 +130,8 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 |---|---|
 | Flight control | PX4 + MAVSDK-Python (offboard velocity mode) |
 | Vision / detection | OpenCV + YOLOv8n (nano — fast enough on Mac, low latency) |
-| State machine | Python `transitions` library |
-| Position prediction | `filterpy` Kalman filter |
+| State machine | Dependency-free Python state machine |
+| Position prediction | Dependency-free constant-velocity Kalman tracker |
 | Voice interaction | Whisper (on Mac) → parsed intent → state command |
 | Simulation | Gazebo + PX4 SITL (for development before hardware arrives) |
 | Onboard OS | DEXI-OS (Raspberry Pi CM5) |
@@ -169,7 +169,6 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 ## Open Questions
 - **CM5 PX4 forwarding:** The full reactive layer stays on the Mac; the CM5 now owns the final heartbeat/TOF safety envelope and a versioned command packet codec. Hardware bring-up still needs the concrete DEXI-OS process that receives packets and forwards only the envelope's safe velocity to PX4.
 - **Obstacle avoidance scope:** TOF sensor gives a single forward distance. Is that enough, or do we need multi-directional sensing for the avoiding state? The public DEXI ROS 2 repository does not expose a TOF driver or distance topic, so the CM5 sensor wiring and topic remain hardware-gated.
-- **Voice trigger:** Always-on listening vs. push-to-talk? Affects Whisper latency and battery tradeoffs.
 
 ## Resolved Decisions
 - **DEXI-OS:** Use it. The CM5→PX4 serial/UART wiring, MAVLink routing, camera drivers, and optical flow sensor config are all pre-done. No reason to start from a blank Pi OS — it doesn't constrain the Mac-side architecture at all.
@@ -239,4 +238,5 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Inspected the public DroneBlocks DEXI ROS 2 repository and identified the CM5 transport as Micro-ROS serial on `/dev/ttyAMA2` at 3 Mbps into PX4 ROS 2 topics. Added `onboard/ros2_forwarder.py`, a dependency-free adapter that publishes velocity-only offboard heartbeat/setpoints and preserves the shared yaw-heading contract. Eighty-six tests pass; `rclpy` node composition and hardware serial validation remain gated on DEXI-OS bring-up.
 - **2026-07-28** — Audited the same DEXI repository for TOF ingress and found no public distance driver or ROS topic; kept the hardware sensor boundary unresolved rather than guessing GPIO/I²C details. Hardened `OnboardSafetyEnvelope` so malformed, infinite, or `NaN` obstacle readings fail to zero instead of being interpreted as clear. Eighty-seven tests pass.
 - **2026-07-28** — Added CM5-side command bounds independent of Mac behavior: horizontal NED components are limited to `±0.5 m/s`, vertical to `±0.3 m/s`, and any non-finite command field fails to zero. Boundary and rejection tests pass; the existing SITL profile remains within these limits.
+- **2026-07-28** — Reconciled the project guide's Tech Stack and Open Questions with the implemented dependency-free tracker/state machine and resolved push-to-talk decision, removing obsolete `filterpy`/`transitions` and always-on voice ambiguity.
 - **2026-07-28** — Required long-running development to reread `AGENTS.md` at milestone and Git-checkpoint boundaries and immediately after editing it, so updated project guidance takes effect without stopping for user confirmation.
