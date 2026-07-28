@@ -13,6 +13,35 @@ class H264StreamConfig:
     height: int = 480
     framerate: int = 30
 
+    def sender_command(self, destination_host: str) -> Sequence[str]:
+        """Return the CM5 libcamera-to-RTP command for this stream format."""
+
+        if not destination_host.strip():
+            raise ValueError("destination host must not be empty")
+        return (
+            "gst-launch-1.0",
+            "-q",
+            "libcamerasrc",
+            "!",
+            f"video/x-raw,width={self.width},height={self.height},framerate={self.framerate}/1",
+            "!",
+            "videoconvert",
+            "!",
+            "x264enc",
+            "tune=zerolatency",
+            "speed-preset=ultrafast",
+            "bitrate=1500",
+            f"key-int-max={self.framerate}",
+            "!",
+            "rtph264pay",
+            "config-interval=1",
+            "pt=96",
+            "!",
+            "udpsink",
+            f"host={destination_host}",
+            f"port={self.port}",
+        )
+
 
 class GStreamerH264Receiver:
     """Decode RTP/H.264 into BGR frames using a GStreamer subprocess."""
