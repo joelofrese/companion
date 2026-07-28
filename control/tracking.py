@@ -12,6 +12,8 @@ class Detection:
     y_px: float
     timestamp_s: float
     confidence: float = 1.0
+    width_px: float = 0.0
+    height_px: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,8 @@ class TrackEstimate:
     predicted_x_px: float
     predicted_y_px: float
     age_s: float = 0.0
+    target_width_px: float = 0.0
+    target_height_px: float = 0.0
 
 
 class _AxisFilter:
@@ -83,6 +87,8 @@ class PersonTracker:
         self._y = _AxisFilter(process_noise=1.0, measurement_noise=4.0)
         self._state_timestamp_s: Optional[float] = None
         self._last_measurement_timestamp_s: Optional[float] = None
+        self._target_width_px = 0.0
+        self._target_height_px = 0.0
 
     def update(self, detection: Detection) -> TrackEstimate:
         """Consume one detector measurement and return its filtered estimate."""
@@ -101,6 +107,8 @@ class PersonTracker:
 
         self._state_timestamp_s = detection.timestamp_s
         self._last_measurement_timestamp_s = detection.timestamp_s
+        self._target_width_px = detection.width_px
+        self._target_height_px = detection.height_px
         return self._estimate(age_s=0.0)
 
     def predict(self, timestamp_s: float) -> Optional[TrackEstimate]:
@@ -131,4 +139,6 @@ class PersonTracker:
             predicted_x_px=predicted_x,
             predicted_y_px=predicted_y,
             age_s=age_s,
+            target_width_px=self._target_width_px,
+            target_height_px=self._target_height_px,
         )

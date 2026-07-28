@@ -38,6 +38,7 @@ class YoloPersonDetectorTests(unittest.TestCase):
 
         self.assertEqual((detection.x_px, detection.y_px), (120.0, 70.0))
         self.assertEqual(detection.confidence, 0.9)
+        self.assertEqual((detection.width_px, detection.height_px), (40.0, 60.0))
         self.assertEqual(model.calls, [("frame", False)])
 
     def test_ignores_below_threshold_and_non_person_boxes(self):

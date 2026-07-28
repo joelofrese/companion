@@ -36,4 +36,5 @@ class CompanionRuntime:
         return self.controller.command(
             obstacle_distance_m=obstacle_distance_m,
             target_age_s=target_age_s,
+            target=self._target,
         )

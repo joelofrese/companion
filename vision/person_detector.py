@@ -64,4 +64,6 @@ class YoloPersonDetector:
             y_px=(y1 + y2) / 2.0,
             timestamp_s=timestamp_s,
             confidence=confidence,
+            width_px=x2 - x1,
+            height_px=y2 - y1,
         )

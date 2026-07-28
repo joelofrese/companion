@@ -1,6 +1,7 @@
 import unittest
 
 from control.state_machine import ReactiveController, State
+from control.tracking import TrackEstimate
 from control.velocity import VelocityCommand
 
 
@@ -9,8 +10,12 @@ class ReactiveControllerTests(unittest.TestCase):
         controller = ReactiveController()
         controller.set_intent(State.FOLLOWING)
         self.assertEqual(
-            controller.command(obstacle_distance_m=2.0, target_age_s=0.0),
-            VelocityCommand(north_m_s=0.5),
+            controller.command(
+                obstacle_distance_m=2.0,
+                target_age_s=0.0,
+                target=TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0),
+            ),
+            VelocityCommand(north_m_s=0.25),
         )
 
     def test_following_without_target_holds_position(self):

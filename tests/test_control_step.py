@@ -17,11 +17,11 @@ class FakeDetector:
 
 class CompanionControlStepTests(unittest.TestCase):
     def test_frame_and_follow_intent_produce_velocity(self):
-        vision = PersonVisionPipeline(FakeDetector([Detection(100.0, 100.0, 1.0)]))
+        vision = PersonVisionPipeline(FakeDetector([Detection(100.0, 100.0, 1.0, height_px=60.0)]))
         step = CompanionControlStep(vision)
         self.assertEqual(
             step.process("frame", 1.0, intent=State.FOLLOWING),
-            VelocityCommand(north_m_s=0.5),
+            VelocityCommand(north_m_s=0.25, east_m_s=-0.20625),
         )
 
     def test_missing_frame_target_holds(self):
@@ -30,7 +30,7 @@ class CompanionControlStepTests(unittest.TestCase):
         self.assertEqual(step.process("frame", 1.0, intent=State.FOLLOWING), VelocityCommand())
 
     def test_obstacle_wins_over_vision_target(self):
-        vision = PersonVisionPipeline(FakeDetector([Detection(100.0, 100.0, 1.0)]))
+        vision = PersonVisionPipeline(FakeDetector([Detection(100.0, 100.0, 1.0, height_px=60.0)]))
         step = CompanionControlStep(vision)
         self.assertEqual(
             step.process("frame", 1.0, intent=State.FOLLOWING, obstacle_distance_m=0.5),

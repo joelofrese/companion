@@ -6,7 +6,7 @@ from control.tracking import TrackEstimate
 from control.velocity import VelocityCommand
 
 
-TARGET = TrackEstimate(100.0, 100.0, 0.0, 0.0, 100.0, 100.0)
+TARGET = TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0)
 
 
 class CompanionRuntimeTests(unittest.TestCase):
@@ -14,7 +14,7 @@ class CompanionRuntimeTests(unittest.TestCase):
         runtime = CompanionRuntime()
         runtime.set_intent(State.FOLLOWING)
         runtime.update_target(TARGET, timestamp_s=10.0)
-        self.assertEqual(runtime.command(timestamp_s=10.4), VelocityCommand(north_m_s=0.5))
+        self.assertEqual(runtime.command(timestamp_s=10.4), VelocityCommand(north_m_s=0.25))
 
     def test_missing_target_holds(self):
         runtime = CompanionRuntime()

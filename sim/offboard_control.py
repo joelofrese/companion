@@ -26,7 +26,7 @@ def demo_state(elapsed_s: float) -> State:
 def demo_target() -> TrackEstimate:
     """Represent a fresh, stable target for the deterministic flight scenario."""
 
-    return TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0)
+    return TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0)
 
 
 def demo_obstacle_distance_m(elapsed_s: float) -> float:
