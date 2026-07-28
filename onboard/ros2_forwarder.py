@@ -34,16 +34,20 @@ class Ros2VelocityForwarder:
     async def send(self, command: VelocityCommand):
         """Publish one velocity heartbeat/setpoint pair."""
 
+        timestamp_us = self.timestamp_us()
         heartbeat = self.heartbeat_factory()
+        heartbeat.timestamp = timestamp_us
         heartbeat.position = False
         heartbeat.velocity = True
         heartbeat.acceleration = False
         heartbeat.attitude = False
         heartbeat.body_rate = False
+        heartbeat.thrust_and_torque = False
+        heartbeat.direct_actuator = False
         self.heartbeat_publisher.publish(heartbeat)
 
         setpoint = self.setpoint_factory()
-        setpoint.timestamp = self.timestamp_us()
+        setpoint.timestamp = timestamp_us
         setpoint.position = [math.nan, math.nan, math.nan]
         setpoint.velocity = [
             command.north_m_s,

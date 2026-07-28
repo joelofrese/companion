@@ -37,11 +37,14 @@ class Ros2VelocityForwarderTests(unittest.TestCase):
         asyncio.run(forwarder.send(VelocityCommand(0.3, -0.1, 0.05, 12.0)))
 
         heartbeat = heartbeat_publisher.messages[0]
+        self.assertEqual(heartbeat.timestamp, 123)
         self.assertFalse(heartbeat.position)
         self.assertTrue(heartbeat.velocity)
         self.assertFalse(heartbeat.acceleration)
         self.assertFalse(heartbeat.attitude)
         self.assertFalse(heartbeat.body_rate)
+        self.assertFalse(heartbeat.thrust_and_torque)
+        self.assertFalse(heartbeat.direct_actuator)
 
         setpoint = setpoint_publisher.messages[0]
         self.assertEqual(setpoint.timestamp, 123)
