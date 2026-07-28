@@ -78,9 +78,8 @@ async def run():
             tick_period_s=SETPOINT_PERIOD_S,
             obstacle_distance=lambda: obstacle_distance_m,
         )
+        service.start()
         service_task = asyncio.create_task(service.run(service_stop))
-        while receiver.port == 0:
-            await asyncio.sleep(0)
 
         def send_packet(
             elapsed_s: float,

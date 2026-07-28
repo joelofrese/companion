@@ -34,9 +34,8 @@ async def run():
     service = SafetyCommandService(receiver, forwarder, obstacle_distance=obstacle_distance)
     service_task = None
     try:
+        service.start()
         service_task = asyncio.create_task(service.run(stop_event))
-        while not receiver.port:
-            await asyncio.sleep(0)
         sender.sendto(
             CommandPacket(1, VelocityCommand(north_m_s=0.3)).encode(),
             ("127.0.0.1", receiver.port),

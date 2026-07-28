@@ -24,10 +24,15 @@ class SafetyCommandService:
         self.tick_period_s = tick_period_s
         self.obstacle_distance = obstacle_distance or (lambda: None)
 
+    def start(self):
+        """Bind the receiver before the Mac is allowed to send packets."""
+
+        self.receiver.start()
+
     async def run(self, stop_event: asyncio.Event):
         """Forward safe commands until requested to stop, then send zero once."""
 
-        self.receiver.start()
+        self.start()
         try:
             while not stop_event.is_set():
                 command = self.receiver.poll(obstacle_distance_m=self.obstacle_distance())

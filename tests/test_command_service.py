@@ -54,6 +54,12 @@ class SafetyCommandServiceTests(unittest.TestCase):
         self.assertEqual(receiver.obstacles, [0.8])
         self.assertEqual(forwarder.commands, [VelocityCommand(north_m_s=0.3), VelocityCommand()])
 
+    def test_start_binds_before_run(self):
+        receiver = FakeReceiver()
+        service = SafetyCommandService(receiver, object())
+        service.start()
+        self.assertTrue(receiver.started)
+
     def test_tick_period_must_be_positive(self):
         with self.assertRaises(ValueError):
             SafetyCommandService(FakeReceiver(), object(), tick_period_s=0.0)
