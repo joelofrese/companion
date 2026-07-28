@@ -9,11 +9,19 @@ from control.state_machine import ReactiveController
 from sim import offboard
 from sim.offboard_control import VideoDemoVision
 from sim.video_loopback import synthetic_sender_command
-from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
+from vision.video_stream import (
+    AsyncLatestFrameReader,
+    GStreamerH264Receiver,
+    H264StreamConfig,
+    close_subprocess,
+)
 
 
-async def run():
-    config = H264StreamConfig(port=5011, width=64, height=48, framerate=30)
+async def run(
+    config=H264StreamConfig(port=5011, width=64, height=48, framerate=30),
+    vision=None,
+    sender_command=None,
+):
     receiver = GStreamerH264Receiver(config)
     frame_reader = AsyncLatestFrameReader(receiver)
     sender = None
@@ -31,21 +39,23 @@ async def run():
     try:
         receiver.start()
         sender = subprocess.Popen(
-            synthetic_sender_command(config),
+            sender_command or synthetic_sender_command(config),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         print("RTP video loopback started.")
         await offboard.run(
-            vision=VideoDemoVision(),
+            vision=vision or VideoDemoVision(),
             runtime=runtime,
             frame_reader=frame_reader.read,
         )
     finally:
         receiver.close()
         if sender is not None:
-            sender.terminate()
-            sender.wait(timeout=5)
+            close_subprocess(sender)
+        close = getattr(vision, "close", None)
+        if close is not None:
+            close()
 
 
 if __name__ == "__main__":
