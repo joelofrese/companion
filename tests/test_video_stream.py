@@ -1,7 +1,8 @@
+import asyncio
 import unittest
 
 from sim.video_loopback import synthetic_sender_command
-from vision.video_stream import GStreamerH264Receiver, H264StreamConfig
+from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
 class FakeStdout:
@@ -26,6 +27,16 @@ class FakeProcess:
 
     def wait(self):
         self.waited = True
+
+
+class FakeReceiver:
+    def __init__(self, result):
+        self.result = result
+        self.read_count = 0
+
+    def read(self):
+        self.read_count += 1
+        return self.result
 
 
 class GStreamerH264ReceiverTests(unittest.TestCase):
@@ -85,6 +96,37 @@ class GStreamerH264ReceiverTests(unittest.TestCase):
     def test_invalid_config_is_rejected(self):
         with self.assertRaises(ValueError):
             GStreamerH264Receiver(H264StreamConfig(port=0))
+
+    def test_async_reader_does_not_block_while_frame_is_pending(self):
+        async def verify():
+            receiver = FakeReceiver((1.0, "frame"))
+            reader = AsyncLatestFrameReader(receiver)
+            first = await reader.read()
+            self.assertIsNone(first[1])
+            second = first
+            for _ in range(20):
+                await asyncio.sleep(0.001)
+                second = await reader.read()
+                if second[1] is not None:
+                    break
+            self.assertEqual(second[1], "frame")
+            self.assertGreater(second[0], first[0])
+
+        asyncio.run(verify())
+
+    def test_async_reader_keeps_capture_timestamps_monotonic(self):
+        async def verify():
+            receiver = FakeReceiver((1.0, "frame"))
+            reader = AsyncLatestFrameReader(receiver)
+            samples = [await reader.read()]
+            for _ in range(20):
+                await asyncio.sleep(0.001)
+                samples.append(await reader.read())
+                if samples[-1][1] is not None:
+                    break
+            self.assertGreater(samples[-1][0], samples[-2][0])
+
+        asyncio.run(verify())
 
 
 if __name__ == "__main__":

@@ -1,9 +1,10 @@
 """Mac-side receiver for the drone's H.264 RTP video stream."""
 
+import asyncio
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -130,3 +131,37 @@ class GStreamerH264Receiver:
         self._process.terminate()
         self._process.wait()
         self._process = None
+
+
+class AsyncLatestFrameReader:
+    """Poll a blocking receiver without delaying the reactive command loop."""
+
+    def __init__(self, receiver: GStreamerH264Receiver):
+        self.receiver = receiver
+        self._pending: Optional[asyncio.Task] = None
+        self._ended = False
+        self._last_timestamp_s: Optional[float] = None
+
+    def _sample(self, timestamp_s: float, frame: Any):
+        timestamp_s = max(timestamp_s, time.monotonic())
+        if self._last_timestamp_s is not None:
+            timestamp_s = max(timestamp_s, self._last_timestamp_s + 1e-6)
+        self._last_timestamp_s = timestamp_s
+        return timestamp_s, frame
+
+    async def read(self):
+        """Return a new frame, or a timestamped empty sample when none is ready."""
+
+        if self._ended:
+            return self._sample(time.monotonic(), None)
+        if self._pending is None:
+            self._pending = asyncio.create_task(asyncio.to_thread(self.receiver.read))
+        if not self._pending.done():
+            return self._sample(time.monotonic(), None)
+
+        result = await self._pending
+        self._pending = None
+        if result is None:
+            self._ended = True
+            return self._sample(time.monotonic(), None)
+        return self._sample(*result)

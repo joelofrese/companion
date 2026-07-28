@@ -74,11 +74,9 @@ async def run(
     await _wait_until_in_air(drone)
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
-    control_loop = CompanionControlLoop(
-        CompanionControlStep(vision or DemoVision(), runtime=runtime)
-    )
+    control_step = CompanionControlStep(vision or DemoVision(), runtime=runtime)
     now, frame = await _read_frame(frame_reader)
-    command = control_loop.tick(
+    command = control_step.process(
         frame=frame,
         timestamp_s=now,
         intent=demo_state(0.0),
@@ -87,6 +85,7 @@ async def run(
     await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
     await drone.offboard.start()
     print("Offboard started.")
+    control_loop = CompanionControlLoop(control_step)
 
     max_north_velocity = 0.0
     min_north_velocity = 0.0

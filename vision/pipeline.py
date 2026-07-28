@@ -20,6 +20,8 @@ class PersonVisionPipeline:
     def process(self, frame: Any, timestamp_s: float) -> Optional[TrackEstimate]:
         """Detect and track one frame; no detection yields no target estimate."""
 
+        if frame is None:
+            return self.tracker.predict(timestamp_s)
         detection = self.detector.detect(frame, timestamp_s)
         if detection is not None:
             return self.tracker.update(detection)

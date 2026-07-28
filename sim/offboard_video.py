@@ -9,26 +9,24 @@ from control.state_machine import ReactiveController
 from sim import offboard
 from sim.offboard_control import VideoDemoVision
 from sim.video_loopback import synthetic_sender_command
-from vision.video_stream import GStreamerH264Receiver, H264StreamConfig
+from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
 async def run():
     config = H264StreamConfig(port=5011, width=64, height=48, framerate=30)
     receiver = GStreamerH264Receiver(config)
+    frame_reader = AsyncLatestFrameReader(receiver)
     sender = None
     runtime = CompanionRuntime(
         ReactiveController(
             VisualFollower(
                 FollowConfig(
                     frame_width_px=config.width,
-                    desired_target_height_px=config.height / 8.0,
+                    desired_target_height_px=config.height / 4.0,
                 )
             )
         )
     )
-
-    async def read_frame():
-        return await asyncio.to_thread(receiver.read)
 
     try:
         receiver.start()
@@ -41,7 +39,7 @@ async def run():
         await offboard.run(
             vision=VideoDemoVision(),
             runtime=runtime,
-            frame_reader=read_frame,
+            frame_reader=frame_reader.read,
         )
     finally:
         receiver.close()

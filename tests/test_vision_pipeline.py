@@ -46,6 +46,13 @@ class PersonVisionPipelineTests(unittest.TestCase):
         self.assertIsNotNone(estimate)
         self.assertAlmostEqual(estimate.age_s, 0.2)
 
+    def test_missing_frame_returns_prediction_without_calling_detector(self):
+        detector = FakeDetector([Detection(10.0, 20.0, 0.0)])
+        pipeline = PersonVisionPipeline(detector)
+        pipeline.process("first", 0.0)
+        self.assertIsNotNone(pipeline.process(None, 0.1))
+        self.assertEqual(detector.calls, [("first", 0.0)])
+
     def test_missing_detection_expires_a_stale_target(self):
         detector = FakeDetector([
             Detection(10.0, 20.0, 0.0),
