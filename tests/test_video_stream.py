@@ -121,6 +121,10 @@ class GStreamerH264ReceiverTests(unittest.TestCase):
             H264StreamConfig(port=0)
         with self.assertRaises(ValueError):
             H264StreamConfig(width=0)
+        with self.assertRaises(ValueError):
+            H264StreamConfig(port=True)
+        with self.assertRaises(ValueError):
+            H264StreamConfig(framerate=False)
 
     def test_async_reader_does_not_block_while_frame_is_pending(self):
         async def verify():

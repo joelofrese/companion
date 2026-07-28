@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence
 
 
+def _positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def close_subprocess(process):
     """Terminate a media child, killing it if graceful shutdown stalls."""
 
@@ -26,7 +30,7 @@ class H264StreamConfig:
     framerate: int = 30
 
     def __post_init__(self):
-        if self.port <= 0 or self.width <= 0 or self.height <= 0 or self.framerate <= 0:
+        if not all(_positive_int(value) for value in (self.port, self.width, self.height, self.framerate)):
             raise ValueError("stream dimensions, port, and framerate must be positive")
 
     def sender_command(self, destination_host: str) -> Sequence[str]:

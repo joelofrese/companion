@@ -18,7 +18,12 @@ class UdpCommandSender:
     ):
         if not destination_host.strip():
             raise ValueError("destination host must not be empty")
-        if destination_port < 1 or destination_port > 65535:
+        if (
+            isinstance(destination_port, bool)
+            or not isinstance(destination_port, int)
+            or destination_port < 1
+            or destination_port > 65535
+        ):
             raise ValueError("destination port must be between 1 and 65535")
         self.destination = (destination_host, destination_port)
         self._socket_factory = socket_factory or socket.socket

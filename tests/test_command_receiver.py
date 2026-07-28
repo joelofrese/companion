@@ -54,6 +54,10 @@ class UdpSafetyReceiverTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             UdpSafetyReceiver().poll()
 
+    def test_boolean_port_is_rejected(self):
+        with self.assertRaises(ValueError):
+            UdpSafetyReceiver(port=True)
+
 
 if __name__ == "__main__":
     unittest.main()

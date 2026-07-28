@@ -19,7 +19,12 @@ class UdpSafetyReceiver:
         safety: Optional[OnboardSafetyEnvelope] = None,
         socket_factory: Optional[Callable[..., object]] = None,
     ):
-        if port < 0 or port > 65535:
+        if (
+            isinstance(port, bool)
+            or not isinstance(port, int)
+            or port < 0
+            or port > 65535
+        ):
             raise ValueError("UDP port must be between 0 and 65535")
         self.bind_host = bind_host
         self.port = port

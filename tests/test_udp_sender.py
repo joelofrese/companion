@@ -42,6 +42,8 @@ class UdpCommandSenderTests(unittest.TestCase):
             UdpCommandSender("drone.local", 0)
         with self.assertRaises(ValueError):
             UdpCommandSender("drone.local", 65536)
+        with self.assertRaises(ValueError):
+            UdpCommandSender("drone.local", True)
 
     def test_send_starts_socket_lazily(self):
         socket_instance = FakeSocket()
