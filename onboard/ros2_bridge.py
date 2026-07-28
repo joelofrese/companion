@@ -184,9 +184,9 @@ def main(argv=None):
         distance_topic=args.distance_topic,
         tick_period_s=args.tick_period,
     )
-    bridge.start()
     bridge_error = None
     try:
+        bridge.start()
         rclpy.spin(node)
     finally:
         bridge.close()
