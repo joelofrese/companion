@@ -150,7 +150,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - [x] YOLOv8n person detection pipeline working
 - [x] Kalman filter for person tracking implemented
 - [ ] WiFi video stream from CM5 to Mac working
-- [ ] Voice command pipeline (Whisper → intent → state)
+- [x] Voice command pipeline (Whisper → intent → state)
 - [ ] Full integration test in simulation
 - [ ] Hardware arrives (DroneBlox DEXI 3)
 - [ ] First real flight test
@@ -191,3 +191,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added `vision/pipeline.py` to compose detection and tracking into one frame-processing boundary. Missing detections return no target explicitly, while tracker timestamp errors propagate for diagnosis. Seventeen tests pass, and the real YOLOv8n-to-Kalman pipeline produced a tracked center and 300 ms prediction on the bundled person image.
 - **2026-07-28** — Bounded intermittent-vision behavior: `PersonTracker.predict()` bridges detector gaps for at most 0.5 seconds, then expires the target; `PersonVisionPipeline` uses this fallback instead of silently dropping every missed frame. Twenty-one tests pass, including gap recovery and stale-target expiry, and the real YOLOv8n first-frame smoke check still passes.
 - **2026-07-28** — Added `vision/video_stream.py`, a Mac-side GStreamer RTP/H.264 receiver that emits timestamped BGR frames through a bounded raw pipe. Twenty-five tests pass, and an elevated local GStreamer `videotestsrc` produced and consumed a complete 36-byte 4×3 BGR frame through the same pipe contract. The Wi-Fi milestone remains unchecked until a CM5 sender and real network stream are available.
+- **2026-07-28** — Added the voice pipeline: `voice/transcriber.py` wraps faster-whisper, `voice/intent.py` conservatively maps transcripts to cognitive `State` values, and `voice/pipeline.py` connects them without bypassing reactive control. Thirty tests pass; faster-whisper 1.2.1 loaded the tiny.en model and successfully transcribed generated silence. Live microphone capture and the always-on versus push-to-talk choice remain open.
