@@ -28,6 +28,17 @@ from vision.pipeline import PersonVisionPipeline
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig, close_subprocess
 
 
+async def _stop_task(task, stop_event):
+    """Request service shutdown and suppress only cleanup-time task errors."""
+
+    stop_event.set()
+    if task is not None and not task.done():
+        try:
+            await task
+        except Exception:
+            pass
+
+
 def _mavsdk_velocity(command):
     return VelocityNedYaw(
         command.north_m_s,
@@ -169,18 +180,8 @@ async def run(image_path: str):
                 print("Landed.")
                 break
     finally:
-        mac_stop.set()
-        if mac_task is not None and not mac_task.done():
-            try:
-                await mac_task
-            except Exception:
-                pass
-        cm5_stop.set()
-        if cm5_task is not None and not cm5_task.done():
-            try:
-                await cm5_task
-            except Exception:
-                pass
+        await _stop_task(mac_task, mac_stop)
+        await _stop_task(cm5_task, cm5_stop)
         if telemetry_task is not None:
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
