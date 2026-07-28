@@ -145,8 +145,8 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 ## Project Status
 - [x] PX4 SITL + Gazebo simulation environment set up
 - [x] MAVSDK-Python connection plus arm/takeoff/hover/land actions working in simulation
-- [ ] PX4 offboard mode with continuous MAVSDK velocity setpoints working in simulation
-- [ ] State machine skeleton implemented
+- [x] PX4 offboard mode with continuous MAVSDK velocity setpoints working in simulation
+- [x] State machine skeleton implemented
 - [ ] YOLOv8n person detection pipeline working
 - [ ] Kalman filter for person tracking implemented
 - [ ] WiFi video stream from CM5 to Mac working
@@ -183,3 +183,5 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-26** — Re-ran the complete PX4 SITL/Gazebo hover test successfully: MAVSDK connected, the simulated x500 armed, took off to 2 m, hovered for 15 seconds, landed, and disarmed. The documented SDF and missing-GCS warnings remained harmless, and the simulator shut down cleanly afterward.
 - **2026-07-28** — Completed the project-guide migration from `CLAUDE.md` to `AGENTS.md` and established autonomous development: make aligned product and technical decisions without interruption, refactor toward the simplest final system, originate useful new capabilities, use verified Git checkpoints, favor safe and reversible choices, and continue with other valuable work when an individual task is blocked.
 - **2026-07-28** — Made simplicity, readability, and maintainability higher priorities than feature throughput, and made autonomous, maintainable automated testing plus SITL/Gazebo verification part of the definition of done.
+- **2026-07-28** — Added `sim/offboard.py` and the deterministic `sim/offboard_control.py` velocity profile. The script primes PX4 with a zero setpoint, streams at 20 Hz, moves north at 0.5 m/s for four seconds, returns to zero velocity, stops offboard, and lands. Standard-library unit tests cover the profile boundaries and safety default. PX4 SITL verified the full connection/arm/offboard/land sequence and reported a measured peak north velocity of 0.52 m/s. A feature branch checkpoint could not be created because this environment exposes `.git` as read-only.
+- **2026-07-28** — Added a dependency-free reactive state-machine core. Cognitive intent selects the state, while a forward obstacle nearer than 0.6 m overrides it to `AVOIDING` and commands a slow north-frame backoff. This establishes the safety authority rule: reactive safety may override cognitive intent, but the cognitive layer still cannot bypass reactive velocity generation.
