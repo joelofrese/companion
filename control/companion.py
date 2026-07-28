@@ -1,0 +1,85 @@
+"""Mac entry point for the production Companion control stack."""
+
+import argparse
+import asyncio
+
+from control.following import FollowConfig, VisualFollower
+from control.loop import CompanionControlLoop
+from control.runtime import CompanionRuntime
+from control.state_machine import ReactiveController, State
+from control.step import CompanionControlStep
+from control.udp_control import UdpControlService
+from control.udp_sender import UdpCommandSender
+from vision.latest import LatestVisionPipeline
+from vision.person_detector import YoloPersonDetector
+from vision.pipeline import PersonVisionPipeline
+from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="Run the Mac-side Companion control stack")
+    parser.add_argument("cm5_host", help="CM5 IP address or hostname")
+    parser.add_argument("--state", choices=("idle", "following"), default="idle")
+    parser.add_argument("--model", default="yolov8n.pt")
+    parser.add_argument("--command-port", type=int, default=5001)
+    parser.add_argument("--video-port", type=int, default=5000)
+    parser.add_argument("--width", type=int, default=640)
+    parser.add_argument("--height", type=int, default=480)
+    parser.add_argument("--framerate", type=int, default=30)
+    parser.add_argument("--target-height", type=float, default=120.0)
+    return parser
+
+
+async def run(args):
+    video_config = H264StreamConfig(
+        port=args.video_port,
+        width=args.width,
+        height=args.height,
+        framerate=args.framerate,
+    )
+    receiver = GStreamerH264Receiver(video_config)
+    frame_reader = AsyncLatestFrameReader(receiver)
+    vision = LatestVisionPipeline(
+        PersonVisionPipeline(YoloPersonDetector(model_path=args.model))
+    )
+    runtime = CompanionRuntime(
+        ReactiveController(
+            VisualFollower(
+                FollowConfig(
+                    frame_width_px=video_config.width,
+                    desired_target_height_px=args.target_height,
+                )
+            )
+        )
+    )
+    sender = UdpCommandSender(args.cm5_host, args.command_port)
+    state = State.FOLLOWING if args.state == "following" else State.IDLE
+    service = UdpControlService(
+        CompanionControlLoop(CompanionControlStep(vision, runtime=runtime)),
+        sender,
+        frame_reader.read,
+        intent_provider=lambda timestamp_s: state,
+    )
+    stop_event = asyncio.Event()
+    try:
+        receiver.start()
+        print(
+            f"Companion ready: video :{video_config.port}, "
+            f"commands {args.cm5_host}:{args.command_port}, state={args.state}."
+        )
+        await service.run(stop_event)
+    finally:
+        receiver.close()
+        vision.close()
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    try:
+        asyncio.run(run(args))
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()
