@@ -53,8 +53,10 @@ class FakeSetpoint:
 
 
 class FakeDistance:
-    def __init__(self, current_distance):
+    def __init__(self, current_distance, min_distance=None, max_distance=None):
         self.current_distance = current_distance
+        self.min_distance = min_distance
+        self.max_distance = max_distance
 
 
 class Ros2DistanceSensorTests(unittest.TestCase):
@@ -70,6 +72,15 @@ class Ros2DistanceSensorTests(unittest.TestCase):
     def test_non_positive_timeout_is_rejected(self):
         with self.assertRaises(ValueError):
             LatestDistanceSensor(timeout_s=0.0)
+
+    def test_out_of_range_or_malformed_readings_become_unsafe(self):
+        sensor = LatestDistanceSensor(clock=lambda: 10.0)
+        sensor.update(FakeDistance(0.1, min_distance=0.2, max_distance=4.0))
+        self.assertTrue(math.isnan(sensor.read()))
+        sensor.update(FakeDistance(5.0, min_distance=0.2, max_distance=4.0))
+        self.assertTrue(math.isnan(sensor.read()))
+        sensor.update(FakeDistance(True, min_distance=0.2, max_distance=4.0))
+        self.assertTrue(math.isnan(sensor.read()))
 
 
 class Ros2SafetyBridgeTests(unittest.TestCase):

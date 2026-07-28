@@ -5,6 +5,7 @@ import asyncio
 import math
 import threading
 import time
+from numbers import Real
 
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
@@ -28,6 +29,26 @@ class LatestDistanceSensor:
 
     def update(self, message):
         distance_m = getattr(message, "current_distance", math.nan)
+        minimum_m = getattr(message, "min_distance", None)
+        maximum_m = getattr(message, "max_distance", None)
+        if (
+            isinstance(distance_m, bool)
+            or not isinstance(distance_m, Real)
+            or not math.isfinite(distance_m)
+            or (
+                minimum_m is not None
+                and (isinstance(minimum_m, bool) or not isinstance(minimum_m, Real)
+                     or not math.isfinite(minimum_m))
+            )
+            or (
+                maximum_m is not None
+                and (isinstance(maximum_m, bool) or not isinstance(maximum_m, Real)
+                     or not math.isfinite(maximum_m))
+            )
+            or (minimum_m is not None and distance_m < minimum_m)
+            or (maximum_m is not None and distance_m > maximum_m)
+        ):
+            distance_m = math.nan
         with self._lock:
             self._distance_m = distance_m
             self._updated_at_s = self._clock()
