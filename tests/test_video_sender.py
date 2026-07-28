@@ -9,6 +9,7 @@ class FakeProcess:
         self.terminated = False
         self.waited = False
         self.killed = False
+        self.exit_code = None
 
     def terminate(self):
         self.terminated = True
@@ -18,6 +19,9 @@ class FakeProcess:
 
     def kill(self):
         self.killed = True
+
+    def poll(self):
+        return self.exit_code
 
 
 class GStreamerH264SenderTests(unittest.TestCase):
@@ -43,6 +47,17 @@ class GStreamerH264SenderTests(unittest.TestCase):
         sender.close()
         self.assertTrue(process.terminated)
         self.assertTrue(process.waited)
+
+    def test_running_reports_pipeline_exit(self):
+        process = FakeProcess()
+        sender = GStreamerH264Sender(
+            "127.0.0.1",
+            process_factory=lambda *args, **kwargs: process,
+        )
+        sender.start()
+        self.assertTrue(sender.running)
+        process.exit_code = 1
+        self.assertFalse(sender.running)
 
     def test_empty_destination_is_rejected(self):
         with self.assertRaises(ValueError):

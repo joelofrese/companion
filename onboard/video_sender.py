@@ -40,6 +40,12 @@ class GStreamerH264Sender:
                 stderr=subprocess.DEVNULL,
             )
 
+    @property
+    def running(self):
+        """Whether the camera pipeline process is still alive."""
+
+        return self._process is not None and self._process.poll() is None
+
     def close(self):
         """Stop the sender and release its child process."""
 
@@ -69,6 +75,8 @@ def main(argv=None):
         sender.start()
         print(f"Streaming camera to {args.destination_host}:{args.port}.")
         while True:
+            if not sender.running:
+                raise RuntimeError("camera streaming pipeline exited")
             time.sleep(1.0)
     except KeyboardInterrupt:
         pass
