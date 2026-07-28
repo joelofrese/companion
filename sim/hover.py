@@ -7,13 +7,11 @@ import asyncio
 from mavsdk import System
 from mavsdk.telemetry import LandedState
 
-
 TAKEOFF_ALTITUDE = 2.0  # meters
 HOVER_DURATION = 15     # seconds
 
 
 async def run():
-
     print("Waiting for drone connection...")
     drone = System()
     await drone.connect()
