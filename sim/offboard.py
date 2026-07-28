@@ -11,6 +11,7 @@ from mavsdk.telemetry import LandedState
 from control.loop import CompanionControlLoop
 from control.runtime import CompanionRuntime
 from control.step import CompanionControlStep
+from control.velocity import VelocityCommand
 from sim.offboard_control import DemoVision, demo_obstacle_distance_m, demo_state
 
 
@@ -46,6 +47,21 @@ async def _read_frame(frame_reader: Optional[FrameReader]):
     return result
 
 
+async def _shutdown_command(control_loop: CompanionControlLoop, frame_reader: Optional[FrameReader]):
+    """Use one last frame when available; any teardown input failure becomes zero."""
+
+    try:
+        now, frame = await _read_frame(frame_reader)
+        return control_loop.tick(
+            frame=frame,
+            timestamp_s=now,
+            intent=demo_state(PROFILE_DURATION_S),
+            obstacle_distance_m=demo_obstacle_distance_m(PROFILE_DURATION_S),
+        )
+    except Exception:
+        return VelocityCommand()
+
+
 async def run(
     vision=None,
     runtime: Optional[CompanionRuntime] = None,
@@ -75,21 +91,13 @@ async def run(
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
     control_step = CompanionControlStep(vision or DemoVision(), runtime=runtime)
-    now, frame = await _read_frame(frame_reader)
-    command = control_step.process(
-        frame=frame,
-        timestamp_s=now,
-        intent=demo_state(0.0),
-        obstacle_distance_m=demo_obstacle_distance_m(0.0),
-    )
-    await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
-    await drone.offboard.start()
-    print("Offboard started.")
     control_loop = CompanionControlLoop(control_step)
-
+    offboard_started = False
+    flight_error = None
     max_north_velocity = 0.0
     min_north_velocity = 0.0
     obstacle_active = False
+    telemetry_task = None
 
     async def observe_velocity():
         nonlocal max_north_velocity, min_north_velocity
@@ -97,9 +105,21 @@ async def run(
             max_north_velocity = max(max_north_velocity, velocity.north_m_s)
             min_north_velocity = min(min_north_velocity, velocity.north_m_s)
 
-    telemetry_task = asyncio.create_task(observe_velocity())
-    started_at = time.monotonic()
     try:
+        now, frame = await _read_frame(frame_reader)
+        command = control_step.process(
+            frame=frame,
+            timestamp_s=now,
+            intent=demo_state(0.0),
+            obstacle_distance_m=demo_obstacle_distance_m(0.0),
+        )
+        await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
+        await drone.offboard.start()
+        offboard_started = True
+        print("Offboard started.")
+
+        telemetry_task = asyncio.create_task(observe_velocity())
+        started_at = time.monotonic()
         while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
             now, frame = await _read_frame(frame_reader)
             obstacle_distance_m = demo_obstacle_distance_m(elapsed)
@@ -120,24 +140,29 @@ async def run(
                 break
             await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
             await asyncio.sleep(SETPOINT_PERIOD_S)
+    except Exception as error:
+        flight_error = error
     finally:
-        now, frame = await _read_frame(frame_reader)
-        command = control_loop.tick(
-            frame=frame,
-            timestamp_s=now,
-            intent=demo_state(PROFILE_DURATION_S),
-            obstacle_distance_m=demo_obstacle_distance_m(PROFILE_DURATION_S),
-        )
-        await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
-        telemetry_task.cancel()
-        await asyncio.gather(telemetry_task, return_exceptions=True)
-        try:
-            await drone.offboard.stop()
-        except OffboardError:
-            pass
+        if offboard_started:
+            command = await _shutdown_command(control_loop, frame_reader)
+            try:
+                await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
+            finally:
+                if telemetry_task is not None:
+                    telemetry_task.cancel()
+                    await asyncio.gather(telemetry_task, return_exceptions=True)
+                try:
+                    await drone.offboard.stop()
+                except OffboardError:
+                    pass
 
+    if flight_error is not None:
+        print("Offboard loop failed; landing safely.")
+    telemetry_error = None
     if min_north_velocity >= -0.05:
-        raise RuntimeError(f"SITL did not observe obstacle backoff velocity: {min_north_velocity:.2f}m/s")
+        telemetry_error = RuntimeError(
+            f"SITL did not observe obstacle backoff velocity: {min_north_velocity:.2f}m/s"
+        )
     print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
     print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
     print("Landing...")
@@ -146,6 +171,10 @@ async def run(
         if state == LandedState.ON_GROUND:
             print("Landed.")
             break
+    if flight_error is not None:
+        raise flight_error
+    if telemetry_error is not None:
+        raise telemetry_error
 
 
 if __name__ == "__main__":
