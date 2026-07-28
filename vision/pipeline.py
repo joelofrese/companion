@@ -21,6 +21,6 @@ class PersonVisionPipeline:
         """Detect and track one frame; no detection yields no target estimate."""
 
         detection = self.detector.detect(frame, timestamp_s)
-        if detection is None:
-            return None
-        return self.tracker.update(detection)
+        if detection is not None:
+            return self.tracker.update(detection)
+        return self.tracker.predict(timestamp_s)

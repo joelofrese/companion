@@ -24,6 +24,7 @@ class TrackEstimate:
     vy_px_s: float
     predicted_x_px: float
     predicted_y_px: float
+    age_s: float = 0.0
 
 
 class _AxisFilter:
@@ -71,22 +72,26 @@ class _AxisFilter:
 class PersonTracker:
     """Track a detected person's center and predict a short time into the future."""
 
-    def __init__(self, prediction_horizon_s: float = 0.3):
+    def __init__(self, prediction_horizon_s: float = 0.3, max_prediction_age_s: float = 0.5):
         if prediction_horizon_s < 0.0:
             raise ValueError("prediction horizon must not be negative")
+        if max_prediction_age_s < 0.0:
+            raise ValueError("maximum prediction age must not be negative")
         self.prediction_horizon_s = prediction_horizon_s
+        self.max_prediction_age_s = max_prediction_age_s
         self._x = _AxisFilter(process_noise=1.0, measurement_noise=4.0)
         self._y = _AxisFilter(process_noise=1.0, measurement_noise=4.0)
-        self._last_timestamp_s: Optional[float] = None
+        self._state_timestamp_s: Optional[float] = None
+        self._last_measurement_timestamp_s: Optional[float] = None
 
     def update(self, detection: Detection) -> TrackEstimate:
         """Consume one detector measurement and return its filtered estimate."""
 
-        if self._last_timestamp_s is None:
+        if self._state_timestamp_s is None:
             self._x.initialize(detection.x_px)
             self._y.initialize(detection.y_px)
         else:
-            dt = detection.timestamp_s - self._last_timestamp_s
+            dt = detection.timestamp_s - self._state_timestamp_s
             if dt <= 0.0:
                 raise ValueError("detections must have increasing timestamps")
             self._x.predict(dt)
@@ -94,7 +99,28 @@ class PersonTracker:
             self._x.update(detection.x_px)
             self._y.update(detection.y_px)
 
-        self._last_timestamp_s = detection.timestamp_s
+        self._state_timestamp_s = detection.timestamp_s
+        self._last_measurement_timestamp_s = detection.timestamp_s
+        return self._estimate(age_s=0.0)
+
+    def predict(self, timestamp_s: float) -> Optional[TrackEstimate]:
+        """Advance without a measurement, expiring the track after a bounded gap."""
+
+        if self._state_timestamp_s is None:
+            return None
+        age_s = timestamp_s - self._last_measurement_timestamp_s
+        if age_s < 0.0:
+            raise ValueError("prediction timestamp must not precede the last measurement")
+        if age_s > self.max_prediction_age_s:
+            return None
+        dt = timestamp_s - self._state_timestamp_s
+        if dt > 0.0:
+            self._x.predict(dt)
+            self._y.predict(dt)
+            self._state_timestamp_s = timestamp_s
+        return self._estimate(age_s=age_s)
+
+    def _estimate(self, age_s: float) -> TrackEstimate:
         predicted_x = self._x.position + self._x.velocity * self.prediction_horizon_s
         predicted_y = self._y.position + self._y.velocity * self.prediction_horizon_s
         return TrackEstimate(
@@ -104,4 +130,5 @@ class PersonTracker:
             vy_px_s=self._y.velocity,
             predicted_x_px=predicted_x,
             predicted_y_px=predicted_y,
+            age_s=age_s,
         )

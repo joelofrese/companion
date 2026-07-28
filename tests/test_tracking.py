@@ -33,6 +33,20 @@ class PersonTrackerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             PersonTracker(prediction_horizon_s=-0.1)
 
+    def test_prediction_bridges_a_short_detection_gap(self):
+        tracker = PersonTracker(max_prediction_age_s=0.5)
+        tracker.update(Detection(0.0, 20.0, 0.0))
+        tracker.update(Detection(100.0, 20.0, 1.0))
+        estimate = tracker.predict(1.2)
+        self.assertIsNotNone(estimate)
+        self.assertAlmostEqual(estimate.age_s, 0.2)
+        self.assertGreater(estimate.predicted_x_px, estimate.x_px)
+
+    def test_prediction_expires_a_stale_track(self):
+        tracker = PersonTracker(max_prediction_age_s=0.5)
+        tracker.update(Detection(10.0, 20.0, 0.0))
+        self.assertIsNone(tracker.predict(0.6))
+
 
 if __name__ == "__main__":
     unittest.main()

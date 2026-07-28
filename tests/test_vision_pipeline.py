@@ -33,6 +33,28 @@ class PersonVisionPipelineTests(unittest.TestCase):
         pipeline = PersonVisionPipeline(detector)
         self.assertIsNone(pipeline.process("empty", 4.0))
 
+    def test_missing_detection_bridges_a_short_gap(self):
+        detector = FakeDetector([
+            Detection(10.0, 20.0, 0.0),
+            Detection(30.0, 20.0, 1.0),
+            None,
+        ])
+        pipeline = PersonVisionPipeline(detector)
+        pipeline.process("first", 0.0)
+        pipeline.process("second", 1.0)
+        estimate = pipeline.process("gap", 1.2)
+        self.assertIsNotNone(estimate)
+        self.assertAlmostEqual(estimate.age_s, 0.2)
+
+    def test_missing_detection_expires_a_stale_target(self):
+        detector = FakeDetector([
+            Detection(10.0, 20.0, 0.0),
+            None,
+        ])
+        pipeline = PersonVisionPipeline(detector)
+        pipeline.process("first", 0.0)
+        self.assertIsNone(pipeline.process("stale", 0.6))
+
     def test_tracker_errors_are_not_hidden(self):
         detector = FakeDetector([
             Detection(10.0, 20.0, 2.0),
