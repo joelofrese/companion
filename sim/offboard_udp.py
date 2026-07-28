@@ -11,9 +11,10 @@ from mavsdk.telemetry import LandedState
 from control.command_packet import CommandPacket
 from control.loop import CompanionControlLoop
 from control.step import CompanionControlStep
-from onboard.command_receiver import UdpSafetyReceiver
-from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from control.velocity import VelocityCommand
+from onboard.command_receiver import UdpSafetyReceiver
+from onboard.command_service import SafetyCommandService
+from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.offboard import (
     PROFILE_DURATION_S,
     SETPOINT_PERIOD_S,
@@ -31,9 +32,12 @@ async def run():
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     drone = System()
-    receiver.start()
     forwarder = None
+    service_task = None
+    service_stop = asyncio.Event()
     telemetry_task = None
+    obstacle_distance_m = None
+    last_safe_command = VelocityCommand()
     try:
         print("Waiting for drone connection...")
         await drone.connect()
@@ -60,6 +64,22 @@ async def run():
         control_loop = CompanionControlLoop(CompanionControlStep(DemoVision()))
         sequence = 0
 
+        class ObservingForwarder:
+            async def send(self, command):
+                nonlocal last_safe_command
+                last_safe_command = command
+                await forwarder.send(command)
+
+        service = SafetyCommandService(
+            receiver,
+            ObservingForwarder(),
+            tick_period_s=SETPOINT_PERIOD_S,
+            obstacle_distance=lambda: obstacle_distance_m,
+        )
+        service_task = asyncio.create_task(service.run(service_stop))
+        while receiver.port == 0:
+            await asyncio.sleep(0)
+
         def send_packet(elapsed_s: float, timestamp_s: float, transmit: bool = True):
             nonlocal sequence
             command = control_loop.tick(
@@ -76,8 +96,7 @@ async def run():
             sequence += 1
 
         send_packet(0.0, time.monotonic())
-        safe_command = receiver.poll(obstacle_distance_m=demo_obstacle_distance_m(0.0))
-        await forwarder.send(safe_command)
+        await asyncio.sleep(SETPOINT_PERIOD_S * 2)
         await drone.offboard.start()
         print("Offboard started through UDP safety receiver.")
 
@@ -99,6 +118,7 @@ async def run():
             while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
                 now = time.monotonic()
                 distance = demo_obstacle_distance_m(elapsed)
+                obstacle_distance_m = distance
                 dropping_commands = COMMAND_DROP_START_S <= elapsed < COMMAND_DROP_END_S
                 if dropping_commands and not dropout_reported:
                     print("Command link dropout; waiting for CM5 heartbeat expiry.")
@@ -109,16 +129,18 @@ async def run():
                 elif distance >= 0.6:
                     obstacle_active = False
                 send_packet(elapsed, now, transmit=not dropping_commands)
-                safe_command = receiver.poll(obstacle_distance_m=distance)
                 if dropping_commands and elapsed >= COMMAND_DROP_START_S + receiver.safety.command_timeout_s:
-                    if safe_command != VelocityCommand():
-                        raise RuntimeError(f"CM5 did not expire the dropped command: {safe_command}")
+                    if last_safe_command != VelocityCommand():
+                        raise RuntimeError(
+                            f"CM5 did not expire the dropped command: {last_safe_command}"
+                        )
                     dropout_safe = True
-                await forwarder.send(safe_command)
                 await asyncio.sleep(SETPOINT_PERIOD_S)
         finally:
             sender.close()
-            await forwarder.send(receiver.poll())
+            service_stop.set()
+            if service_task is not None:
+                await service_task
             if telemetry_task is not None:
                 telemetry_task.cancel()
                 await asyncio.gather(telemetry_task, return_exceptions=True)
@@ -142,6 +164,9 @@ async def run():
     finally:
         receiver.close()
         sender.close()
+        if service_task is not None and not service_task.done():
+            service_stop.set()
+            await service_task
 
 
 if __name__ == "__main__":
