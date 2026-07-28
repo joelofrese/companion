@@ -38,10 +38,10 @@ class LatestVisionPipeline:
         self._future = None
         try:
             estimate = future.result()
-        except Exception:
+        except Exception as error:
             self._estimate = None
             self._estimate_timestamp_s = None
-            return
+            raise RuntimeError("vision inference failed") from error
         self._estimate = estimate
         self._estimate_timestamp_s = self._submitted_timestamp_s
 

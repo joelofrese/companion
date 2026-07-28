@@ -36,7 +36,7 @@ class LatestVisionTests(unittest.TestCase):
         finally:
             latest.close()
 
-    def test_inference_error_clears_previous_estimate(self):
+    def test_inference_error_is_visible_to_the_control_service(self):
         class FailingVision:
             def __init__(self):
                 self.started = threading.Event()
@@ -50,7 +50,8 @@ class LatestVisionTests(unittest.TestCase):
         try:
             latest.process("frame", 1.0)
             self.assertTrue(vision.started.wait(timeout=1.0))
-            self.assertIsNone(latest.process(None, 1.1))
+            with self.assertRaisesRegex(RuntimeError, "vision inference failed"):
+                latest.process(None, 1.1)
         finally:
             latest.close()
 
