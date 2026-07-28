@@ -164,6 +164,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 ## Resolved Decisions
 - **DEXI-OS:** Use it. The CM5→PX4 serial/UART wiring, MAVLink routing, camera drivers, and optical flow sensor config are all pre-done. No reason to start from a blank Pi OS — it doesn't constrain the Mac-side architecture at all.
 - **Power and tethering:** Do not build a custom power tether or modify the drone's power electronics. Accept the stock battery's short flight time, do most development in simulation, and use brief untethered flights for hardware validation.
+- **Voice trigger:** Use push-to-talk for the first implementation. It avoids accidental commands and keeps idle CPU/battery use predictable; always-on listening can be reconsidered after the core flight loop is safe.
 
 ## Constraints / Non-Goals
 - **No GPS** — positioning is optical flow only; designed for indoor/GPS-denied environments
@@ -192,3 +193,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Bounded intermittent-vision behavior: `PersonTracker.predict()` bridges detector gaps for at most 0.5 seconds, then expires the target; `PersonVisionPipeline` uses this fallback instead of silently dropping every missed frame. Twenty-one tests pass, including gap recovery and stale-target expiry, and the real YOLOv8n first-frame smoke check still passes.
 - **2026-07-28** — Added `vision/video_stream.py`, a Mac-side GStreamer RTP/H.264 receiver that emits timestamped BGR frames through a bounded raw pipe. Twenty-five tests pass, and an elevated local GStreamer `videotestsrc` produced and consumed a complete 36-byte 4×3 BGR frame through the same pipe contract. The Wi-Fi milestone remains unchecked until a CM5 sender and real network stream are available.
 - **2026-07-28** — Added the voice pipeline: `voice/transcriber.py` wraps faster-whisper, `voice/intent.py` conservatively maps transcripts to cognitive `State` values, and `voice/pipeline.py` connects them without bypassing reactive control. Thirty tests pass; faster-whisper 1.2.1 loaded the tiny.en model and successfully transcribed generated silence. Live microphone capture and the always-on versus push-to-talk choice remain open.
+- **2026-07-28** — Added `voice/recorder.py` for fixed-length push-to-talk mono 16 kHz capture and declared `sounddevice`. Thirty-two tests pass; the runtime dependency installed, but this environment exposes zero audio input devices, so physical microphone capture remains unverified.
