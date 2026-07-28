@@ -10,10 +10,8 @@ from mavsdk.offboard import VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
 from control.following import FollowConfig, VisualFollower
-from control.loop import CompanionControlLoop
 from control.runtime import CompanionRuntime
 from control.state_machine import ReactiveController
-from control.step import CompanionControlStep
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from onboard.command_receiver import UdpSafetyReceiver
@@ -125,7 +123,8 @@ async def run(image_path: str):
         vision = LatestVisionPipeline(
             PersonVisionPipeline(YoloPersonDetector(model_path="yolov8n.pt"))
         )
-        runtime = CompanionRuntime(
+        control = CompanionRuntime(
+            vision,
             ReactiveController(
                 VisualFollower(
                     FollowConfig(
@@ -135,10 +134,9 @@ async def run(image_path: str):
                 )
             )
         )
-        control_loop = CompanionControlLoop(CompanionControlStep(vision, runtime=runtime))
         flight_started_at = time.monotonic()
         mac_service = UdpControlService(
-            control_loop,
+            control,
             sender,
             frame_reader.read,
             intent_provider=current_intent,

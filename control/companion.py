@@ -4,10 +4,8 @@ import argparse
 import asyncio
 
 from control.following import FollowConfig, VisualFollower
-from control.loop import CompanionControlLoop
 from control.runtime import CompanionRuntime
 from control.state_machine import ReactiveController, State
-from control.step import CompanionControlStep
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from vision.latest import LatestVisionPipeline
@@ -65,7 +63,8 @@ async def run(args):
     vision = LatestVisionPipeline(
         PersonVisionPipeline(YoloPersonDetector(model_path=args.model))
     )
-    runtime = CompanionRuntime(
+    control = CompanionRuntime(
+        vision,
         ReactiveController(
             VisualFollower(
                 FollowConfig(
@@ -77,7 +76,7 @@ async def run(args):
     )
     sender = UdpCommandSender(args.cm5_host, args.command_port)
     service = UdpControlService(
-        CompanionControlLoop(CompanionControlStep(vision, runtime=runtime)),
+        control,
         sender,
         frame_reader.read,
         intent_provider=lambda timestamp_s: state,

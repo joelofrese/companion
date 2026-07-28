@@ -3,9 +3,8 @@
 import asyncio
 import time
 
-from control.loop import CompanionControlLoop
+from control.runtime import CompanionRuntime
 from control.state_machine import State
-from control.step import CompanionControlStep
 from control.udp_sender import UdpCommandSender
 from control.udp_control import UdpControlService
 from control.velocity import VelocityCommand
@@ -59,7 +58,7 @@ async def run():
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         mac_task = asyncio.create_task(
             UdpControlService(
-                CompanionControlLoop(CompanionControlStep(DemoVision())),
+                CompanionRuntime(DemoVision()),
                 sender,
                 frame_reader,
                 intent_provider=lambda timestamp_s: State.FOLLOWING,

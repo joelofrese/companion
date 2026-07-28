@@ -8,9 +8,7 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError, VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
-from control.loop import CompanionControlLoop
 from control.runtime import CompanionRuntime
-from control.step import CompanionControlStep
 from control.velocity import VelocityCommand
 from sim.offboard_control import DemoVision, demo_obstacle_distance_m, demo_state
 
@@ -47,12 +45,12 @@ async def _read_frame(frame_reader: Optional[FrameReader]):
     return result
 
 
-async def _shutdown_command(control_loop: CompanionControlLoop, frame_reader: Optional[FrameReader]):
+async def _shutdown_command(control: CompanionRuntime, frame_reader: Optional[FrameReader]):
     """Use one last frame when available; any teardown input failure becomes zero."""
 
     try:
         now, frame = await _read_frame(frame_reader)
-        return control_loop.tick(
+        return control.tick(
             frame=frame,
             timestamp_s=now,
             intent=demo_state(PROFILE_DURATION_S),
@@ -64,7 +62,7 @@ async def _shutdown_command(control_loop: CompanionControlLoop, frame_reader: Op
 
 async def run(
     vision=None,
-    runtime: Optional[CompanionRuntime] = None,
+    controller=None,
     frame_reader: Optional[FrameReader] = None,
 ):
     print("Waiting for drone connection...")
@@ -90,8 +88,7 @@ async def run(
     await _wait_until_in_air(drone)
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
-    control_step = CompanionControlStep(vision or DemoVision(), runtime=runtime)
-    control_loop = CompanionControlLoop(control_step)
+    control = CompanionRuntime(vision or DemoVision(), controller=controller)
     offboard_started = False
     flight_error = None
     max_north_velocity = 0.0
@@ -107,7 +104,7 @@ async def run(
 
     try:
         now, frame = await _read_frame(frame_reader)
-        command = control_step.process(
+        command = control.tick(
             frame=frame,
             timestamp_s=now,
             intent=demo_state(0.0),
@@ -128,13 +125,13 @@ async def run(
                 obstacle_active = True
             elif obstacle_distance_m >= 0.6:
                 obstacle_active = False
-            command = control_loop.tick(
+            command = control.tick(
                 frame=frame,
                 timestamp_s=now,
                 intent=demo_state(elapsed),
                 obstacle_distance_m=obstacle_distance_m,
             )
-            if control_loop.watchdog.tripped:
+            if control.watchdog.tripped:
                 print("Setpoint watchdog tripped; sending zero velocity and landing.")
                 await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
                 break
@@ -144,7 +141,7 @@ async def run(
         flight_error = error
     finally:
         if offboard_started:
-            command = await _shutdown_command(control_loop, frame_reader)
+            command = await _shutdown_command(control, frame_reader)
             shutdown_error = None
             try:
                 await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))

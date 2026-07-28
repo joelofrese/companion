@@ -5,7 +5,7 @@ import math
 from numbers import Real
 from typing import Awaitable, Callable, Optional, Protocol
 
-from control.loop import CompanionControlLoop
+from control.runtime import CompanionRuntime
 from control.state_machine import State
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
@@ -21,7 +21,7 @@ class UdpControlService:
 
     def __init__(
         self,
-        control_loop: CompanionControlLoop,
+        control: CompanionRuntime,
         sender: UdpCommandSender,
         frame_reader: FrameReader,
         intent_provider: Optional[Callable[[float], Optional[State]]] = None,
@@ -38,7 +38,7 @@ class UdpControlService:
             or frame_timeout_s <= 0.0
         ):
             raise ValueError("frame timeout must be positive")
-        self.control_loop = control_loop
+        self.control = control
         self.sender = sender
         self.frame_reader = frame_reader
         self.intent_provider = intent_provider or (lambda timestamp_s: None)
@@ -63,7 +63,7 @@ class UdpControlService:
                     last_frame_at_s = timestamp_s
                 elif timestamp_s - last_frame_at_s > self.frame_timeout_s:
                     raise RuntimeError("video stream stalled before control shutdown")
-                command = self.control_loop.tick(
+                command = self.control.tick(
                     frame=frame,
                     timestamp_s=timestamp_s,
                     intent=self.intent_provider(timestamp_s),

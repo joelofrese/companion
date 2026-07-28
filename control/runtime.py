@@ -1,40 +1,46 @@
-"""Coordinator between cognitive intent, vision freshness, and reactive safety."""
+"""One Mac-side tick from vision and intent to a safe velocity command."""
 
-from typing import Optional
+from typing import Any, Optional, Protocol
 
 from control.state_machine import ReactiveController, State
 from control.tracking import TrackEstimate
 from control.velocity import VelocityCommand
+from control.watchdog import SetpointWatchdog
+
+
+class VisionPipeline(Protocol):
+    def process(self, frame: Any, timestamp_s: float) -> Optional[TrackEstimate]:
+        ...
 
 
 class CompanionRuntime:
-    """Hold the latest cognitive state and target while emitting safe commands."""
+    """Run one complete cognitive-to-reactive control tick."""
 
-    def __init__(self, controller: Optional[ReactiveController] = None):
+    def __init__(
+        self,
+        vision: VisionPipeline,
+        controller: Optional[ReactiveController] = None,
+        watchdog: Optional[SetpointWatchdog] = None,
+    ):
+        self.vision = vision
         self.controller = controller or ReactiveController()
-        self._target: Optional[TrackEstimate] = None
-        self._target_updated_at_s: Optional[float] = None
+        self.watchdog = watchdog or SetpointWatchdog()
 
-    def set_intent(self, state: Optional[State]):
-        """Apply a recognized cognitive intent; unknown voice stays a no-op."""
+    def tick(
+        self,
+        frame: Any,
+        timestamp_s: float,
+        intent: Optional[State] = None,
+        obstacle_distance_m: Optional[float] = None,
+    ) -> VelocityCommand:
+        """Return one watchdog-protected command for the current sensor snapshot."""
 
-        if state is not None:
-            self.controller.set_intent(state)
-
-    def update_target(self, estimate: Optional[TrackEstimate], timestamp_s: float):
-        """Store the latest vision estimate and the monotonic time it was received."""
-
-        self._target = estimate
-        self._target_updated_at_s = timestamp_s if estimate is not None else None
-
-    def command(self, timestamp_s: float, obstacle_distance_m: Optional[float] = None) -> VelocityCommand:
-        """Generate one reactive command with target age derived from current time."""
-
-        target_age_s = None
-        if self._target is not None and self._target_updated_at_s is not None:
-            target_age_s = self._target.age_s + max(0.0, timestamp_s - self._target_updated_at_s)
-        return self.controller.command(
+        target = self.vision.process(frame, timestamp_s)
+        if intent is not None:
+            self.controller.set_intent(intent)
+        desired = self.controller.command(
             obstacle_distance_m=obstacle_distance_m,
-            target_age_s=target_age_s,
-            target=self._target,
+            target_age_s=target.age_s if target is not None else None,
+            target=target,
         )
+        return self.watchdog.emit(timestamp_s, desired)

@@ -4,7 +4,6 @@ import asyncio
 import subprocess
 
 from control.following import FollowConfig, VisualFollower
-from control.runtime import CompanionRuntime
 from control.state_machine import ReactiveController
 from sim import offboard
 from sim.offboard_control import VideoDemoVision
@@ -25,13 +24,11 @@ async def run(
     receiver = GStreamerH264Receiver(config)
     frame_reader = AsyncLatestFrameReader(receiver)
     sender = None
-    runtime = CompanionRuntime(
-        ReactiveController(
-            VisualFollower(
-                FollowConfig(
-                    frame_width_px=config.width,
-                    desired_target_height_px=config.height / 4.0,
-                )
+    controller = ReactiveController(
+        VisualFollower(
+            FollowConfig(
+                frame_width_px=config.width,
+                desired_target_height_px=config.height / 4.0,
             )
         )
     )
@@ -46,7 +43,7 @@ async def run(
         print("RTP video loopback started.")
         await offboard.run(
             vision=vision or VideoDemoVision(),
-            runtime=runtime,
+            controller=controller,
             frame_reader=frame_reader.read,
         )
     finally:

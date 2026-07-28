@@ -7,8 +7,7 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError
 from mavsdk.telemetry import LandedState
 
-from control.loop import CompanionControlLoop
-from control.step import CompanionControlStep
+from control.runtime import CompanionRuntime
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
@@ -62,7 +61,7 @@ async def run():
         await _wait_until_in_air(drone)
 
         forwarder = MavsdkVelocityForwarder(drone)
-        control_loop = CompanionControlLoop(CompanionControlStep(DemoVision()))
+        control = CompanionRuntime(DemoVision())
 
         class ObservingForwarder:
             async def send(self, command):
@@ -86,7 +85,7 @@ async def run():
             transmit: bool = True,
             command_override=None,
         ):
-            command = control_loop.tick(
+            command = control.tick(
                 frame=None,
                 timestamp_s=timestamp_s,
                 intent=demo_state(elapsed_s),
