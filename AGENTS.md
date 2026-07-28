@@ -23,7 +23,6 @@ Work autonomously without waiting for user input. Make product, architecture, pr
 
 Refactor freely when the existing structure would make a change less clear. Preserve required behavior, safety properties, and architectural boundaries—not incidental implementation details.
 
-- Reread the root `AGENTS.md` before selecting each new milestone, after every meaningful Git checkpoint, and immediately after modifying it. Incorporate the latest guidance without pausing for user confirmation.
 - Take initiative beyond the current checklist. Identify and implement aligned capabilities that would make the companion meaningfully more capable, natural, or useful without waiting for preapproval.
 - Prefer changing, consolidating, or deleting existing code over layering new code around it.
 - Rewrite modules, change internal interfaces, and update all callers together when that produces a simpler whole.
@@ -239,4 +238,3 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Audited the same DEXI repository for TOF ingress and found no public distance driver or ROS topic; kept the hardware sensor boundary unresolved rather than guessing GPIO/I²C details. Hardened `OnboardSafetyEnvelope` so malformed, infinite, or `NaN` obstacle readings fail to zero instead of being interpreted as clear. Eighty-seven tests pass.
 - **2026-07-28** — Added CM5-side command bounds independent of Mac behavior: horizontal NED components are limited to `±0.5 m/s`, vertical to `±0.3 m/s`, and any non-finite command field fails to zero. Boundary and rejection tests pass; the existing SITL profile remains within these limits.
 - **2026-07-28** — Reconciled the project guide's Tech Stack and Open Questions with the implemented dependency-free tracker/state machine and resolved push-to-talk decision, removing obsolete `filterpy`/`transitions` and always-on voice ambiguity.
-- **2026-07-28** — Required long-running development to reread `AGENTS.md` at milestone and Git-checkpoint boundaries and immediately after editing it, so updated project guidance takes effect without stopping for user confirmation.
