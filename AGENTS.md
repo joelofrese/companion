@@ -19,10 +19,11 @@ Keep every change as simple, minimal, and readable as possible.
 
 ## Autonomous Development
 
-Work autonomously on reversible changes within the requested scope. Do not pause for routine implementation choices. Ask only when a decision would materially change product behavior, architecture, safety policy, scope, or incur a significant new maintenance burden.
+Work autonomously without waiting for user input. Make product, architecture, prioritization, implementation, and in-scope maintenance decisions according to the project vision and constraints. When several reasonable choices exist, choose the simplest, safest, most reversible option, document consequential decisions, create a Git checkpoint, and continue.
 
 Refactor freely when the existing structure would make a change less clear. Preserve required behavior, safety properties, and architectural boundaries—not incidental implementation details.
 
+- Take initiative beyond the current checklist. Identify and implement aligned capabilities that would make the companion meaningfully more capable, natural, or useful without waiting for preapproval.
 - Prefer changing, consolidating, or deleting existing code over layering new code around it.
 - Rewrite modules, change internal interfaces, and update all callers together when that produces a simpler whole.
 - Do not retain obsolete paths, temporary adapters, or compatibility shims after the change that required them is complete.
@@ -30,6 +31,8 @@ Refactor freely when the existing structure would make a change less clear. Pres
 - Establish a working baseline before substantial restructuring and verify the same relevant behavior afterward.
 - Implement the smallest complete vertical slice, then perform a separate simplification pass across the final diff.
 - Consider added dependencies, files, configuration, processes, public interfaces, and abstractions to be maintenance costs that require present value.
+- Preserve existing safety constraints when uncertain and continue in simulation rather than weakening safeguards.
+- If one task is blocked, record why and continue with another valuable part of the project. Stop only when no meaningful work can proceed; platform-required permissions, unavailable credentials, or unavailable hardware may still block specific actions.
 
 Use Git as a recovery mechanism, not as a reason to avoid worthwhile refactoring.
 
@@ -166,4 +169,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-26** — Established simplicity and minimalism as permanent code-quality requirements for every future change, while keeping safety-critical behavior explicit and verifiable.
 - **2026-07-26** — Ruled out a physical power tether and custom power electronics. Development will remain simulation-first, with short stock-battery flights used only when hardware validation is necessary.
 - **2026-07-26** — Re-ran the complete PX4 SITL/Gazebo hover test successfully: MAVSDK connected, the simulated x500 armed, took off to 2 m, hovered for 15 seconds, landed, and disarmed. The documented SDF and missing-GCS warnings remained harmless, and the simulator shut down cleanly afterward.
-- **2026-07-28** — Completed the project-guide migration from `CLAUDE.md` to `AGENTS.md` and added an autonomous-development contract: routine in-scope work proceeds without step-by-step approval; broad refactoring is encouraged when it simplifies the final system; substantial changes use verified Git checkpoints while preserving unrelated work; and only product, architectural, safety, scope, or significant maintenance decisions require interruption.
+- **2026-07-28** — Completed the project-guide migration from `CLAUDE.md` to `AGENTS.md` and established autonomous development: make aligned product and technical decisions without interruption, refactor toward the simplest final system, originate useful new capabilities, use verified Git checkpoints, favor safe and reversible choices, and continue with other valuable work when an individual task is blocked.
