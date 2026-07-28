@@ -166,7 +166,6 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 ## Open Questions
 - **CM5 PX4 forwarding:** The full reactive layer stays on the Mac; the CM5 now owns the final heartbeat/TOF safety envelope and a versioned command packet codec. Hardware bring-up still needs the concrete DEXI-OS process that receives packets and forwards only the envelope's safe velocity to PX4.
 - **Obstacle avoidance scope:** TOF sensor gives a single forward distance. Is that enough, or do we need multi-directional sensing for the avoiding state?
-- **State transition authority:** Can the reactive layer ever trigger a state transition (e.g. force AVOIDING), or does only the cognitive layer set state? Needs a clear rule to avoid race conditions.
 - **Voice trigger:** Always-on listening vs. push-to-talk? Affects Whisper latency and battery tradeoffs.
 
 ## Resolved Decisions
@@ -176,6 +175,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **Visual follow geometry:** Start with a forward-facing 640 px camera model: target height controls north-frame distance correction and horizontal image error controls east-frame correction. Calibrate camera orientation and desired target size before hardware flight.
 - **Reactive layer location:** Keep vision, tracking, state, and normal velocity generation on the Mac; run only the small CM5 safety envelope locally so Wi-Fi loss cannot preserve a stale command or bypass the forward obstacle stop.
 - **Command wire contract:** Use version-1 compact JSON packets containing a non-negative sequence and NED/yaw velocity; timestamp on CM5 receipt rather than synchronizing Mac and CM5 clocks. Duplicate or reordered sequence numbers do not refresh the heartbeat.
+- **State transition authority:** Cognitive intent owns the persistent state; reactive obstacle safety may expose a transient `AVOIDING` state and backoff command, then restores the saved intent when the path is clear. Safety can override output, but it does not permanently rewrite cognitive intent.
 
 ## Constraints / Non-Goals
 - **No GPS** — positioning is optical flow only; designed for indoor/GPS-denied environments
@@ -227,4 +227,5 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added `onboard/command_receiver.py` and `sim/command_loopback.py`. The non-blocking UDP receiver drains Mac packets, ignores malformed/reordered data, and exposes only envelope-approved velocity; the real localhost verifier passed fresh `0.3 m/s` forwarding and `-0.2 m/s` obstacle override. Eighty-one tests pass; Wi-Fi, CM5, and PX4-forwarding validation remain hardware-gated.
 - **2026-07-28** — Added `onboard/velocity_forwarder.py` and `sim/offboard_udp.py`. PX4 SITL verified the complete packet path through the CM5 safety receiver and MAVSDK NED sink: `0.30 m/s` forward telemetry, `-0.17 m/s` obstacle backoff, and a clean landing. Eighty-two tests pass; the sink is explicitly a SITL stand-in for the eventual DEXI-OS MAVLink forwarder.
 - **2026-07-28** — Extended `sim/offboard_udp.py` with a deliberate 0.5-second command-link dropout while the Mac loop continues generating commands. The CM5 envelope expired the missing stream to zero after 150 ms, then resumed safely; clean SITL telemetry observed `0.25 m/s` forward and `-0.15 m/s` obstacle backoff before landing. The Wi-Fi milestone remains unchecked because this is a localhost loss simulation, not a CM5 radio test.
+- **2026-07-28** — Fixed reactive state recovery: obstacle safety now temporarily exposes `AVOIDING` without destroying the cognitive intent, and the next clear command restores `FOLLOWING`/`HOVERING`/other saved intent. Eighty-three tests pass; the UDP dropout/obstacle SITL regression observed `0.32 m/s` forward and `-0.19 m/s` backoff before a clean landing.
 - **2026-07-28** — Required long-running development to reread `AGENTS.md` at milestone and Git-checkpoint boundaries and immediately after editing it, so updated project guidance takes effect without stopping for user confirmation.

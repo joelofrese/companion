@@ -34,6 +34,18 @@ class ReactiveControllerTests(unittest.TestCase):
         self.assertEqual(controller.command(obstacle_distance_m=0.5), VelocityCommand(north_m_s=-0.2))
         self.assertIs(controller.state, State.AVOIDING)
 
+    def test_obstacle_override_recovers_to_saved_intent(self):
+        controller = ReactiveController()
+        controller.set_intent(State.FOLLOWING)
+        controller.command(obstacle_distance_m=0.5)
+        command = controller.command(
+            obstacle_distance_m=2.0,
+            target_age_s=0.0,
+            target=TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0),
+        )
+        self.assertEqual(command, VelocityCommand(north_m_s=0.25))
+        self.assertIs(controller.state, State.FOLLOWING)
+
     def test_no_obstacle_holds_for_non_following_states(self):
         controller = ReactiveController()
         controller.set_intent(State.RESPONDING)
