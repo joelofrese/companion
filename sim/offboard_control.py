@@ -1,8 +1,9 @@
 """Deterministic cognitive intent profile for SITL bring-up."""
 
 from control.state_machine import State
-from control.tracking import TrackEstimate
+from control.tracking import Detection, TrackEstimate
 from voice.pipeline import VoiceCommandPipeline
+from vision.pipeline import PersonVisionPipeline
 
 
 class _DemoTranscriber:
@@ -40,3 +41,23 @@ class DemoVision:
 
     def process(self, frame, timestamp_s):
         return demo_target()
+
+
+class _VideoDemoDetector:
+    """Turn any decoded test frame into a centered synthetic person detection."""
+
+    def detect(self, frame, timestamp_s):
+        if frame is None or len(frame.shape) < 2:
+            raise ValueError("decoded video frame must have image dimensions")
+        height, width = frame.shape[:2]
+        return Detection(width / 2.0, height / 2.0, timestamp_s, height_px=height / 8.0)
+
+
+class VideoDemoVision:
+    """Use the real decoded-frame path with a deterministic detector for SITL."""
+
+    def __init__(self):
+        self._pipeline = PersonVisionPipeline(_VideoDemoDetector())
+
+    def process(self, frame, timestamp_s):
+        return self._pipeline.process(frame, timestamp_s)

@@ -1,5 +1,6 @@
 import unittest
 
+from sim.video_loopback import synthetic_sender_command
 from vision.video_stream import GStreamerH264Receiver, H264StreamConfig
 
 
@@ -50,6 +51,13 @@ class GStreamerH264ReceiverTests(unittest.TestCase):
     def test_sender_rejects_empty_destination(self):
         with self.assertRaises(ValueError):
             H264StreamConfig().sender_command(" ")
+
+    def test_synthetic_sender_matches_receiver_format(self):
+        config = H264StreamConfig(port=6000, width=4, height=3, framerate=25)
+        command = synthetic_sender_command(config)
+        self.assertIn("videotestsrc", command)
+        self.assertIn("video/x-raw,width=4,height=3,framerate=25/1", command)
+        self.assertIn("port=6000", command)
 
     def test_read_handles_partial_pipe_reads_and_shapes_bgr_frame(self):
         config = H264StreamConfig(width=4, height=3)

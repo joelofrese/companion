@@ -5,11 +5,10 @@ import subprocess
 from vision.video_stream import GStreamerH264Receiver, H264StreamConfig
 
 
-def run():
-    config = H264StreamConfig(port=5010, width=64, height=48, framerate=30)
-    receiver = GStreamerH264Receiver(config)
-    sender = None
-    sender_command = [
+def synthetic_sender_command(config: H264StreamConfig):
+    """Return a local GStreamer sender matching the production RTP format."""
+
+    return [
         "gst-launch-1.0",
         "-q",
         "videotestsrc",
@@ -33,9 +32,19 @@ def run():
         "host=127.0.0.1",
         f"port={config.port}",
     ]
+
+
+def run():
+    config = H264StreamConfig(port=5010, width=64, height=48, framerate=30)
+    receiver = GStreamerH264Receiver(config)
+    sender = None
     try:
         receiver.start()
-        sender = subprocess.Popen(sender_command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        sender = subprocess.Popen(
+            synthetic_sender_command(config),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         result = receiver.read()
         if result is None:
             raise RuntimeError("video loopback ended before a frame arrived")

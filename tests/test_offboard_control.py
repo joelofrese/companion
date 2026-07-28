@@ -1,7 +1,7 @@
 import unittest
 
 from control.state_machine import State
-from sim.offboard_control import demo_obstacle_distance_m, demo_state
+from sim.offboard_control import VideoDemoVision, demo_obstacle_distance_m, demo_state
 
 
 class DemoIntentTests(unittest.TestCase):
@@ -23,6 +23,12 @@ class DemoIntentTests(unittest.TestCase):
         self.assertEqual(demo_obstacle_distance_m(1.9), 2.0)
         self.assertEqual(demo_obstacle_distance_m(2.0), 0.5)
         self.assertEqual(demo_obstacle_distance_m(3.0), 2.0)
+
+    def test_video_demo_vision_uses_decoded_frame_dimensions(self):
+        frame = type("Frame", (), {"shape": (48, 64, 3)})()
+        estimate = VideoDemoVision().process(frame, 1.0)
+        self.assertEqual(estimate.x_px, 32.0)
+        self.assertEqual(estimate.target_height_px, 6.0)
 
 
 if __name__ == "__main__":

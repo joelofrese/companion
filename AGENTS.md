@@ -151,7 +151,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - [x] Kalman filter for person tracking implemented
 - [ ] WiFi video stream from CM5 to Mac working
 - [x] Voice command pipeline (Whisper → intent → state)
-- [ ] Full integration test in simulation
+- [x] Full integration test in simulation (deterministic voice intent + decoded RTP video + reactive obstacle safety)
 - [ ] Hardware arrives (DroneBlox DEXI 3)
 - [ ] First real flight test
 
@@ -206,5 +206,6 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Visual-follow SITL regression passed through the shared control step: synthetic target geometry produced `0.33 m/s` forward telemetry, the simulated obstacle produced `-0.17 m/s` backoff, and the vehicle landed cleanly. Hardware calibration remains required before trusting camera-to-NED alignment in flight.
 - **2026-07-28** — Added a latched `SetpointWatchdog` with a 150 ms deadline; missed deadlines emit zero velocity and remain tripped until the flight loop is safely stopped. The watchdog-protected visual-follow/obstacle SITL run stayed healthy at 20 Hz, observed `0.34 m/s` forward and `-0.17 m/s` backoff, and landed cleanly. Fifty-four tests pass.
 - **2026-07-28** — Added `PushToTalkVoicePipeline.listen_once()` to compose recorder output, Whisper transcription, and conservative intent parsing into one optional cognitive state. Unknown speech remains a no-op; fifty-six focused tests pass. Physical microphone capture is still unavailable in this environment.
+- **2026-07-28** — Extracted `CompanionControlLoop` as the production one-tick boundary: each frame, intent, and obstacle reading is converted to one reactive command and passed through the latched setpoint watchdog exactly once. Fifty-nine tests pass, and the refactored visual-follow/obstacle SITL run observed `0.31 m/s` forward and `-0.18 m/s` backoff velocities before a clean landing.
 - **2026-07-28** — Fixed the RTP/H.264 receiver negotiation by inserting `h264parse` between depayloading and decoding, then added `sim/video_loopback.py`. The reusable verifier passed with a real local GStreamer sender and production receiver, decoding a `(48, 64, 3)` BGR frame. CM5 camera and Wi-Fi validation remain pending hardware.
-- **2026-07-28** — Extracted `CompanionControlLoop` as the production one-tick boundary: each frame, intent, and obstacle reading is converted to one reactive command and passed through the latched setpoint watchdog exactly once. Fifty-nine tests pass, and the refactored visual-follow/obstacle SITL run observed `0.31 m/s` forward and `-0.18 m/s` backoff velocities before a clean landing. The full integration milestone remains pending real camera/audio sources.
+- **2026-07-28** — Added the reusable offboard frame-reader seam and `sim/offboard_video.py`. The full simulation path now starts a local RTP/H.264 sender, decodes frames through the production receiver, runs the vision/tracker seam, applies deterministic voice intent and TOF obstacle input, and sends the resulting velocity through the watchdog into PX4 SITL. The integrated run observed `0.15 m/s` forward and `-0.21 m/s` obstacle backoff velocities, then landed cleanly; real YOLO/Whisper runtime inputs and CM5/Wi-Fi remain separate hardware-facing validation tasks.
