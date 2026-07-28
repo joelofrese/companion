@@ -64,10 +64,10 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
             FakeHeartbeat,
             FakeSetpoint,
             FakeDistance,
+            qos_profile="px4-qos",
             bind_host="127.0.0.1",
             command_port=0,
             tick_period_s=0.01,
-            qos_profile="px4-qos",
         )
         sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:

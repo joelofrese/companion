@@ -40,11 +40,11 @@ class Ros2SafetyBridge:
         heartbeat_message,
         setpoint_message,
         distance_message,
+        qos_profile,
         bind_host: str = "0.0.0.0",
         command_port: int = 5001,
         distance_topic: str = "/fmu/out/distance_sensor",
         tick_period_s: float = 0.02,
-        qos_profile=10,
     ):
         self._distance = LatestDistanceSensor()
         self._receiver = UdpSafetyReceiver(bind_host=bind_host, port=command_port)
