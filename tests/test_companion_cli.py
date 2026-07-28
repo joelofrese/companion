@@ -7,6 +7,7 @@ class CompanionCliTests(unittest.TestCase):
     def test_idle_is_the_safe_default(self):
         args = build_parser().parse_args(["192.168.1.20"])
         self.assertEqual(args.state, "idle")
+        self.assertFalse(args.voice_once)
         self.assertEqual(args.command_port, 5001)
         self.assertEqual(args.video_port, 5000)
 
@@ -16,6 +17,11 @@ class CompanionCliTests(unittest.TestCase):
                 "drone.local",
                 "--state",
                 "following",
+                "--voice-once",
+                "--whisper-model",
+                "base.en",
+                "--record-duration",
+                "2",
                 "--command-port",
                 "6001",
                 "--video-port",
@@ -31,6 +37,9 @@ class CompanionCliTests(unittest.TestCase):
             ]
         )
         self.assertEqual(args.state, "following")
+        self.assertTrue(args.voice_once)
+        self.assertEqual(args.whisper_model, "base.en")
+        self.assertEqual(args.record_duration, 2.0)
         self.assertEqual((args.command_port, args.video_port), (6001, 6000))
         self.assertEqual((args.width, args.height, args.framerate), (320, 240, 20))
         self.assertEqual(args.target_height, 80.0)
