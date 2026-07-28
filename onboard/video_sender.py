@@ -6,7 +6,7 @@ import time
 from dataclasses import replace
 from typing import Callable, Optional
 
-from vision.video_stream import H264StreamConfig
+from vision.video_stream import H264StreamConfig, close_subprocess
 
 
 class GStreamerH264Sender:
@@ -45,8 +45,7 @@ class GStreamerH264Sender:
 
         if self._process is None:
             return
-        self._process.terminate()
-        self._process.wait()
+        close_subprocess(self._process)
         self._process = None
 
 

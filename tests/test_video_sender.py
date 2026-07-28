@@ -8,12 +8,16 @@ class FakeProcess:
     def __init__(self):
         self.terminated = False
         self.waited = False
+        self.killed = False
 
     def terminate(self):
         self.terminated = True
 
-    def wait(self):
+    def wait(self, timeout=None):
         self.waited = True
+
+    def kill(self):
+        self.killed = True
 
 
 class GStreamerH264SenderTests(unittest.TestCase):

@@ -7,6 +7,17 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence
 
 
+def close_subprocess(process):
+    """Terminate a media child, killing it if graceful shutdown stalls."""
+
+    process.terminate()
+    try:
+        process.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 @dataclass(frozen=True)
 class H264StreamConfig:
     port: int = 5000
@@ -130,8 +141,7 @@ class GStreamerH264Receiver:
     def close(self):
         if self._process is None:
             return
-        self._process.terminate()
-        self._process.wait()
+        close_subprocess(self._process)
         self._process = None
 
 

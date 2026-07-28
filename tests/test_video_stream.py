@@ -1,8 +1,14 @@
 import asyncio
+import subprocess
 import unittest
 
 from sim.video_loopback import synthetic_sender_command
-from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
+from vision.video_stream import (
+    AsyncLatestFrameReader,
+    GStreamerH264Receiver,
+    H264StreamConfig,
+    close_subprocess,
+)
 
 
 class FakeStdout:
@@ -21,11 +27,22 @@ class FakeProcess:
         self.stdout = FakeStdout(payload)
         self.terminated = False
         self.waited = False
+        self.killed = False
 
     def terminate(self):
         self.terminated = True
 
-    def wait(self):
+    def wait(self, timeout=None):
+        self.waited = True
+
+    def kill(self):
+        self.killed = True
+
+
+class StuckProcess(FakeProcess):
+    def wait(self, timeout=None):
+        if timeout is not None:
+            raise subprocess.TimeoutExpired("gst-launch-1.0", timeout)
         self.waited = True
 
 
@@ -40,6 +57,12 @@ class FakeReceiver:
 
 
 class GStreamerH264ReceiverTests(unittest.TestCase):
+    def test_stuck_media_process_is_killed_after_timeout(self):
+        process = StuckProcess(b"")
+        close_subprocess(process)
+        self.assertTrue(process.killed)
+        self.assertTrue(process.waited)
+
     def test_command_contains_rtp_h264_decode_chain(self):
         receiver = GStreamerH264Receiver(H264StreamConfig(port=6000, width=4, height=3, framerate=25))
         command = receiver.command()
