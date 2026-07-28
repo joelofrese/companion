@@ -2,7 +2,7 @@ import unittest
 
 from control.state_machine import State
 from voice.intent import parse_intent
-from voice.pipeline import VoiceCommandPipeline
+from voice.pipeline import PushToTalkVoicePipeline, VoiceCommandPipeline
 from voice.transcriber import WhisperTranscriber
 
 
@@ -30,6 +30,16 @@ class FakeTranscriber:
         return self.transcript
 
 
+class FakeRecorder:
+    def __init__(self, audio):
+        self.audio = audio
+        self.calls = 0
+
+    def record(self):
+        self.calls += 1
+        return self.audio
+
+
 class VoiceTests(unittest.TestCase):
     def test_parser_maps_commands_to_cognitive_states(self):
         self.assertIs(parse_intent("Follow me!"), State.FOLLOWING)
@@ -49,6 +59,16 @@ class VoiceTests(unittest.TestCase):
         pipeline = VoiceCommandPipeline(transcriber)
         self.assertIs(pipeline.handle("audio"), State.FOLLOWING)
         self.assertEqual(transcriber.source, "audio")
+
+    def test_push_to_talk_pipeline_composes_recording_and_intent(self):
+        recorder = FakeRecorder("audio")
+        pipeline = PushToTalkVoicePipeline(recorder, FakeTranscriber("follow me"))
+        self.assertIs(pipeline.listen_once(), State.FOLLOWING)
+        self.assertEqual(recorder.calls, 1)
+
+    def test_unrecognized_push_to_talk_is_a_no_op(self):
+        pipeline = PushToTalkVoicePipeline(FakeRecorder("audio"), FakeTranscriber("background noise"))
+        self.assertIsNone(pipeline.listen_once())
 
     def test_whisper_adapter_joins_segments_and_uses_conservative_options(self):
         model = FakeWhisperModel()

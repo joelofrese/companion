@@ -11,6 +11,11 @@ class Transcriber(Protocol):
         ...
 
 
+class AudioRecorder(Protocol):
+    def record(self) -> Any:
+        ...
+
+
 class VoiceCommandPipeline:
     def __init__(self, transcriber: Transcriber):
         self.transcriber = transcriber
@@ -19,3 +24,14 @@ class VoiceCommandPipeline:
         """Transcribe one utterance and return only a recognized cognitive intent."""
 
         return parse_intent(self.transcriber.transcribe(audio_source))
+
+
+class PushToTalkVoicePipeline:
+    """Capture one utterance and convert it into one optional cognitive state."""
+
+    def __init__(self, recorder: AudioRecorder, transcriber: Transcriber):
+        self.recorder = recorder
+        self.commands = VoiceCommandPipeline(transcriber)
+
+    def listen_once(self) -> Optional[State]:
+        return self.commands.handle(self.recorder.record())
