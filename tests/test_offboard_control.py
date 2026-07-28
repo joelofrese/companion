@@ -1,7 +1,7 @@
 import unittest
 
 from control.state_machine import State
-from sim.offboard_control import demo_state
+from sim.offboard_control import demo_obstacle_distance_m, demo_state
 
 
 class DemoIntentTests(unittest.TestCase):
@@ -18,6 +18,11 @@ class DemoIntentTests(unittest.TestCase):
     def test_demo_intent_uses_voice_state_mapping(self):
         self.assertIs(demo_state(1.0), State.FOLLOWING)
         self.assertIs(demo_state(5.0), State.HOVERING)
+
+    def test_demo_obstacle_profile_has_one_forward_sensor_event(self):
+        self.assertEqual(demo_obstacle_distance_m(1.9), 2.0)
+        self.assertEqual(demo_obstacle_distance_m(2.0), 0.5)
+        self.assertEqual(demo_obstacle_distance_m(3.0), 2.0)
 
 
 if __name__ == "__main__":

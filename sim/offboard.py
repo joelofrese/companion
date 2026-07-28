@@ -8,7 +8,7 @@ from mavsdk.offboard import OffboardError, VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
 from control.runtime import CompanionRuntime
-from sim.offboard_control import demo_state, demo_target
+from sim.offboard_control import demo_obstacle_distance_m, demo_state, demo_target
 
 
 SETPOINT_PERIOD_S = 0.05
@@ -59,16 +59,21 @@ async def run():
     now = time.monotonic()
     runtime.set_intent(demo_state(0.0))
     runtime.update_target(demo_target(), now)
-    await drone.offboard.set_velocity_ned(_mavsdk_velocity(runtime.command(now)))
+    await drone.offboard.set_velocity_ned(_mavsdk_velocity(
+        runtime.command(now, obstacle_distance_m=demo_obstacle_distance_m(0.0))
+    ))
     await drone.offboard.start()
     print("Offboard started.")
 
     max_north_velocity = 0.0
+    min_north_velocity = 0.0
+    obstacle_active = False
 
     async def observe_velocity():
-        nonlocal max_north_velocity
+        nonlocal max_north_velocity, min_north_velocity
         async for velocity in drone.telemetry.velocity_ned():
-            max_north_velocity = max(max_north_velocity, abs(velocity.north_m_s))
+            max_north_velocity = max(max_north_velocity, velocity.north_m_s)
+            min_north_velocity = min(min_north_velocity, velocity.north_m_s)
 
     telemetry_task = asyncio.create_task(observe_velocity())
     started_at = time.monotonic()
@@ -77,13 +82,23 @@ async def run():
             now = time.monotonic()
             runtime.set_intent(demo_state(elapsed))
             runtime.update_target(demo_target(), now)
-            await drone.offboard.set_velocity_ned(_mavsdk_velocity(runtime.command(now)))
+            obstacle_distance_m = demo_obstacle_distance_m(elapsed)
+            if obstacle_distance_m < 0.6 and not obstacle_active:
+                print("Obstacle detected; backing off.")
+                obstacle_active = True
+            elif obstacle_distance_m >= 0.6:
+                obstacle_active = False
+            await drone.offboard.set_velocity_ned(_mavsdk_velocity(
+                runtime.command(now, obstacle_distance_m=obstacle_distance_m)
+            ))
             await asyncio.sleep(SETPOINT_PERIOD_S)
     finally:
         now = time.monotonic()
         runtime.set_intent(demo_state(PROFILE_DURATION_S))
         runtime.update_target(demo_target(), now)
-        await drone.offboard.set_velocity_ned(_mavsdk_velocity(runtime.command(now)))
+        await drone.offboard.set_velocity_ned(_mavsdk_velocity(
+            runtime.command(now, obstacle_distance_m=demo_obstacle_distance_m(PROFILE_DURATION_S))
+        ))
         telemetry_task.cancel()
         await asyncio.gather(telemetry_task, return_exceptions=True)
         try:
@@ -91,7 +106,10 @@ async def run():
         except OffboardError:
             pass
 
+    if min_north_velocity >= -0.05:
+        raise RuntimeError(f"SITL did not observe obstacle backoff velocity: {min_north_velocity:.2f}m/s")
     print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
+    print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
     print("Landing...")
     await drone.action.land()
     async for state in drone.telemetry.landed_state():

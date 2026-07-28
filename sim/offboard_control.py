@@ -27,3 +27,9 @@ def demo_target() -> TrackEstimate:
     """Represent a fresh, stable target for the deterministic flight scenario."""
 
     return TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0)
+
+
+def demo_obstacle_distance_m(elapsed_s: float) -> float:
+    """Simulate a forward TOF obstacle for one second during following."""
+
+    return 0.5 if 2.0 <= elapsed_s < 3.0 else 2.0
