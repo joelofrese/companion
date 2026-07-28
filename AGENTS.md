@@ -157,7 +157,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - [ ] First real flight test
 
 ## Open Questions
-- **Reactive layer location:** Does the reactive layer (20–50 Hz control loop) run on the Mac or on the CM5? Mac gives more compute; CM5 survives WiFi drops. Current lean: Mac, with a simple heartbeat-based failsafe on CM5.
+- **CM5 PX4 forwarding:** The full reactive layer stays on the Mac; the CM5 now owns the final heartbeat/TOF safety envelope. Hardware bring-up still needs the concrete DEXI-OS process that forwards only the envelope's safe velocity to PX4.
 - **Obstacle avoidance scope:** TOF sensor gives a single forward distance. Is that enough, or do we need multi-directional sensing for the avoiding state?
 - **State transition authority:** Can the reactive layer ever trigger a state transition (e.g. force AVOIDING), or does only the cognitive layer set state? Needs a clear rule to avoid race conditions.
 - **Voice trigger:** Always-on listening vs. push-to-talk? Affects Whisper latency and battery tradeoffs.
@@ -167,6 +167,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **Power and tethering:** Do not build a custom power tether or modify the drone's power electronics. Accept the stock battery's short flight time, do most development in simulation, and use brief untethered flights for hardware validation.
 - **Voice trigger:** Use push-to-talk for the first implementation. It avoids accidental commands and keeps idle CPU/battery use predictable; always-on listening can be reconsidered after the core flight loop is safe.
 - **Visual follow geometry:** Start with a forward-facing 640 px camera model: target height controls north-frame distance correction and horizontal image error controls east-frame correction. Calibrate camera orientation and desired target size before hardware flight.
+- **Reactive layer location:** Keep vision, tracking, state, and normal velocity generation on the Mac; run only the small CM5 safety envelope locally so Wi-Fi loss cannot preserve a stale command or bypass the forward obstacle stop.
 
 ## Constraints / Non-Goals
 - **No GPS** — positioning is optical flow only; designed for indoor/GPS-denied environments
@@ -212,3 +213,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added the reusable offboard frame-reader seam and `sim/offboard_video.py`. The full simulation path now starts a local RTP/H.264 sender, decodes frames through the production receiver, runs the vision/tracker seam, applies deterministic voice intent and TOF obstacle input, and sends the resulting velocity through the watchdog into PX4 SITL. The integrated run observed `0.15 m/s` forward and `-0.21 m/s` obstacle backoff velocities, then landed cleanly; real YOLO/Whisper runtime inputs and CM5/Wi-Fi remain separate hardware-facing validation tasks.
 - **2026-07-28** — Added `AsyncLatestFrameReader` so a blocking GStreamer pipe cannot starve the reactive setpoint loop. Empty samples use tracker prediction, and capture timestamps are normalized monotonically before entering the watchdog. Sixty-four tests pass; the clean RTP/SITL regression observed `0.26 m/s` forward and `-0.14 m/s` obstacle backoff without a watchdog trip, then landed cleanly. A timestamp-order regression and an orphaned MAVSDK helper were both diagnosed and fixed at their sources.
 - **2026-07-28** — Added `onboard/video_sender.py`, a managed CM5 `libcamerasrc`→RTP/H.264 process with explicit lifecycle and CLI configuration. Sixty-seven tests pass, the sender CLI help is verified, and the existing local RTP loopback still decodes a `(48, 64, 3)` BGR frame. Actual CM5 camera execution remains hardware/DEXI-OS gated because this Mac has no `libcamerasrc` plugin.
+- **2026-07-28** — Added `onboard/safety.py`, the transport-independent CM5 safety envelope. Fresh Mac commands pass through, stale or absent commands become zero velocity, and a local forward TOF reading overrides a fresh command with the bounded backoff. Seventy-two tests pass, and the existing offboard SITL regression observed `0.32 m/s` forward and `-0.17 m/s` backoff before a clean landing. The remaining hardware task is wiring this envelope to the DEXI-OS MAVLink/PX4 forwarding process.
