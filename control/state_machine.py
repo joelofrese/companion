@@ -16,6 +16,7 @@ class State(Enum):
 
 OBSTACLE_STOP_M = 0.6
 BACKOFF_SPEED_M_S = 0.2
+TARGET_MAX_AGE_S = 0.5
 
 
 class ReactiveController:
@@ -27,13 +28,17 @@ class ReactiveController:
 
         self.state = state
 
-    def command(self, obstacle_distance_m: Optional[float] = None) -> VelocityCommand:
+    def command(
+        self,
+        obstacle_distance_m: Optional[float] = None,
+        target_age_s: Optional[float] = None,
+    ) -> VelocityCommand:
         """Return one safe velocity command for the current sensor snapshot."""
 
         if obstacle_distance_m is not None and obstacle_distance_m < OBSTACLE_STOP_M:
             self.state = State.AVOIDING
             return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
 
-        if self.state is State.FOLLOWING:
+        if self.state is State.FOLLOWING and target_age_s is not None and 0.0 <= target_age_s <= TARGET_MAX_AGE_S:
             return VelocityCommand(north_m_s=0.5)
         return VelocityCommand()

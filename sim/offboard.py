@@ -57,7 +57,7 @@ async def run():
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
     controller = ReactiveController()
     controller.set_intent(demo_state(0.0))
-    await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command()))
+    await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command(target_age_s=0.0)))
     await drone.offboard.start()
     print("Offboard started.")
 
@@ -73,11 +73,11 @@ async def run():
     try:
         while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
             controller.set_intent(demo_state(elapsed))
-            await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command()))
+            await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command(target_age_s=0.0)))
             await asyncio.sleep(SETPOINT_PERIOD_S)
     finally:
         controller.set_intent(demo_state(PROFILE_DURATION_S))
-        await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command()))
+        await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command(target_age_s=0.0)))
         telemetry_task.cancel()
         await asyncio.gather(telemetry_task, return_exceptions=True)
         try:
