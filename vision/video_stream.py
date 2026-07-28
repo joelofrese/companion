@@ -70,6 +70,8 @@ class GStreamerH264Receiver:
             "!",
             "rtph264depay",
             "!",
+            "h264parse",
+            "!",
             "avdec_h264",
             "!",
             "videoconvert",
@@ -89,11 +91,16 @@ class GStreamerH264Receiver:
             bufsize=0,
         )
 
-    def read(self):
-        """Return ``(monotonic_timestamp_s, BGR_frame)`` or None at stream EOF."""
+    def start(self):
+        """Start the decoder before a sender is launched, if it is not running."""
 
         if self._process is None:
             self._start()
+
+    def read(self):
+        """Return ``(monotonic_timestamp_s, BGR_frame)`` or None at stream EOF."""
+
+        self.start()
         frame_bytes = self._read_exact(self._process.stdout, self.config.width * self.config.height * 3)
         if frame_bytes is None:
             return None

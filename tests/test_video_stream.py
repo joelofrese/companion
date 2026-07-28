@@ -33,6 +33,7 @@ class GStreamerH264ReceiverTests(unittest.TestCase):
         command = receiver.command()
         self.assertIn("port=6000", command)
         self.assertIn("rtph264depay", command)
+        self.assertIn("h264parse", command)
         self.assertIn("avdec_h264", command)
         self.assertIn("video/x-raw,format=BGR,width=4,height=3,framerate=25/1", command)
 
