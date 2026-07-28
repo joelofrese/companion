@@ -28,6 +28,11 @@ class FakeSocket:
         self.closed = True
 
 
+class BindFailingSocket(FakeSocket):
+    def bind(self, address):
+        raise OSError("port unavailable")
+
+
 class UdpSafetyReceiverTests(unittest.TestCase):
     def test_loopback_packet_reaches_safety_envelope(self):
         fake_socket = FakeSocket()
@@ -57,6 +62,15 @@ class UdpSafetyReceiverTests(unittest.TestCase):
     def test_boolean_port_is_rejected(self):
         with self.assertRaises(ValueError):
             UdpSafetyReceiver(port=True)
+
+    def test_failed_bind_closes_socket_and_leaves_receiver_unstarted(self):
+        failed_socket = BindFailingSocket()
+        receiver = UdpSafetyReceiver(socket_factory=lambda *args: failed_socket)
+        with self.assertRaises(OSError):
+            receiver.start()
+        self.assertTrue(failed_socket.closed)
+        with self.assertRaises(RuntimeError):
+            receiver.poll()
 
 
 if __name__ == "__main__":

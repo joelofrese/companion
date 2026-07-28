@@ -37,10 +37,15 @@ class UdpSafetyReceiver:
 
         if self._socket is not None:
             return
-        self._socket = self._socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.bind((self.bind_host, self.port))
-        self._socket.setblocking(False)
-        self.port = self._socket.getsockname()[1]
+        receiver_socket = self._socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            receiver_socket.bind((self.bind_host, self.port))
+            receiver_socket.setblocking(False)
+        except Exception:
+            receiver_socket.close()
+            raise
+        self._socket = receiver_socket
+        self.port = receiver_socket.getsockname()[1]
 
     def poll(self, obstacle_distance_m: Optional[float] = None) -> VelocityCommand:
         """Drain available packets and return the safe command for this local tick."""
