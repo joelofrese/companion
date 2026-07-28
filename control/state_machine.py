@@ -1,6 +1,8 @@
 """Minimal reactive state machine: intent selects behavior, obstacles override it."""
 
+import math
 from enum import Enum, auto
+from numbers import Real
 from typing import Optional
 
 from control.following import VisualFollower
@@ -41,9 +43,14 @@ class ReactiveController:
     ) -> VelocityCommand:
         """Return one safe velocity command for the current sensor snapshot."""
 
-        if obstacle_distance_m is not None and obstacle_distance_m < OBSTACLE_STOP_M:
-            self.state = State.AVOIDING
-            return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
+        if obstacle_distance_m is not None:
+            if isinstance(obstacle_distance_m, bool) or not isinstance(obstacle_distance_m, Real):
+                return VelocityCommand()
+            if not math.isfinite(obstacle_distance_m):
+                return VelocityCommand()
+            if obstacle_distance_m < OBSTACLE_STOP_M:
+                self.state = State.AVOIDING
+                return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
 
         if self.state is State.AVOIDING:
             self.state = self._intent_state

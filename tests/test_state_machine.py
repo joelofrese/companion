@@ -46,6 +46,17 @@ class ReactiveControllerTests(unittest.TestCase):
         self.assertEqual(command, VelocityCommand(north_m_s=0.25))
         self.assertIs(controller.state, State.FOLLOWING)
 
+    def test_invalid_obstacle_reading_holds_and_preserves_intent(self):
+        controller = ReactiveController()
+        controller.set_intent(State.FOLLOWING)
+        target = TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0)
+        for reading in (float("nan"), float("inf"), True, "unknown"):
+            self.assertEqual(
+                controller.command(obstacle_distance_m=reading, target_age_s=0.0, target=target),
+                VelocityCommand(),
+            )
+            self.assertIs(controller.state, State.FOLLOWING)
+
     def test_no_obstacle_holds_for_non_following_states(self):
         controller = ReactiveController()
         controller.set_intent(State.RESPONDING)
