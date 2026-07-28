@@ -148,7 +148,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - [x] PX4 offboard mode with continuous MAVSDK velocity setpoints working in simulation
 - [x] State machine skeleton implemented
 - [ ] YOLOv8n person detection pipeline working
-- [ ] Kalman filter for person tracking implemented
+- [x] Kalman filter for person tracking implemented
 - [ ] WiFi video stream from CM5 to Mac working
 - [ ] Voice command pipeline (Whisper → intent → state)
 - [ ] Full integration test in simulation
@@ -186,3 +186,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added `sim/offboard.py` and the deterministic `sim/offboard_control.py` velocity profile. The script primes PX4 with a zero setpoint, streams at 20 Hz, moves north at 0.5 m/s for four seconds, returns to zero velocity, stops offboard, and lands. Standard-library unit tests cover the profile boundaries and safety default. PX4 SITL verified the full connection/arm/offboard/land sequence and reported a measured peak north velocity of 0.52 m/s. A feature branch checkpoint could not be created because this environment exposes `.git` as read-only.
 - **2026-07-28** — Added a dependency-free reactive state-machine core. Cognitive intent selects the state, while a forward obstacle nearer than 0.6 m overrides it to `AVOIDING` and commands a slow north-frame backoff. This establishes the safety authority rule: reactive safety may override cognitive intent, but the cognitive layer still cannot bypass reactive velocity generation.
 - **2026-07-28** — Routed the live `sim/offboard.py` MAVSDK adapter through `ReactiveController`; the adapter now converts the demo cognitive intent into `FOLLOWING`/`HOVERING` states and never constructs flight velocity commands outside the reactive layer. SITL re-verification preserved the measured 0.52 m/s north velocity and clean landing sequence.
+- **2026-07-28** — Added `control/tracking.py`, a dependency-free constant-velocity Kalman tracker for image-plane person detections. It smooths noisy center measurements, rejects out-of-order timestamps, and predicts 300 ms ahead; 5 focused tracker tests plus a repeated-motion check pass. Kept this local rather than adding `filterpy` because the project only needs this small fixed model and avoiding a runtime dependency keeps the Mac/CM5 boundary simpler.
