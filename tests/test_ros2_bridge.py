@@ -98,6 +98,8 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
             while setpoints[-1].velocity != [0.3, 0.0, 0.0] and time.monotonic() < deadline:
                 time.sleep(0.01)
             self.assertEqual(setpoints[-1].velocity, [0.3, 0.0, 0.0])
+            bridge.close()
+            self.assertEqual(setpoints[-1].velocity, [0.0, 0.0, 0.0])
         finally:
             bridge.close()
             sender.close()
