@@ -59,6 +59,8 @@ class OnboardSafetyEnvelope:
         if timestamp_s - self._received_at_s > self.command_timeout_s:
             return VelocityCommand()
         if obstacle_distance_m is not None:
+            if isinstance(obstacle_distance_m, bool) or not isinstance(obstacle_distance_m, Real):
+                return VelocityCommand()
             try:
                 if not math.isfinite(obstacle_distance_m):
                     return VelocityCommand()

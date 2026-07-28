@@ -32,6 +32,8 @@ class OnboardSafetyEnvelopeTests(unittest.TestCase):
         self.assertEqual(envelope.tick(1.1, obstacle_distance_m=float("nan")), VelocityCommand())
         self.assertEqual(envelope.tick(1.2, obstacle_distance_m=float("inf")), VelocityCommand())
         self.assertEqual(envelope.tick(1.3, obstacle_distance_m="unknown"), VelocityCommand())
+        self.assertEqual(envelope.tick(1.4, obstacle_distance_m=True), VelocityCommand())
+        self.assertEqual(envelope.tick(1.5, obstacle_distance_m=False), VelocityCommand())
 
     def test_fresh_command_is_bounded_locally(self):
         envelope = OnboardSafetyEnvelope()
