@@ -33,6 +33,11 @@ class FakeForwarder:
             self.stop_event.set()
 
 
+class FailingForwarder:
+    async def send(self, command):
+        raise RuntimeError("forwarder unavailable")
+
+
 class SafetyCommandServiceTests(unittest.TestCase):
     def test_lifecycle_forwards_then_stops_with_zero(self):
         async def scenario():
@@ -63,6 +68,17 @@ class SafetyCommandServiceTests(unittest.TestCase):
     def test_tick_period_must_be_positive(self):
         with self.assertRaises(ValueError):
             SafetyCommandService(FakeReceiver(), object(), tick_period_s=0.0)
+
+    def test_receiver_closes_when_forwarder_fails(self):
+        async def scenario():
+            receiver = FakeReceiver()
+            service = SafetyCommandService(receiver, FailingForwarder())
+            with self.assertRaises(RuntimeError):
+                await service.run(asyncio.Event())
+            return receiver
+
+        receiver = asyncio.run(scenario())
+        self.assertTrue(receiver.closed)
 
 
 if __name__ == "__main__":

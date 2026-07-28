@@ -39,5 +39,7 @@ class SafetyCommandService:
                 await self.forwarder.send(command)
                 await asyncio.sleep(self.tick_period_s)
         finally:
-            await self.forwarder.send(VelocityCommand())
-            self.receiver.close()
+            try:
+                await self.forwarder.send(VelocityCommand())
+            finally:
+                self.receiver.close()
