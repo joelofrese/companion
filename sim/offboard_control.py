@@ -33,3 +33,10 @@ def demo_obstacle_distance_m(elapsed_s: float) -> float:
     """Simulate a forward TOF obstacle for one second during following."""
 
     return 0.5 if 2.0 <= elapsed_s < 3.0 else 2.0
+
+
+class DemoVision:
+    """Synthetic camera provider used to exercise the shared control step in SITL."""
+
+    def process(self, frame, timestamp_s):
+        return demo_target()

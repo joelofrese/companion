@@ -7,8 +7,8 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError, VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
-from control.runtime import CompanionRuntime
-from sim.offboard_control import demo_obstacle_distance_m, demo_state, demo_target
+from control.step import CompanionControlStep
+from sim.offboard_control import DemoVision, demo_obstacle_distance_m, demo_state
 
 
 SETPOINT_PERIOD_S = 0.05
@@ -55,12 +55,15 @@ async def run():
     await _wait_until_in_air(drone)
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
-    runtime = CompanionRuntime()
+    control_step = CompanionControlStep(DemoVision())
     now = time.monotonic()
-    runtime.set_intent(demo_state(0.0))
-    runtime.update_target(demo_target(), now)
     await drone.offboard.set_velocity_ned(_mavsdk_velocity(
-        runtime.command(now, obstacle_distance_m=demo_obstacle_distance_m(0.0))
+        control_step.process(
+            frame=None,
+            timestamp_s=now,
+            intent=demo_state(0.0),
+            obstacle_distance_m=demo_obstacle_distance_m(0.0),
+        )
     ))
     await drone.offboard.start()
     print("Offboard started.")
@@ -80,8 +83,6 @@ async def run():
     try:
         while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
             now = time.monotonic()
-            runtime.set_intent(demo_state(elapsed))
-            runtime.update_target(demo_target(), now)
             obstacle_distance_m = demo_obstacle_distance_m(elapsed)
             if obstacle_distance_m < 0.6 and not obstacle_active:
                 print("Obstacle detected; backing off.")
@@ -89,15 +90,23 @@ async def run():
             elif obstacle_distance_m >= 0.6:
                 obstacle_active = False
             await drone.offboard.set_velocity_ned(_mavsdk_velocity(
-                runtime.command(now, obstacle_distance_m=obstacle_distance_m)
+                control_step.process(
+                    frame=None,
+                    timestamp_s=now,
+                    intent=demo_state(elapsed),
+                    obstacle_distance_m=obstacle_distance_m,
+                )
             ))
             await asyncio.sleep(SETPOINT_PERIOD_S)
     finally:
         now = time.monotonic()
-        runtime.set_intent(demo_state(PROFILE_DURATION_S))
-        runtime.update_target(demo_target(), now)
         await drone.offboard.set_velocity_ned(_mavsdk_velocity(
-            runtime.command(now, obstacle_distance_m=demo_obstacle_distance_m(PROFILE_DURATION_S))
+            control_step.process(
+                frame=None,
+                timestamp_s=now,
+                intent=demo_state(PROFILE_DURATION_S),
+                obstacle_distance_m=demo_obstacle_distance_m(PROFILE_DURATION_S),
+            )
         ))
         telemetry_task.cancel()
         await asyncio.gather(telemetry_task, return_exceptions=True)
