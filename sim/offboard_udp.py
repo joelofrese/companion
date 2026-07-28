@@ -1,16 +1,15 @@
 """Verify Mac command packets through a CM5 safety receiver into PX4 SITL."""
 
 import asyncio
-import socket
 import time
 
 from mavsdk import System
 from mavsdk.offboard import OffboardError
 from mavsdk.telemetry import LandedState
 
-from control.command_packet import CommandPacket
 from control.loop import CompanionControlLoop
 from control.step import CompanionControlStep
+from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
@@ -32,7 +31,7 @@ COMMAND_INVALID_END_S = 1.8
 
 async def run():
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
-    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sender = None
     drone = System()
     forwarder = None
     service_task = None
@@ -64,7 +63,6 @@ async def run():
 
         forwarder = MavsdkVelocityForwarder(drone)
         control_loop = CompanionControlLoop(CompanionControlStep(DemoVision()))
-        sequence = 0
 
         class ObservingForwarder:
             async def send(self, command):
@@ -80,6 +78,7 @@ async def run():
         )
         service.start()
         service_task = asyncio.create_task(service.run(service_stop))
+        sender = UdpCommandSender("127.0.0.1", receiver.port)
 
         def send_packet(
             elapsed_s: float,
@@ -87,7 +86,6 @@ async def run():
             transmit: bool = True,
             command_override=None,
         ):
-            nonlocal sequence
             command = control_loop.tick(
                 frame=None,
                 timestamp_s=timestamp_s,
@@ -97,11 +95,7 @@ async def run():
             if command_override is not None:
                 command = command_override
             if transmit:
-                sender.sendto(
-                    CommandPacket(sequence, command).encode(),
-                    ("127.0.0.1", receiver.port),
-                )
-            sequence += 1
+                sender.send(command)
 
         send_packet(0.0, time.monotonic())
         await asyncio.sleep(SETPOINT_PERIOD_S * 2)
@@ -164,7 +158,8 @@ async def run():
                     invalid_command_safe = True
                 await asyncio.sleep(SETPOINT_PERIOD_S)
         finally:
-            sender.close()
+            if sender is not None:
+                sender.close()
             service_stop.set()
             if service_task is not None:
                 await service_task
@@ -192,7 +187,8 @@ async def run():
                 break
     finally:
         receiver.close()
-        sender.close()
+        if sender is not None:
+            sender.close()
         if service_task is not None and not service_task.done():
             service_stop.set()
             await service_task
