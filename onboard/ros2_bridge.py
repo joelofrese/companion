@@ -111,12 +111,19 @@ class Ros2SafetyBridge:
         )
         self._stop = threading.Event()
         self._thread = None
+        self._error = None
 
     @property
     def port(self) -> int:
         """Return the bound UDP port after ``start``."""
 
         return self._receiver.port
+
+    @property
+    def error(self):
+        """Return a service-thread failure after it has stopped, if any."""
+
+        return self._error
 
     def start(self):
         """Bind before starting the service thread so senders cannot race it."""
@@ -128,7 +135,10 @@ class Ros2SafetyBridge:
         self._thread.start()
 
     def _run(self):
-        asyncio.run(self._service.run(self._stop))
+        try:
+            asyncio.run(self._service.run(self._stop))
+        except Exception as error:
+            self._error = error
 
     def close(self):
         """Stop the service and wait for its final zero command."""
@@ -175,12 +185,16 @@ def main(argv=None):
         tick_period_s=args.tick_period,
     )
     bridge.start()
+    bridge_error = None
     try:
         rclpy.spin(node)
     finally:
         bridge.close()
+        bridge_error = bridge.error
         node.destroy_node()
         rclpy.shutdown()
+    if bridge_error is not None:
+        raise bridge_error
 
 
 if __name__ == "__main__":

@@ -16,6 +16,11 @@ class FakePublisher:
         self.messages.append(message)
 
 
+class FailingPublisher(FakePublisher):
+    def publish(self, message):
+        raise RuntimeError("publisher failed")
+
+
 class FakeClockTime:
     nanoseconds = 2_000_000
 
@@ -42,6 +47,14 @@ class FakeNode:
 
     def get_clock(self):
         return FakeClock()
+
+
+class FailingNode(FakeNode):
+    def create_publisher(self, message_type, topic, qos):
+        publisher = FailingPublisher()
+        self.publishers[topic] = publisher
+        self.publisher_calls.append((message_type, topic, qos))
+        return publisher
 
 
 class FakeHeartbeat:
@@ -130,6 +143,27 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
         finally:
             bridge.close()
             sender.close()
+
+    def test_forwarder_failure_is_observable_after_bridge_close(self):
+        bridge = Ros2SafetyBridge(
+            FailingNode(),
+            FakeHeartbeat,
+            FakeSetpoint,
+            FakeDistance,
+            qos_profile="px4-qos",
+            bind_host="127.0.0.1",
+            command_port=0,
+            tick_period_s=0.01,
+        )
+        try:
+            bridge.start()
+            deadline = time.monotonic() + 1.0
+            while bridge.error is None and time.monotonic() < deadline:
+                time.sleep(0.01)
+            bridge.close()
+            self.assertIsInstance(bridge.error, RuntimeError)
+        finally:
+            bridge.close()
 
 if __name__ == "__main__":
     unittest.main()
