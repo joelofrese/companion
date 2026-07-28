@@ -84,6 +84,8 @@ def collect_checks(
     return (
         check_module("rclpy"),
         check_module("px4_msgs"),
+        check_command("ros2"),
+        check_command("micro_ros_agent"),
         check_command("gst-launch-1.0"),
         check_command("gst-inspect-1.0"),
         check_gstreamer_plugin("libcamerasrc"),
