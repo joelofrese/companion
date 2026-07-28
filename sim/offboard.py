@@ -145,8 +145,11 @@ async def run(
     finally:
         if offboard_started:
             command = await _shutdown_command(control_loop, frame_reader)
+            shutdown_error = None
             try:
                 await drone.offboard.set_velocity_ned(_mavsdk_velocity(command))
+            except Exception as error:
+                shutdown_error = error
             finally:
                 if telemetry_task is not None:
                     telemetry_task.cancel()
@@ -155,6 +158,11 @@ async def run(
                     await drone.offboard.stop()
                 except OffboardError:
                     pass
+                except Exception as error:
+                    if shutdown_error is None:
+                        shutdown_error = error
+            if shutdown_error is not None and flight_error is None:
+                flight_error = shutdown_error
 
     if flight_error is not None:
         print("Offboard loop failed; landing safely.")
