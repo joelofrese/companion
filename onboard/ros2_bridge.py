@@ -44,6 +44,7 @@ class Ros2SafetyBridge:
         command_port: int = 5001,
         distance_topic: str = "/fmu/out/distance_sensor",
         tick_period_s: float = 0.02,
+        qos_profile=10,
     ):
         self._distance = LatestDistanceSensor()
         self._receiver = UdpSafetyReceiver(bind_host=bind_host, port=command_port)
@@ -51,12 +52,12 @@ class Ros2SafetyBridge:
             heartbeat_publisher=node.create_publisher(
                 heartbeat_message,
                 "/fmu/in/offboard_control_mode",
-                10,
+                qos_profile,
             ),
             setpoint_publisher=node.create_publisher(
                 setpoint_message,
                 "/fmu/in/trajectory_setpoint",
-                10,
+                qos_profile,
             ),
             heartbeat_factory=heartbeat_message,
             setpoint_factory=setpoint_message,
@@ -66,7 +67,7 @@ class Ros2SafetyBridge:
             distance_message,
             distance_topic,
             self._distance.update,
-            10,
+            qos_profile,
         )
         self._service = SafetyCommandService(
             self._receiver,
@@ -111,14 +112,22 @@ def main():
 
     import rclpy
     from px4_msgs.msg import DistanceSensor, OffboardControlMode, TrajectorySetpoint
+    from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 
     rclpy.init()
     node = rclpy.create_node("companion_safety_bridge")
+    qos_profile = QoSProfile(
+        reliability=ReliabilityPolicy.BEST_EFFORT,
+        durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        history=HistoryPolicy.KEEP_LAST,
+        depth=1,
+    )
     bridge = Ros2SafetyBridge(
         node,
         heartbeat_message=OffboardControlMode,
         setpoint_message=TrajectorySetpoint,
         distance_message=DistanceSensor,
+        qos_profile=qos_profile,
     )
     bridge.start()
     try:

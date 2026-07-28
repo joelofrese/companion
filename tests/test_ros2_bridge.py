@@ -27,11 +27,13 @@ class FakeClock:
 class FakeNode:
     def __init__(self):
         self.publishers = {}
+        self.publisher_calls = []
         self.subscriptions = []
 
     def create_publisher(self, message_type, topic, qos):
         publisher = FakePublisher()
         self.publishers[topic] = publisher
+        self.publisher_calls.append((message_type, topic, qos))
         return publisher
 
     def create_subscription(self, message_type, topic, callback, qos):
@@ -65,10 +67,17 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
             bind_host="127.0.0.1",
             command_port=0,
             tick_period_s=0.01,
+            qos_profile="px4-qos",
         )
         sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             bridge.start()
+            self.assertTrue(all(call[3] == "px4-qos" for call in node.subscriptions))
+            self.assertTrue(all(call[2] == "px4-qos" for call in node.publisher_calls))
+            self.assertEqual(set(node.publishers), {
+                "/fmu/in/offboard_control_mode",
+                "/fmu/in/trajectory_setpoint",
+            })
             sender.sendto(
                 CommandPacket(1, VelocityCommand(north_m_s=0.3)).encode(),
                 ("127.0.0.1", bridge.port),
