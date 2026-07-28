@@ -25,6 +25,18 @@ class VisualFollowerTests(unittest.TestCase):
     def test_missing_size_holds(self):
         self.assertEqual(VisualFollower().command(target(320.0, 0.0)), VelocityCommand())
 
+    def test_invalid_target_geometry_holds(self):
+        follower = VisualFollower()
+        for height in (float("nan"), float("inf"), True, "unknown"):
+            self.assertEqual(follower.command(target(320.0, height)), VelocityCommand())
+        self.assertEqual(follower.command(target(float("nan"), 120.0)), VelocityCommand())
+
+    def test_invalid_follow_configuration_is_rejected(self):
+        with self.assertRaises(ValueError):
+            VisualFollower(FollowConfig(max_forward_speed_m_s=float("nan")))
+        with self.assertRaises(ValueError):
+            VisualFollower(FollowConfig(max_lateral_speed_m_s=-0.1))
+
 
 if __name__ == "__main__":
     unittest.main()
