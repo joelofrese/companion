@@ -1,5 +1,6 @@
 """CM5-side safety envelope for commands received from the Mac."""
 
+import math
 from typing import Optional
 
 from control.command_packet import CommandPacket
@@ -52,6 +53,12 @@ class OnboardSafetyEnvelope:
             return VelocityCommand()
         if timestamp_s - self._received_at_s > self.command_timeout_s:
             return VelocityCommand()
-        if obstacle_distance_m is not None and obstacle_distance_m < OBSTACLE_STOP_M:
-            return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
+        if obstacle_distance_m is not None:
+            try:
+                if not math.isfinite(obstacle_distance_m):
+                    return VelocityCommand()
+            except TypeError:
+                return VelocityCommand()
+            if obstacle_distance_m < OBSTACLE_STOP_M:
+                return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
         return self._command

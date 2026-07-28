@@ -167,7 +167,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 
 ## Open Questions
 - **CM5 PX4 forwarding:** The full reactive layer stays on the Mac; the CM5 now owns the final heartbeat/TOF safety envelope and a versioned command packet codec. Hardware bring-up still needs the concrete DEXI-OS process that receives packets and forwards only the envelope's safe velocity to PX4.
-- **Obstacle avoidance scope:** TOF sensor gives a single forward distance. Is that enough, or do we need multi-directional sensing for the avoiding state?
+- **Obstacle avoidance scope:** TOF sensor gives a single forward distance. Is that enough, or do we need multi-directional sensing for the avoiding state? The public DEXI ROS 2 repository does not expose a TOF driver or distance topic, so the CM5 sensor wiring and topic remain hardware-gated.
 - **Voice trigger:** Always-on listening vs. push-to-talk? Affects Whisper latency and battery tradeoffs.
 
 ## Resolved Decisions
@@ -180,6 +180,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **State transition authority:** Cognitive intent owns the persistent state; reactive obstacle safety may expose a transient `AVOIDING` state and backoff command, then restores the saved intent when the path is clear. Safety can override output, but it does not permanently rewrite cognitive intent.
 - **CM5 service lifecycle:** Bind the receiver before the Mac sends its first packet, run safety polling at the reactive setpoint rate, and send a zero velocity during orderly shutdown. The service remains a hardware-neutral seam until DEXI-OS exposes the actual PX4 forwarder.
 - **ROS 2 flight setpoints:** Keep the DEXI integration velocity-only even though the stock `px4_offboard_manager` also contains position-navigation helpers. Map the shared yaw heading in degrees to `TrajectorySetpoint.yaw` radians; leave position, acceleration, and yaw-rate fields unused.
+- **Invalid obstacle data:** Treat a non-finite or malformed CM5 obstacle reading as unsafe and output zero velocity. A finite reading below the stop threshold still gets the explicit bounded backoff.
 
 ## Constraints / Non-Goals
 - **No GPS** — positioning is optical flow only; designed for indoor/GPS-denied environments
@@ -234,4 +235,5 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Fixed reactive state recovery: obstacle safety now temporarily exposes `AVOIDING` without destroying the cognitive intent, and the next clear command restores `FOLLOWING`/`HOVERING`/other saved intent. Eighty-three tests pass; the UDP dropout/obstacle SITL regression observed `0.32 m/s` forward and `-0.19 m/s` backoff before a clean landing.
 - **2026-07-28** — Added `onboard/command_service.py` as the minimal CM5 lifecycle boundary: it binds the UDP receiver, polls the local safety envelope at 50 Hz, forwards only approved NED velocity, and emits zero on shutdown. The real localhost loopback verified fresh forwarding, obstacle override, and shutdown zero; 85 tests pass. The first service-backed SITL attempt exposed and fixed a sender-before-bind race, and a clean retry verified command dropout expiry, `0.33 m/s` forward, `-0.17 m/s` obstacle backoff, and a clean landing.
 - **2026-07-28** — Inspected the public DroneBlocks DEXI ROS 2 repository and identified the CM5 transport as Micro-ROS serial on `/dev/ttyAMA2` at 3 Mbps into PX4 ROS 2 topics. Added `onboard/ros2_forwarder.py`, a dependency-free adapter that publishes velocity-only offboard heartbeat/setpoints and preserves the shared yaw-heading contract. Eighty-six tests pass; `rclpy` node composition and hardware serial validation remain gated on DEXI-OS bring-up.
+- **2026-07-28** — Audited the same DEXI repository for TOF ingress and found no public distance driver or ROS topic; kept the hardware sensor boundary unresolved rather than guessing GPIO/I²C details. Hardened `OnboardSafetyEnvelope` so malformed, infinite, or `NaN` obstacle readings fail to zero instead of being interpreted as clear. Eighty-seven tests pass.
 - **2026-07-28** — Required long-running development to reread `AGENTS.md` at milestone and Git-checkpoint boundaries and immediately after editing it, so updated project guidance takes effect without stopping for user confirmation.

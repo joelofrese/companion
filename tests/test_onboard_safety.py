@@ -26,6 +26,13 @@ class OnboardSafetyEnvelopeTests(unittest.TestCase):
         envelope.receive(1.0, VelocityCommand(north_m_s=0.3))
         self.assertEqual(envelope.tick(1.1, obstacle_distance_m=0.5), VelocityCommand(north_m_s=-0.2))
 
+    def test_invalid_obstacle_reading_fails_safe_to_zero(self):
+        envelope = OnboardSafetyEnvelope()
+        envelope.receive(1.0, VelocityCommand(north_m_s=0.3))
+        self.assertEqual(envelope.tick(1.1, obstacle_distance_m=float("nan")), VelocityCommand())
+        self.assertEqual(envelope.tick(1.2, obstacle_distance_m=float("inf")), VelocityCommand())
+        self.assertEqual(envelope.tick(1.3, obstacle_distance_m="unknown"), VelocityCommand())
+
     def test_out_of_order_commands_and_ticks_are_rejected(self):
         envelope = OnboardSafetyEnvelope()
         envelope.receive(2.0, VelocityCommand())
