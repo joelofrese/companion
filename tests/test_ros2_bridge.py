@@ -1,9 +1,8 @@
 import math
-import socket
 import time
 import unittest
 
-from control.command_packet import CommandPacket
+from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.ros2_bridge import LatestDistanceSensor, Ros2SafetyBridge
 
@@ -109,19 +108,17 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
             command_port=0,
             tick_period_s=0.01,
         )
-        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sender = None
         try:
             bridge.start()
+            sender = UdpCommandSender("127.0.0.1", bridge.port)
             self.assertTrue(all(call[3] == "px4-qos" for call in node.subscriptions))
             self.assertTrue(all(call[2] == "px4-qos" for call in node.publisher_calls))
             self.assertEqual(set(node.publishers), {
                 "/fmu/in/offboard_control_mode",
                 "/fmu/in/trajectory_setpoint",
             })
-            sender.sendto(
-                CommandPacket(1, VelocityCommand(north_m_s=0.3)).encode(),
-                ("127.0.0.1", bridge.port),
-            )
+            sender.send(VelocityCommand(north_m_s=0.3))
             setpoints = node.publishers["/fmu/in/trajectory_setpoint"].messages
             deadline = time.monotonic() + 1.0
             while len(setpoints) < 2 and time.monotonic() < deadline:
@@ -130,10 +127,7 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
             self.assertEqual(setpoints[-1].velocity, [0.0, 0.0, 0.0])
 
             node.subscriptions[0][2](FakeDistance(2.0))
-            sender.sendto(
-                CommandPacket(2, VelocityCommand(north_m_s=0.3)).encode(),
-                ("127.0.0.1", bridge.port),
-            )
+            sender.send(VelocityCommand(north_m_s=0.3))
             deadline = time.monotonic() + 1.0
             while setpoints[-1].velocity != [0.3, 0.0, 0.0] and time.monotonic() < deadline:
                 time.sleep(0.01)
@@ -142,7 +136,8 @@ class Ros2SafetyBridgeTests(unittest.TestCase):
             self.assertEqual(setpoints[-1].velocity, [0.0, 0.0, 0.0])
         finally:
             bridge.close()
-            sender.close()
+            if sender is not None:
+                sender.close()
 
     def test_forwarder_failure_is_observable_after_bridge_close(self):
         bridge = Ros2SafetyBridge(
