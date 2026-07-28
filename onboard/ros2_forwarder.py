@@ -2,7 +2,6 @@
 
 import asyncio
 import math
-import time
 from typing import Callable
 
 from control.velocity import VelocityCommand
@@ -23,7 +22,7 @@ class Ros2VelocityForwarder:
         setpoint_publisher,
         heartbeat_factory,
         setpoint_factory,
-        timestamp_us: Callable[[], int] = lambda: int(time.time() * 1_000_000),
+        timestamp_us: Callable[[], int],
     ):
         self.heartbeat_publisher = heartbeat_publisher
         self.setpoint_publisher = setpoint_publisher
