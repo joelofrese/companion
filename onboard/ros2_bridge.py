@@ -3,26 +3,38 @@
 import asyncio
 import math
 import threading
+import time
 
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_forwarder import Ros2VelocityForwarder
 
 
+DISTANCE_TIMEOUT_S = 0.15
+
+
 class LatestDistanceSensor:
     """Thread-safe latest PX4 distance reading; no reading is unsafe."""
 
-    def __init__(self):
+    def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
+        if timeout_s <= 0.0:
+            raise ValueError("distance timeout must be positive")
         self._distance_m = math.nan
+        self._clock = clock
+        self._timeout_s = timeout_s
+        self._updated_at_s = None
         self._lock = threading.Lock()
 
     def update(self, message):
         distance_m = getattr(message, "current_distance", math.nan)
         with self._lock:
             self._distance_m = distance_m
+            self._updated_at_s = self._clock()
 
     def read(self):
         with self._lock:
+            if self._updated_at_s is None or self._clock() - self._updated_at_s > self._timeout_s:
+                return math.nan
             return self._distance_m
 
 

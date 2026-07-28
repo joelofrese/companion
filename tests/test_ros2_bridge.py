@@ -1,10 +1,11 @@
+import math
 import socket
 import time
 import unittest
 
 from control.command_packet import CommandPacket
 from control.velocity import VelocityCommand
-from onboard.ros2_bridge import Ros2SafetyBridge
+from onboard.ros2_bridge import LatestDistanceSensor, Ros2SafetyBridge
 
 
 class FakePublisher:
@@ -54,6 +55,21 @@ class FakeSetpoint:
 class FakeDistance:
     def __init__(self, current_distance):
         self.current_distance = current_distance
+
+
+class Ros2DistanceSensorTests(unittest.TestCase):
+    def test_distance_expires_without_a_fresh_message(self):
+        now = [10.0]
+        sensor = LatestDistanceSensor(clock=lambda: now[0], timeout_s=0.15)
+        self.assertTrue(math.isnan(sensor.read()))
+        sensor.update(FakeDistance(2.0))
+        self.assertEqual(sensor.read(), 2.0)
+        now[0] = 10.151
+        self.assertTrue(math.isnan(sensor.read()))
+
+    def test_non_positive_timeout_is_rejected(self):
+        with self.assertRaises(ValueError):
+            LatestDistanceSensor(timeout_s=0.0)
 
 
 class Ros2SafetyBridgeTests(unittest.TestCase):
