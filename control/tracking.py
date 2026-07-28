@@ -11,6 +11,7 @@ class Detection:
     x_px: float
     y_px: float
     timestamp_s: float
+    confidence: float = 1.0
 
 
 @dataclass(frozen=True)

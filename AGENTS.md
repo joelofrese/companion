@@ -147,7 +147,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - [x] MAVSDK-Python connection plus arm/takeoff/hover/land actions working in simulation
 - [x] PX4 offboard mode with continuous MAVSDK velocity setpoints working in simulation
 - [x] State machine skeleton implemented
-- [ ] YOLOv8n person detection pipeline working
+- [x] YOLOv8n person detection pipeline working
 - [x] Kalman filter for person tracking implemented
 - [ ] WiFi video stream from CM5 to Mac working
 - [ ] Voice command pipeline (Whisper → intent → state)
@@ -187,3 +187,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added a dependency-free reactive state-machine core. Cognitive intent selects the state, while a forward obstacle nearer than 0.6 m overrides it to `AVOIDING` and commands a slow north-frame backoff. This establishes the safety authority rule: reactive safety may override cognitive intent, but the cognitive layer still cannot bypass reactive velocity generation.
 - **2026-07-28** — Routed the live `sim/offboard.py` MAVSDK adapter through `ReactiveController`; the adapter now converts the demo cognitive intent into `FOLLOWING`/`HOVERING` states and never constructs flight velocity commands outside the reactive layer. SITL re-verification preserved the measured 0.52 m/s north velocity and clean landing sequence.
 - **2026-07-28** — Added `control/tracking.py`, a dependency-free constant-velocity Kalman tracker for image-plane person detections. It smooths noisy center measurements, rejects out-of-order timestamps, and predicts 300 ms ahead; 5 focused tracker tests plus a repeated-motion check pass. Kept this local rather than adding `filterpy` because the project only needs this small fixed model and avoiding a runtime dependency keeps the Mac/CM5 boundary simpler.
+- **2026-07-28** — Added `vision/person_detector.py`, a lazy YOLOv8n adapter that filters class 0 persons, applies a confidence threshold, selects the strongest detection, and emits tracker-compatible center observations. Added `ultralytics` to the Mac-side requirements. Fourteen unit tests pass; the real `ultralytics 8.4.108` runtime loaded `yolov8n.pt` and detected a person in its bundled sample image at 0.836 confidence. Model weights are ignored as local runtime artifacts.
