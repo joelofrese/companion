@@ -15,6 +15,10 @@ class DemoIntentTests(unittest.TestCase):
     def test_negative_elapsed_time_is_safe(self):
         self.assertIs(demo_state(-1.0), State.HOVERING)
 
+    def test_demo_intent_uses_voice_state_mapping(self):
+        self.assertIs(demo_state(1.0), State.FOLLOWING)
+        self.assertIs(demo_state(5.0), State.HOVERING)
+
 
 if __name__ == "__main__":
     unittest.main()

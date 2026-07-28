@@ -1,11 +1,22 @@
 """Deterministic cognitive intent profile for SITL bring-up."""
 
 from control.state_machine import State
+from voice.pipeline import VoiceCommandPipeline
+
+
+class _DemoTranscriber:
+    def transcribe(self, transcript):
+        return transcript
+
+
+_demo_voice = VoiceCommandPipeline(_DemoTranscriber())
 
 
 def demo_state(elapsed_s: float) -> State:
     """Follow for four seconds, then ask the reactive layer to hover."""
 
-    if 0.0 <= elapsed_s < 4.0:
-        return State.FOLLOWING
-    return State.HOVERING
+    transcript = "follow me" if 0.0 <= elapsed_s < 4.0 else "hover"
+    state = _demo_voice.handle(transcript)
+    if state is None:
+        raise RuntimeError(f"demo transcript produced no state: {transcript!r}")
+    return state
