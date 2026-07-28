@@ -8,6 +8,10 @@ from control.tracking import TrackEstimate
 from control.velocity import VelocityCommand
 
 
+MAX_FORWARD_SPEED_M_S = 0.5
+MAX_LATERAL_SPEED_M_S = 0.3
+
+
 def _clamp(value: float) -> float:
     return max(-1.0, min(1.0, value))
 
@@ -20,8 +24,8 @@ def _finite(value: object) -> bool:
 class FollowConfig:
     frame_width_px: float = 640.0
     desired_target_height_px: float = 120.0
-    max_forward_speed_m_s: float = 0.5
-    max_lateral_speed_m_s: float = 0.3
+    max_forward_speed_m_s: float = MAX_FORWARD_SPEED_M_S
+    max_lateral_speed_m_s: float = MAX_LATERAL_SPEED_M_S
 
 
 class VisualFollower:
@@ -37,8 +41,10 @@ class VisualFollower:
             or config.desired_target_height_px <= 0.0
             or config.max_forward_speed_m_s < 0.0
             or config.max_lateral_speed_m_s < 0.0
+            or config.max_forward_speed_m_s > MAX_FORWARD_SPEED_M_S
+            or config.max_lateral_speed_m_s > MAX_LATERAL_SPEED_M_S
         ):
-            raise ValueError("follow configuration must contain finite, non-negative values")
+            raise ValueError("follow configuration must stay within the vehicle speed envelope")
         self.config = config
 
     def command(self, target: TrackEstimate) -> VelocityCommand:

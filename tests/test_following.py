@@ -36,6 +36,8 @@ class VisualFollowerTests(unittest.TestCase):
             VisualFollower(FollowConfig(max_forward_speed_m_s=float("nan")))
         with self.assertRaises(ValueError):
             VisualFollower(FollowConfig(max_lateral_speed_m_s=-0.1))
+        with self.assertRaises(ValueError):
+            VisualFollower(FollowConfig(max_forward_speed_m_s=0.6))
 
 
 if __name__ == "__main__":
