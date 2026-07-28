@@ -48,6 +48,8 @@ class ReactiveController:
                 return VelocityCommand()
             if not math.isfinite(obstacle_distance_m):
                 return VelocityCommand()
+            if obstacle_distance_m < 0.0:
+                return VelocityCommand()
             if obstacle_distance_m < OBSTACLE_STOP_M:
                 self.state = State.AVOIDING
                 return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)

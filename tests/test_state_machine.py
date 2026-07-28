@@ -50,7 +50,7 @@ class ReactiveControllerTests(unittest.TestCase):
         controller = ReactiveController()
         controller.set_intent(State.FOLLOWING)
         target = TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0)
-        for reading in (float("nan"), float("inf"), True, "unknown"):
+        for reading in (float("nan"), float("inf"), True, "unknown", -1.0):
             self.assertEqual(
                 controller.command(obstacle_distance_m=reading, target_age_s=0.0, target=target),
                 VelocityCommand(),

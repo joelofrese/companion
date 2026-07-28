@@ -23,7 +23,7 @@ Work autonomously without waiting for user input. Make product, architecture, pr
 
 Refactor freely when the existing structure would make a change less clear. Preserve required behavior, safety properties, and architectural boundaries—not incidental implementation details.
 
-- Reread the root `AGENTS.md` before selecting each new milestone, after every meaningful Git checkpoint, and immediately after modifying it. Incorporate the latest guidance without pausing for user confirmation.
+- At each meaningful milestone, read `STEERING.md` once before selecting the next work when the file exists. Treat it as current temporary steering, incorporate it according to this guide, and continue without waiting for user confirmation. Do not poll it during implementation or control loops.
 - Take initiative beyond the current checklist. Identify and implement aligned capabilities that would make the companion meaningfully more capable, natural, or useful without waiting for preapproval.
 - Prefer changing, consolidating, or deleting existing code over layering new code around it.
 - Rewrite modules, change internal interfaces, and update all callers together when that produces a simpler whole.
@@ -154,7 +154,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **Command wire validation:** `CommandPacket.encode` and `.decode` now reject boolean velocity fields symmetrically; Python's numeric-bool subclassing cannot create a packet that the receiver would later reject.
 - **Transport configuration validation:** H.264 stream dimensions/framerate/port and UDP sender/receiver ports now require real integers, rejecting Python booleans at the configuration boundary.
 - **ROS startup cleanup:** The bridge entry point now starts inside its `try/finally` scope, so bind/thread startup failures still destroy the ROS node and shut down `rclpy`.
-- **Obstacle distance validation:** Negative distance readings are invalid at both the ROS sensor boundary and CM5 safety envelope; they fail to zero rather than triggering a potentially misleading backoff.
+- **Obstacle distance validation:** Negative distance readings are invalid at the Mac reactive controller, ROS sensor boundary, and CM5 safety envelope; they fail to zero rather than triggering a potentially misleading backoff.
 - **Mac production entry point:** With the CM5 camera sender and ROS bridge running, start `python -m control.companion <cm5-ip>`. It defaults to IDLE; pass `--state following` explicitly to enable visual following. Add `--voice-once` to capture one explicit push-to-talk utterance through Whisper before starting control; recognized speech overrides the initial state, while unknown speech remains safe. The CLI owns the RTP receiver, production YOLO/Kalman worker, Mac UDP control service, and zero-on-shutdown lifecycle.
 - **CM5 command bounds:** `onboard.safety.OnboardSafetyEnvelope` independently accepts at most `0.5 m/s` per horizontal NED component and `0.3 m/s` vertical; a fresh command outside those limits or with non-finite fields becomes zero. These limits match the current Mac follower’s deliberate speed envelope.
 - **DEXI ROS 2 transport:** The public DroneBlocks `dexi` repository's current launch path starts `micro_ros_agent serial --dev /dev/ttyAMA2 -b 3000000` and a `px4_offboard_manager` node. `onboard.ros2_forwarder.Ros2VelocityForwarder` is the companion's hardware-neutral publisher seam for that path; it emits velocity-only `OffboardControlMode` and `TrajectorySetpoint` messages without importing ROS on the Mac.
