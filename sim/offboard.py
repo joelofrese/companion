@@ -7,8 +7,8 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError, VelocityNedYaw
 from mavsdk.telemetry import LandedState
 
-from control.state_machine import ReactiveController
-from sim.offboard_control import demo_state
+from control.runtime import CompanionRuntime
+from sim.offboard_control import demo_state, demo_target
 
 
 SETPOINT_PERIOD_S = 0.05
@@ -55,9 +55,11 @@ async def run():
     await _wait_until_in_air(drone)
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
-    controller = ReactiveController()
-    controller.set_intent(demo_state(0.0))
-    await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command(target_age_s=0.0)))
+    runtime = CompanionRuntime()
+    now = time.monotonic()
+    runtime.set_intent(demo_state(0.0))
+    runtime.update_target(demo_target(), now)
+    await drone.offboard.set_velocity_ned(_mavsdk_velocity(runtime.command(now)))
     await drone.offboard.start()
     print("Offboard started.")
 
@@ -72,12 +74,16 @@ async def run():
     started_at = time.monotonic()
     try:
         while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
-            controller.set_intent(demo_state(elapsed))
-            await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command(target_age_s=0.0)))
+            now = time.monotonic()
+            runtime.set_intent(demo_state(elapsed))
+            runtime.update_target(demo_target(), now)
+            await drone.offboard.set_velocity_ned(_mavsdk_velocity(runtime.command(now)))
             await asyncio.sleep(SETPOINT_PERIOD_S)
     finally:
-        controller.set_intent(demo_state(PROFILE_DURATION_S))
-        await drone.offboard.set_velocity_ned(_mavsdk_velocity(controller.command(target_age_s=0.0)))
+        now = time.monotonic()
+        runtime.set_intent(demo_state(PROFILE_DURATION_S))
+        runtime.update_target(demo_target(), now)
+        await drone.offboard.set_velocity_ned(_mavsdk_velocity(runtime.command(now)))
         telemetry_task.cancel()
         await asyncio.gather(telemetry_task, return_exceptions=True)
         try:

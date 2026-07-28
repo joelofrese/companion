@@ -1,6 +1,7 @@
 """Deterministic cognitive intent profile for SITL bring-up."""
 
 from control.state_machine import State
+from control.tracking import TrackEstimate
 from voice.pipeline import VoiceCommandPipeline
 
 
@@ -20,3 +21,9 @@ def demo_state(elapsed_s: float) -> State:
     if state is None:
         raise RuntimeError(f"demo transcript produced no state: {transcript!r}")
     return state
+
+
+def demo_target() -> TrackEstimate:
+    """Represent a fresh, stable target for the deterministic flight scenario."""
+
+    return TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0)
