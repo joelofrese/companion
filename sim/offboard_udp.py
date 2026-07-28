@@ -26,6 +26,8 @@ from sim.offboard_control import DemoVision, demo_obstacle_distance_m, demo_stat
 
 COMMAND_DROP_START_S = 1.0
 COMMAND_DROP_END_S = 1.5
+COMMAND_INVALID_START_S = 1.6
+COMMAND_INVALID_END_S = 1.8
 
 
 async def run():
@@ -80,7 +82,12 @@ async def run():
         while receiver.port == 0:
             await asyncio.sleep(0)
 
-        def send_packet(elapsed_s: float, timestamp_s: float, transmit: bool = True):
+        def send_packet(
+            elapsed_s: float,
+            timestamp_s: float,
+            transmit: bool = True,
+            command_override=None,
+        ):
             nonlocal sequence
             command = control_loop.tick(
                 frame=None,
@@ -88,6 +95,8 @@ async def run():
                 intent=demo_state(elapsed_s),
                 obstacle_distance_m=demo_obstacle_distance_m(elapsed_s),
             )
+            if command_override is not None:
+                command = command_override
             if transmit:
                 sender.sendto(
                     CommandPacket(sequence, command).encode(),
@@ -114,27 +123,46 @@ async def run():
         obstacle_active = False
         dropout_reported = False
         dropout_safe = False
+        invalid_command_reported = False
+        invalid_command_safe = False
         try:
             while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
                 now = time.monotonic()
                 distance = demo_obstacle_distance_m(elapsed)
                 obstacle_distance_m = distance
                 dropping_commands = COMMAND_DROP_START_S <= elapsed < COMMAND_DROP_END_S
+                injecting_invalid_command = (
+                    COMMAND_INVALID_START_S <= elapsed < COMMAND_INVALID_END_S
+                )
                 if dropping_commands and not dropout_reported:
                     print("Command link dropout; waiting for CM5 heartbeat expiry.")
                     dropout_reported = True
+                if injecting_invalid_command and not invalid_command_reported:
+                    print("Out-of-bounds command; waiting for CM5 local speed limit.")
+                    invalid_command_reported = True
                 if distance < 0.6 and not obstacle_active:
                     print("Obstacle detected; CM5 envelope backing off.")
                     obstacle_active = True
                 elif distance >= 0.6:
                     obstacle_active = False
-                send_packet(elapsed, now, transmit=not dropping_commands)
+                send_packet(
+                    elapsed,
+                    now,
+                    transmit=not dropping_commands,
+                    command_override=(
+                        VelocityCommand(north_m_s=1.0)
+                        if injecting_invalid_command
+                        else None
+                    ),
+                )
                 if dropping_commands and elapsed >= COMMAND_DROP_START_S + receiver.safety.command_timeout_s:
                     if last_safe_command != VelocityCommand():
                         raise RuntimeError(
                             f"CM5 did not expire the dropped command: {last_safe_command}"
                         )
                     dropout_safe = True
+                if injecting_invalid_command and last_safe_command == VelocityCommand():
+                    invalid_command_safe = True
                 await asyncio.sleep(SETPOINT_PERIOD_S)
         finally:
             sender.close()
@@ -151,6 +179,8 @@ async def run():
 
         if not dropout_safe:
             raise RuntimeError("SITL did not observe CM5 zero output during command link dropout")
+        if not invalid_command_safe:
+            raise RuntimeError("SITL did not observe CM5 zero output for an out-of-bounds command")
         if min_north_velocity >= -0.05:
             raise RuntimeError(f"SITL did not observe CM5 obstacle backoff: {min_north_velocity:.2f}m/s")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
