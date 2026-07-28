@@ -1,5 +1,6 @@
 """ROS 2 composition boundary for the CM5 safety command process."""
 
+import argparse
 import asyncio
 import math
 import threading
@@ -119,8 +120,15 @@ class Ros2SafetyBridge:
         self._thread = None
 
 
-def main():
+def main(argv=None):
     """Run the bridge on DEXI-OS where ROS 2 and px4_msgs are installed."""
+
+    parser = argparse.ArgumentParser(description="Run the CM5 ROS 2 safety bridge")
+    parser.add_argument("--bind-host", default="0.0.0.0")
+    parser.add_argument("--command-port", type=int, default=5001)
+    parser.add_argument("--distance-topic", default="/fmu/out/distance_sensor")
+    parser.add_argument("--tick-period", type=float, default=0.02)
+    args = parser.parse_args(argv)
 
     import rclpy
     from px4_msgs.msg import DistanceSensor, OffboardControlMode, TrajectorySetpoint
@@ -140,6 +148,10 @@ def main():
         setpoint_message=TrajectorySetpoint,
         distance_message=DistanceSensor,
         qos_profile=qos_profile,
+        bind_host=args.bind_host,
+        command_port=args.command_port,
+        distance_topic=args.distance_topic,
+        tick_period_s=args.tick_period,
     )
     bridge.start()
     try:
