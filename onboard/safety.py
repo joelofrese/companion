@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from control.command_packet import CommandPacket
 from control.state_machine import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 
@@ -16,6 +17,7 @@ class OnboardSafetyEnvelope:
         self._command: Optional[VelocityCommand] = None
         self._received_at_s: Optional[float] = None
         self._last_tick_s: Optional[float] = None
+        self._last_sequence: Optional[int] = None
 
     def receive(self, timestamp_s: float, command: VelocityCommand):
         """Record one command using the CM5 receive timestamp."""
@@ -24,6 +26,16 @@ class OnboardSafetyEnvelope:
             raise ValueError("received command timestamps must increase")
         self._command = command
         self._received_at_s = timestamp_s
+
+    def receive_packet(self, timestamp_s: float, payload: bytes) -> bool:
+        """Accept a newer wire packet and ignore duplicates or reordered packets."""
+
+        packet = CommandPacket.decode(payload)
+        if self._last_sequence is not None and packet.sequence <= self._last_sequence:
+            return False
+        self.receive(timestamp_s, packet.command)
+        self._last_sequence = packet.sequence
+        return True
 
     def tick(
         self,

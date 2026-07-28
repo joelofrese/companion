@@ -161,7 +161,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - [ ] First real flight test
 
 ## Open Questions
-- **CM5 PX4 forwarding:** The full reactive layer stays on the Mac; the CM5 now owns the final heartbeat/TOF safety envelope. Hardware bring-up still needs the concrete DEXI-OS process that forwards only the envelope's safe velocity to PX4.
+- **CM5 PX4 forwarding:** The full reactive layer stays on the Mac; the CM5 now owns the final heartbeat/TOF safety envelope and a versioned command packet codec. Hardware bring-up still needs the concrete DEXI-OS process that receives packets and forwards only the envelope's safe velocity to PX4.
 - **Obstacle avoidance scope:** TOF sensor gives a single forward distance. Is that enough, or do we need multi-directional sensing for the avoiding state?
 - **State transition authority:** Can the reactive layer ever trigger a state transition (e.g. force AVOIDING), or does only the cognitive layer set state? Needs a clear rule to avoid race conditions.
 - **Voice trigger:** Always-on listening vs. push-to-talk? Affects Whisper latency and battery tradeoffs.
@@ -172,6 +172,7 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **Voice trigger:** Use push-to-talk for the first implementation. It avoids accidental commands and keeps idle CPU/battery use predictable; always-on listening can be reconsidered after the core flight loop is safe.
 - **Visual follow geometry:** Start with a forward-facing 640 px camera model: target height controls north-frame distance correction and horizontal image error controls east-frame correction. Calibrate camera orientation and desired target size before hardware flight.
 - **Reactive layer location:** Keep vision, tracking, state, and normal velocity generation on the Mac; run only the small CM5 safety envelope locally so Wi-Fi loss cannot preserve a stale command or bypass the forward obstacle stop.
+- **Command wire contract:** Use version-1 compact JSON packets containing a non-negative sequence and NED/yaw velocity; timestamp on CM5 receipt rather than synchronizing Mac and CM5 clocks. Duplicate or reordered sequence numbers do not refresh the heartbeat.
 
 ## Constraints / Non-Goals
 - **No GPS** — positioning is optical flow only; designed for indoor/GPS-denied environments
@@ -219,3 +220,4 @@ States are set by the AI. Transitions happen slowly (1–5 Hz) — that's fine.
 - **2026-07-28** — Added `onboard/video_sender.py`, a managed CM5 `libcamerasrc`→RTP/H.264 process with explicit lifecycle and CLI configuration. Sixty-seven tests pass, the sender CLI help is verified, and the existing local RTP loopback still decodes a `(48, 64, 3)` BGR frame. Actual CM5 camera execution remains hardware/DEXI-OS gated because this Mac has no `libcamerasrc` plugin.
 - **2026-07-28** — Re-audited the 72-test suite. It remains fast and mostly behavior-focused, but repeated exact motion assertions and a few adapter-call assertions could resist future refactoring. Clarified that test count is not progress, redundant or obsolete tests should be deleted, tunable behavior should use bounds and tolerances, and SITL/Gazebo remains the final authority for flight behavior.
 - **2026-07-28** — Added `onboard/safety.py`, the transport-independent CM5 safety envelope. Fresh Mac commands pass through, stale or absent commands become zero velocity, and a local forward TOF reading overrides a fresh command with the bounded backoff. Seventy-two tests pass, and the existing offboard SITL regression observed `0.32 m/s` forward and `-0.17 m/s` backoff before a clean landing. The remaining hardware task is wiring this envelope to the DEXI-OS MAVLink/PX4 forwarding process.
+- **2026-07-28** — Added `control/command_packet.py` and connected packet receipt to the CM5 safety envelope. The dependency-free version-1 codec validates finite velocity fields, bounds packet size, and prevents reordered packets from refreshing the local heartbeat. Seventy-eight tests pass; the remaining hardware task is wiring packet reception and safe-command forwarding into DEXI-OS.

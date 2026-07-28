@@ -1,5 +1,6 @@
 import unittest
 
+from control.command_packet import CommandPacket
 from control.velocity import VelocityCommand
 from onboard.safety import OnboardSafetyEnvelope
 
@@ -33,6 +34,14 @@ class OnboardSafetyEnvelopeTests(unittest.TestCase):
         envelope.tick(2.1)
         with self.assertRaises(ValueError):
             envelope.tick(2.0)
+
+    def test_reordered_wire_packets_do_not_refresh_heartbeat(self):
+        envelope = OnboardSafetyEnvelope()
+        first = CommandPacket(2, VelocityCommand(north_m_s=0.3)).encode()
+        old = CommandPacket(1, VelocityCommand(north_m_s=-0.3)).encode()
+        self.assertTrue(envelope.receive_packet(1.0, first))
+        self.assertFalse(envelope.receive_packet(1.1, old))
+        self.assertEqual(envelope.tick(1.151), VelocityCommand())
 
 
 if __name__ == "__main__":
