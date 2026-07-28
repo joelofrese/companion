@@ -14,6 +14,10 @@ class H264StreamConfig:
     height: int = 480
     framerate: int = 30
 
+    def __post_init__(self):
+        if self.port <= 0 or self.width <= 0 or self.height <= 0 or self.framerate <= 0:
+            raise ValueError("stream dimensions, port, and framerate must be positive")
+
     def sender_command(self, destination_host: str) -> Sequence[str]:
         """Return the CM5 libcamera-to-RTP command for this stream format."""
 
@@ -52,8 +56,6 @@ class GStreamerH264Receiver:
         config: H264StreamConfig = H264StreamConfig(),
         process_factory: Optional[Callable[..., object]] = None,
     ):
-        if config.port <= 0 or config.width <= 0 or config.height <= 0 or config.framerate <= 0:
-            raise ValueError("stream dimensions, port, and framerate must be positive")
         self.config = config
         self._process_factory = process_factory or subprocess.Popen
         self._process = None

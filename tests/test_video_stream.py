@@ -95,7 +95,9 @@ class GStreamerH264ReceiverTests(unittest.TestCase):
 
     def test_invalid_config_is_rejected(self):
         with self.assertRaises(ValueError):
-            GStreamerH264Receiver(H264StreamConfig(port=0))
+            H264StreamConfig(port=0)
+        with self.assertRaises(ValueError):
+            H264StreamConfig(width=0)
 
     def test_async_reader_does_not_block_while_frame_is_pending(self):
         async def verify():
