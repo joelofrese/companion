@@ -96,3 +96,5 @@ and review the companion continuously without physical intervention.
 Hardware bring-up later validates how well the simulated interfaces translate
 to the real camera, network, sensors, and vehicle. It should add evidence and
 calibration, not replace the simulation-first development loop.
+
+thank you, good luck, and i love you
