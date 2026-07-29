@@ -90,7 +90,12 @@ retries merely to make a run pass.
 
 ## Current boundary
 
-The software control and simulation paths are implemented and continuously
-verified. Hardware bring-up remains the next source of evidence for camera and
-network behavior, onboard sensor data, flight-controller forwarding, and real
-flight. Keep those unknowns explicit rather than hiding them behind simulation.
+Simulation is the main development environment, not a preliminary demo. Keep
+building thorough, autonomous PX4/Gazebo scenarios that exercise the complete
+control path, varied perception and sensor conditions, faults, recovery,
+safety, and long-running behavior. Use those scenarios to develop, refactor,
+and review the companion continuously without physical intervention.
+
+Hardware bring-up later validates how well the simulated interfaces translate
+to the real camera, network, sensors, and vehicle. It should add evidence and
+calibration, not replace the simulation-first development loop.
