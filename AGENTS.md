@@ -24,9 +24,10 @@ Remove dead code, unnecessary tests, speculative configuration, and abstractions
 that do not provide present value. Preserve unrelated user work. Refactor
 broadly when it makes the whole system cleaner.
 
-Continue iterating toward the project goal autonomously. When no meaningful
-work remains, sleep for 15 minutes, reread `STEERING.md`, and continue; repeat
-until new steering is given.
+Continuously review the entire codebase for cleanliness and simplicity. Refactor
+freely when it improves the whole system, then develop new capabilities that
+help the companion operate autonomously and learn. Repeat this review,
+refactoring, and development loop continuously.
 
 ## How control works
 
