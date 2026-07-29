@@ -120,6 +120,10 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Hardened `sim.world` failure cleanup to attempt a landing after
+  any post-arm assertion or service failure, matching the production verifier's
+  safety lifecycle. Normal synthetic-world SITL still passed with complete
+  motion, fault, recovery, and landing evidence.
 - 2026-07-28: Applied the same finite numeric validation to the Mac watchdog
   interval and UDP control tick period. The 36-check suite, command loopback,
   synthetic-world SITL, and production RTP/YOLO SITL all passed afterward.

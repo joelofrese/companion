@@ -111,10 +111,14 @@ async def run():
     service_stop = asyncio.Event()
     telemetry_task = None
     position_task = None
+    offboard_started = False
+    armed = False
+    landed = False
     obstacle_distance_m = None
     safe_commands = []
     try:
         await prepare(drone)
+        armed = True
 
         origin = None
         vehicle_position_m = None
@@ -171,6 +175,7 @@ async def run():
         send_packet(0.0, time.monotonic())
         await asyncio.sleep(SETPOINT_PERIOD_S * 2)
         await drone.offboard.start()
+        offboard_started = True
         print("Offboard started through synthetic world and CM5 safety.")
 
         max_north_velocity = 0.0
@@ -216,10 +221,12 @@ async def run():
             await asyncio.gather(telemetry_task, return_exceptions=True)
             position_task.cancel()
             await asyncio.gather(position_task, return_exceptions=True)
-            try:
-                await drone.offboard.stop()
-            except OffboardError:
-                pass
+            if offboard_started:
+                try:
+                    await drone.offboard.stop()
+                except OffboardError:
+                    pass
+                offboard_started = False
 
         commands = [(timestamp_s - started_at, command) for timestamp_s, command in safe_commands]
 
@@ -249,6 +256,7 @@ async def run():
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
         await land(drone)
+        landed = True
     finally:
         receiver.close()
         if sender is not None:
@@ -259,6 +267,16 @@ async def run():
         if position_task is not None:
             position_task.cancel()
             await asyncio.gather(position_task, return_exceptions=True)
+        if offboard_started:
+            try:
+                await drone.offboard.stop()
+            except Exception:
+                pass
+        if armed and not landed:
+            try:
+                await land(drone)
+            except Exception:
+                pass
         close_mavsdk(drone)
 
 
