@@ -138,6 +138,10 @@ PX4/Gazebo/MAVSDK processes before retrying.
   stream ends with its shutdown zero. The managed RTP/YOLO/Kalman SITL run
   passed with priming, following, hover, obstacle backoff, shutdown zero,
   landing, and disarm.
+- 2026-07-29: Shared flight preparation now attempts a landing if arming or
+  takeoff setup fails. Production priming evidence is recorded only after the
+  MAVSDK forwarder accepts the setpoint, fixing a real `NO_SETPOINT_SET` race;
+  synthetic and production managed SITL both passed afterward.
 - 2026-07-29: Hardened managed-run cleanup to terminate the dedicated PX4
   process group even when `make` exits before the scenario starts, avoiding
   broad name-based kills and partial-boot leftovers.

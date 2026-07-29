@@ -95,8 +95,8 @@ async def run(image_path: str):
 
         class ObservingForwarder:
             async def send(self, command):
-                safe_commands.append((time.monotonic(), command))
                 await forwarder.send(command)
+                safe_commands.append((time.monotonic(), command))
 
         receiver.start()
         cm5_service = SafetyCommandService(

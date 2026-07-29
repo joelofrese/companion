@@ -25,13 +25,20 @@ async def prepare(drone):
             break
 
     print("Arming...")
-    await drone.action.arm()
-    print(f"Taking off to {TAKEOFF_ALTITUDE}m...")
-    await drone.action.set_takeoff_altitude(TAKEOFF_ALTITUDE)
-    await drone.action.takeoff()
-    async for state in drone.telemetry.landed_state():
-        if state == LandedState.IN_AIR:
-            return
+    try:
+        await drone.action.arm()
+        print(f"Taking off to {TAKEOFF_ALTITUDE}m...")
+        await drone.action.set_takeoff_altitude(TAKEOFF_ALTITUDE)
+        await drone.action.takeoff()
+        async for state in drone.telemetry.landed_state():
+            if state == LandedState.IN_AIR:
+                return
+    except Exception:
+        try:
+            await drone.action.land()
+        except Exception:
+            pass
+        raise
 
 
 async def land(drone):
