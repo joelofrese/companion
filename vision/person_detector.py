@@ -8,6 +8,7 @@ from control.tracking import Detection
 
 
 PERSON_CLASS_ID = 0
+ASSOCIATION_MAX_GAP_S = 0.5
 
 
 def _finite(value: object) -> bool:
@@ -47,9 +48,18 @@ class YoloPersonDetector:
         self._model = model
         self.confidence_threshold = confidence_threshold
         self._last_center = None
+        self._last_detection_timestamp_s = None
 
     def detect(self, frame: Any, timestamp_s: float) -> Optional[Detection]:
         """Run YOLO and return one person observation, or None when no person is found."""
+
+        if not _finite(timestamp_s):
+            raise ValueError("detection timestamp must be finite")
+        if (
+            self._last_detection_timestamp_s is not None
+            and timestamp_s - self._last_detection_timestamp_s > ASSOCIATION_MAX_GAP_S
+        ):
+            self._last_center = None
 
         results = self._model(frame, verbose=False)
         candidates = []
@@ -93,6 +103,7 @@ class YoloPersonDetector:
             )
         _, confidence, coordinates, center_x, center_y = best
         self._last_center = (center_x, center_y)
+        self._last_detection_timestamp_s = timestamp_s
         x1, y1, x2, y2 = coordinates
         return Detection(
             x_px=center_x,
