@@ -102,6 +102,8 @@ class SyntheticWorld:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
         if DROPOUT_START_S <= elapsed_s < DROPOUT_END_S:
             return WorldStep(State.FOLLOWING, transmit=False)
+        if DROPOUT_END_S <= elapsed_s < LINK_RECOVERY_END_S:
+            return WorldStep(State.FOLLOWING)
         if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
             return WorldStep(
                 State.FOLLOWING,

@@ -18,9 +18,12 @@ async def prepare(drone):
 
     print("Waiting for vehicle to be ready to arm...")
     async for health in drone.telemetry.health():
-        if (health.is_global_position_ok
-                and health.is_home_position_ok
-                and health.is_magnetometer_calibration_ok):
+        if (
+            health.is_global_position_ok
+            and health.is_home_position_ok
+            and health.is_local_position_ok
+            and health.is_magnetometer_calibration_ok
+        ):
             print("Ready.")
             break
 
