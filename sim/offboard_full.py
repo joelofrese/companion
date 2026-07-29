@@ -18,8 +18,12 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare
-from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S
-from sim.offboard_control import demo_obstacle_distance_m, demo_state
+from sim.offboard_control import (
+    PROFILE_DURATION_S,
+    SETPOINT_PERIOD_S,
+    demo_obstacle_distance_m,
+    demo_state,
+)
 from sim.video_loopback import image_sender_command
 from vision.latest import LatestVisionPipeline
 from vision.person_detector import YoloPersonDetector

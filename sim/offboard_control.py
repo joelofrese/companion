@@ -5,6 +5,10 @@ from control.tracking import TrackEstimate
 from voice.pipeline import VoiceCommandPipeline
 
 
+SETPOINT_PERIOD_S = 0.05
+PROFILE_DURATION_S = 8.0
+
+
 class _DemoTranscriber:
     def transcribe(self, transcript):
         return transcript

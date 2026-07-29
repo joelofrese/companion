@@ -23,7 +23,7 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare
-from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S
+from sim.offboard_control import PROFILE_DURATION_S, SETPOINT_PERIOD_S
 
 
 TARGET_RIGHT_START_S = 1.0
