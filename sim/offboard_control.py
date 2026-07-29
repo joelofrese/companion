@@ -1,5 +1,7 @@
 """Deterministic cognitive intent profile for SITL bring-up."""
 
+from dataclasses import dataclass
+
 from control.state_machine import State
 from control.tracking import TrackEstimate
 from voice.pipeline import VoiceCommandPipeline
@@ -12,6 +14,15 @@ SECOND_FOLLOW_START_S = 12.0
 SECOND_FOLLOW_END_S = 16.0
 THIRD_FOLLOW_START_S = 24.0
 THIRD_FOLLOW_END_S = 28.0
+
+
+@dataclass(frozen=True)
+class DistanceMessage:
+    """Small simulation equivalent of PX4's distance-sensor message."""
+
+    current_distance: float
+    min_distance: float = 0.0
+    max_distance: float = 10.0
 
 
 class _DemoTranscriber:

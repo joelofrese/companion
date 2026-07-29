@@ -25,6 +25,7 @@ from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
+    DistanceMessage,
     PROFILE_DURATION_S,
     SECOND_FOLLOW_END_S,
     SECOND_FOLLOW_START_S,
@@ -60,13 +61,6 @@ class WorldStep:
     obstacle_distance_m: Optional[float] = 2.0
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
-
-
-@dataclass(frozen=True)
-class DistanceMessage:
-    current_distance: float
-    min_distance: float = 0.0
-    max_distance: float = 10.0
 
 
 class SyntheticWorld:

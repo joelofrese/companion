@@ -15,9 +15,11 @@ from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
+from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
+    DistanceMessage,
     FOLLOW_END_S,
     SECOND_FOLLOW_END_S,
     SECOND_FOLLOW_START_S,
@@ -61,7 +63,7 @@ async def run(image_path: str):
     offboard_task = None
     cm5_stop = asyncio.Event()
     mac_stop = asyncio.Event()
-    obstacle_distance_m = 2.0
+    distance_sensor = LatestDistanceSensor()
     flight_started_at = None
     armed = False
     offboard_started = False
@@ -74,10 +76,9 @@ async def run(image_path: str):
     video_fault_reported = False
 
     def current_obstacle(timestamp_s):
-        nonlocal obstacle_distance_m
         elapsed_s = max(0.0, timestamp_s - flight_started_at)
-        obstacle_distance_m = demo_obstacle_distance_m(elapsed_s)
-        return obstacle_distance_m
+        distance_sensor.update(DistanceMessage(demo_obstacle_distance_m(elapsed_s)))
+        return distance_sensor.read()
 
     def current_intent(timestamp_s):
         return demo_state(max(0.0, timestamp_s - flight_started_at))
@@ -107,7 +108,7 @@ async def run(image_path: str):
             receiver,
             ObservingForwarder(),
             tick_period_s=SETPOINT_PERIOD_S,
-            obstacle_distance=lambda: obstacle_distance_m,
+            obstacle_distance=distance_sensor.read,
         )
         cm5_service.start()
         cm5_task = asyncio.create_task(cm5_service.run(cm5_stop))
