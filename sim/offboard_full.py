@@ -27,6 +27,8 @@ from sim.offboard_control import (
     SECOND_FOLLOW_START_S,
     PROFILE_DURATION_S,
     SETPOINT_PERIOD_S,
+    TARGET_LOST_END_S,
+    TARGET_LOST_START_S,
     THIRD_FOLLOW_END_S,
     THIRD_FOLLOW_START_S,
     demo_obstacle_distance_m,
@@ -76,6 +78,7 @@ async def run(image_path: str):
     min_east_velocity = 0.0
     frames_received = 0
     video_fault_reported = False
+    target_loss_reported = False
 
     def current_obstacle(timestamp_s):
         elapsed_s = max(0.0, timestamp_s - flight_started_at)
@@ -133,8 +136,18 @@ async def run(image_path: str):
         flight_started_at = time.monotonic()
 
         async def read_frame():
-            nonlocal frames_received, video_fault_reported
+            nonlocal frames_received, target_loss_reported, video_fault_reported
             sample = await frame_reader.read()
+            elapsed_s = (
+                time.monotonic() - flight_started_at
+                if flight_started_at is not None
+                else 0.0
+            )
+            if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
+                if not target_loss_reported:
+                    print("Camera frame loss injected during following.")
+                    target_loss_reported = True
+                return time.monotonic(), None
             if (
                 flight_started_at is not None
                 and time.monotonic() - flight_started_at >= PROFILE_DURATION_S - 3.0
@@ -254,6 +267,18 @@ async def run(image_path: str):
                 SECOND_FOLLOW_END_S,
                 lambda command: command.north_m_s > 0.0,
                 "following recovery after invalid sensor",
+            ),
+            (
+                TARGET_LOST_START_S + 0.55,
+                TARGET_LOST_END_S,
+                lambda command: command == VelocityCommand(),
+                "target-loss hold after vision expiry",
+            ),
+            (
+                TARGET_LOST_END_S + 0.1,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after target loss",
             ),
             (
                 SECOND_FOLLOW_END_S,
