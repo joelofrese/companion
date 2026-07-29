@@ -175,12 +175,14 @@ async def run():
 
         max_north_velocity = 0.0
         min_north_velocity = 0.0
+        max_east_velocity = 0.0
 
         async def observe_velocity():
-            nonlocal max_north_velocity, min_north_velocity
+            nonlocal max_north_velocity, min_north_velocity, max_east_velocity
             async for velocity in drone.telemetry.velocity_ned():
                 max_north_velocity = max(max_north_velocity, velocity.north_m_s)
                 min_north_velocity = min(min_north_velocity, velocity.north_m_s)
+                max_east_velocity = max(max_east_velocity, velocity.east_m_s)
 
         telemetry_task = asyncio.create_task(observe_velocity())
         reported = set()
@@ -241,7 +243,10 @@ async def run():
                 raise RuntimeError(f"SITL did not observe {behavior}")
         if min_north_velocity >= -0.05:
             raise RuntimeError(f"SITL did not observe obstacle backoff: {min_north_velocity:.2f}m/s")
+        if max_east_velocity <= 0.02:
+            raise RuntimeError(f"SITL did not observe lateral following: {max_east_velocity:.2f}m/s")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
+        print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
         await land(drone)
     finally:

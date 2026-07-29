@@ -129,6 +129,12 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   position-coupled too. The scenario verifies saved following intent
   resumes after obstacle backoff. The verifier explicitly closes its MAVSDK
   helper for clean repeated runs.
+- 2026-07-28: Strengthened `sim.world` to require actual simulated eastward
+  vehicle motion as well as lateral command-path evidence. The scenario passed
+  again with `0.17 m/s` forward, `0.16 m/s` obstacle backoff, and clean landing.
+  Audited PX4's named SDF-world mechanism; adding a companion-owned world would
+  require coupling to an external PX4 rebuild without improving this automated
+  control evidence enough to justify the added maintenance.
 - 2026-07-28: Tightened `sim.offboard_full` so its production RTP/YOLO scenario
   must observe both nonzero visual-following motion and obstacle backoff before
   it can pass. The bundled YOLO person fixture produced 0.04 m/s forward,
