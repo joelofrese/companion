@@ -78,10 +78,10 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The synthetic world exercises
 the command path, motion, target loss, obstacle handling, malformed input,
-dropout, recovery, shutdown, landing, and disarm. The image scenario exercises
-decoded RTP/video, perception, Mac commands, onboard safety, and PX4. Neither
-scenario proves physical sensors, radio behavior, or hardware-specific
-transport.
+dropout, recovery, sustained hover, shutdown, landing, and disarm. The image
+scenario exercises decoded RTP/video, perception, Mac commands, onboard safety,
+and PX4. Neither scenario proves physical sensors, radio behavior, or
+hardware-specific transport.
 
 ## Current state
 
