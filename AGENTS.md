@@ -47,15 +47,16 @@ The onboard safety path must remain safe when the Mac, vision, or Wi-Fi fails:
 stale or invalid input becomes zero motion, and a fresh obstacle reading may
 override normal intent. Safety behavior must be explicit and bounded.
 
-## System boundary
+## Where the parts run
 
 Heavy perception, cognition, and interaction run on the Mac. The vehicle-side
-computer relays sensors and video, enforces the final command boundary, and
-forwards approved velocity setpoints to PX4. Hardware-specific integration is
-kept at that boundary so the Mac-side control behavior remains testable.
+computer relays sensors and video, performs the final safety check, and
+forwards approved velocity setpoints to PX4. Keep hardware-specific code there
+so the Mac-side control behavior remains easy to simulate and test.
 
 Do not add hardware features, sensing directions, speed, or autonomy claims
-without a concrete need and evidence. Prefer deliberate, cancellable motion.
+without a concrete need and evidence. Keep movement slow, deliberate, and easy
+to stop.
 
 ## Simulation and validation
 
@@ -88,7 +89,7 @@ transport.
 Fix failures at their source. Do not weaken simulation assertions or add
 retries merely to make a run pass.
 
-## Current boundary
+## Current state
 
 Simulation is the main development environment, not a preliminary demo. Keep
 building thorough, autonomous PX4/Gazebo scenarios that exercise the complete
