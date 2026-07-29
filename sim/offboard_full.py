@@ -178,6 +178,7 @@ async def run(image_path: str):
             raise RuntimeError("full stack did not observe CM5 shutdown zero")
         print("CM5 shutdown zero=verified.")
         print(f"RTP frames received: {frames_received}.")
+
         def forward_count(start_s, end_s):
             return sum(
                 command.north_m_s > 0.0
@@ -199,36 +200,45 @@ async def run(image_path: str):
             raise RuntimeError(
                 f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
             )
-        if not any(
-            5.0 <= timestamp_s - flight_started_at < 7.0
-            and command == VelocityCommand()
-            for timestamp_s, command in safe_commands
-        ):
-            raise RuntimeError("full stack did not observe hover intent at CM5")
-        if not any(
-            SECOND_FOLLOW_START_S <= timestamp_s - flight_started_at < SECOND_FOLLOW_END_S
-            and command.north_m_s > 0.0
-            for timestamp_s, command in safe_commands
-        ):
-            raise RuntimeError("full stack did not observe following after hover at CM5")
-        if not any(
-            SECOND_FOLLOW_END_S <= timestamp_s - flight_started_at < THIRD_FOLLOW_START_S
-            and command == VelocityCommand()
-            for timestamp_s, command in safe_commands
-        ):
-            raise RuntimeError("full stack did not observe second hover intent at CM5")
-        if not any(
-            THIRD_FOLLOW_START_S <= timestamp_s - flight_started_at < THIRD_FOLLOW_END_S
-            and command.north_m_s > 0.0
-            for timestamp_s, command in safe_commands
-        ):
-            raise RuntimeError("full stack did not observe following after second hover at CM5")
-        if not any(
-            THIRD_FOLLOW_END_S <= timestamp_s - flight_started_at < PROFILE_DURATION_S
-            and command == VelocityCommand()
-            for timestamp_s, command in safe_commands
-        ):
-            raise RuntimeError("full stack did not observe final hover intent at CM5")
+
+        def observed(start_s, end_s, predicate):
+            return any(
+                start_s <= timestamp_s - flight_started_at < end_s
+                and predicate(command)
+                for timestamp_s, command in safe_commands
+            )
+
+        objectives = (
+            (5.0, 7.0, lambda command: command == VelocityCommand(), "hover intent"),
+            (
+                SECOND_FOLLOW_START_S,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following after hover",
+            ),
+            (
+                SECOND_FOLLOW_END_S,
+                THIRD_FOLLOW_START_S,
+                lambda command: command == VelocityCommand(),
+                "second hover intent",
+            ),
+            (
+                THIRD_FOLLOW_START_S,
+                THIRD_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following after second hover",
+            ),
+            (
+                THIRD_FOLLOW_END_S,
+                PROFILE_DURATION_S,
+                lambda command: command == VelocityCommand(),
+                "final hover intent",
+            ),
+        )
+        for start_s, end_s, predicate, objective in objectives:
+            if not observed(start_s, end_s, predicate):
+                raise RuntimeError(f"full stack did not observe {objective} at CM5")
+            print(f"Mission objective passed: {objective} through CM5.")
         print("Repeated following and hover intent through CM5=verified.")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
