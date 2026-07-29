@@ -127,6 +127,10 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   now responds to the vehicle's actual simulated NED position, and the scenario
   verifies saved following intent resumes after obstacle backoff. The verifier
   explicitly closes its MAVSDK helper for clean repeated runs.
+- 2026-07-28: Tightened `sim.offboard_full` so its production RTP/YOLO scenario
+  must observe both nonzero visual-following motion and obstacle backoff before
+  it can pass. A known person-containing fixture produced 0.04 m/s forward,
+  -0.17 m/s backoff, and clean landing.
 - 2026-07-28: Reduced deterministic coverage to 32 focused safety-contract
   checks across command validity, watchdog/obstacle fail-safe behavior, safe
   shutdown, vision liveness, and CM5/PX4 bridge seams. Removed component and

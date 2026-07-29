@@ -129,7 +129,7 @@ async def run(image_path: str):
                 VisualFollower(
                     FollowConfig(
                         frame_width_px=video_config.width,
-                        desired_target_height_px=video_config.height / 4.0,
+                        desired_target_height_px=video_config.height / 2.0,
                     )
                 )
             )
@@ -165,6 +165,10 @@ async def run(image_path: str):
         if min_north_velocity >= -0.05:
             raise RuntimeError(
                 f"full stack did not observe obstacle backoff: {min_north_velocity:.2f}m/s"
+            )
+        if max_north_velocity <= 0.02:
+            raise RuntimeError(
+                f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
             )
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
