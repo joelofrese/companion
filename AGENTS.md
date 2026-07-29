@@ -65,17 +65,15 @@ confirmed from output or telemetry, including connection, readiness, arming,
 offboard setpoints, expected motion, safety intervention, landing, and disarm.
 
 Do not add unit tests; keeping them out keeps the codebase simpler and less
-rigid. Keep verification in Gazebo and through end-to-end behavior. Remove
-existing unit tests when their behavior is covered by the simulation; do not
-preserve code or architecture to support them.
+rigid. Keep verification in Gazebo and through end-to-end behavior.
 
 From `companion/`, the normal simulation loop is:
 
 ```sh
-PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice tests
-python -m sim.command_loopback
-python -m sim.run_world
-python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
+PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice
+.venv/bin/python -m sim.command_loopback
+.venv/bin/python -m sim.run_world
+.venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The synthetic world exercises
