@@ -176,6 +176,8 @@ async def run(image_path: str):
         await cm5_task
         if not safe_commands or safe_commands[-1][1] != VelocityCommand():
             raise RuntimeError("full stack did not observe CM5 shutdown zero")
+        if frames_received == 0:
+            raise RuntimeError("full stack did not receive a decoded RTP frame")
         print("CM5 shutdown zero=verified.")
         print(f"RTP frames received: {frames_received}.")
 
