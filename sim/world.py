@@ -72,7 +72,7 @@ class SyntheticWorld:
         if vehicle_position_m is None:
             return None
         north_m, east_m = vehicle_position_m
-        target_north_m = 1.6
+        target_north_m = 8.0
         target_east_m = 0.8 if TARGET_RIGHT_START_S <= elapsed_s < TARGET_RIGHT_END_S else 0.0
         north_distance_m = target_north_m - north_m
         if north_distance_m <= 0.0:
