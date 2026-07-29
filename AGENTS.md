@@ -120,6 +120,9 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Applied the same finite numeric validation to the Mac watchdog
+  interval and UDP control tick period. The 36-check suite, command loopback,
+  synthetic-world SITL, and production RTP/YOLO SITL all passed afterward.
 - 2026-07-28: Hardened CM5 safety configuration so non-finite, boolean, and
   non-numeric command timeouts, distance freshness windows, and service tick
   periods are rejected before a safety loop starts. The focused suite now has

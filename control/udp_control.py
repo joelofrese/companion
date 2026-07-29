@@ -29,7 +29,12 @@ class UdpControlService:
         tick_period_s: float = 0.05,
         frame_timeout_s: float = 2.0,
     ):
-        if tick_period_s <= 0.0:
+        if (
+            isinstance(tick_period_s, bool)
+            or not isinstance(tick_period_s, Real)
+            or not math.isfinite(tick_period_s)
+            or tick_period_s <= 0.0
+        ):
             raise ValueError("tick period must be positive")
         if (
             isinstance(frame_timeout_s, bool)

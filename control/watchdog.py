@@ -1,5 +1,8 @@
 """Latched setpoint heartbeat watchdog for safety-critical offboard output."""
 
+import math
+from numbers import Real
+
 from control.velocity import VelocityCommand
 
 
@@ -7,7 +10,12 @@ class SetpointWatchdog:
     """Replace commands with zero velocity after a missed setpoint deadline."""
 
     def __init__(self, max_interval_s: float = 0.15):
-        if max_interval_s <= 0.0:
+        if (
+            isinstance(max_interval_s, bool)
+            or not isinstance(max_interval_s, Real)
+            or not math.isfinite(max_interval_s)
+            or max_interval_s <= 0.0
+        ):
             raise ValueError("watchdog interval must be positive")
         self.max_interval_s = max_interval_s
         self._last_sent_at_s = None

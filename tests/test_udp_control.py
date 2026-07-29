@@ -27,6 +27,12 @@ class FakeSender:
 
 
 class UdpControlServiceTests(unittest.TestCase):
+    def test_invalid_tick_period_is_rejected(self):
+        for value in (0.0, float("nan"), True, "slow"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    UdpControlService(FakeLoop(), FakeSender(), lambda: None, tick_period_s=value)
+
     def test_streams_commands_and_sends_shutdown_zero(self):
         sender = FakeSender()
         samples = iter([(1.0, "frame")])

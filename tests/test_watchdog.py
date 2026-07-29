@@ -5,6 +5,12 @@ from control.watchdog import SetpointWatchdog
 
 
 class SetpointWatchdogTests(unittest.TestCase):
+    def test_invalid_interval_is_rejected(self):
+        for value in (0.0, float("nan"), True, "slow"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    SetpointWatchdog(max_interval_s=value)
+
     def test_healthy_ticks_pass_desired_command(self):
         watchdog = SetpointWatchdog(max_interval_s=0.15)
         desired = VelocityCommand(north_m_s=0.5)
