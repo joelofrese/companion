@@ -1,4 +1,4 @@
-"""Launch PX4/Gazebo, run the synthetic world, and clean up as one command."""
+"""Launch PX4/Gazebo, run a companion scenario, and clean up as one command."""
 
 import argparse
 import os
@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+from typing import Optional
 
 
 BOOT_MARKER = "pxh>"
@@ -42,12 +43,14 @@ def _stop_process_group(process):
             pass
 
 
-def run(px4_dir: Path, companion_dir: Path) -> int:
+def run(px4_dir: Path, companion_dir: Path, image_path: Optional[Path] = None) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
         raise RuntimeError("stdbuf is required to observe PX4 boot output")
     if not px4_dir.is_dir():
         raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
+    if image_path is not None and not image_path.is_file():
+        raise RuntimeError(f"scenario image does not exist: {image_path}")
 
     process = subprocess.Popen(
         [stdbuf, "-oL", "-eL", "make", "px4_sitl", "gz_x500"],
@@ -74,26 +77,33 @@ def run(px4_dir: Path, companion_dir: Path) -> int:
                 )
             if time.monotonic() >= deadline:
                 raise RuntimeError("PX4 did not reach pxh> before the boot timeout")
-        result = subprocess.run(
-            [sys.executable, "-u", "-m", "sim.world"],
-            cwd=companion_dir,
-            check=False,
-        )
+        scenario = [sys.executable, "-u", "-m"]
+        scenario += ["sim.offboard_full", str(image_path)] if image_path else ["sim.world"]
+        result = subprocess.run(scenario, cwd=companion_dir, check=False)
         return result.returncode
     finally:
         _stop_process_group(process)
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Run the complete PX4/Gazebo synthetic world")
+    parser = argparse.ArgumentParser(description="Run a complete PX4/Gazebo companion scenario")
     parser.add_argument(
         "--px4-dir",
         type=Path,
         default=Path.home() / "Code/Croppie/PX4-Autopilot",
     )
+    parser.add_argument(
+        "--image",
+        type=Path,
+        help="run production RTP/YOLO full-stack verification with this person image",
+    )
     args = parser.parse_args(argv)
     try:
-        return run(args.px4_dir.expanduser().resolve(), Path(__file__).resolve().parent.parent)
+        return run(
+            args.px4_dir.expanduser().resolve(),
+            Path(__file__).resolve().parent.parent,
+            args.image.expanduser().resolve() if args.image else None,
+        )
     except KeyboardInterrupt:
         return 130
     except RuntimeError as error:

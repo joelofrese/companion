@@ -77,6 +77,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 python -m sim.command_loopback
 python -m sim.world
 python -m sim.run_world
+python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 python -m sim.offboard_full .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
@@ -108,7 +109,8 @@ PX4/Gazebo/MAVSDK processes before retrying.
   motion, target loss, obstacle, malformed sensor, dropout, invalid command,
   recovery, zero shutdown, landing, and disarm through the real path. It is not
   a claim of camera or TOF realism.
-- `sim.run_world` starts and cleans up PX4/Gazebo around that scenario.
+- `sim.run_world` starts and cleans up PX4/Gazebo around the behavioral world;
+  pass `--image` to run the production RTP/YOLO full-stack scenario instead.
 - Hardware remains pending: CM5 Wi-Fi video, DEXI ROS serial/PX4 response, TOF
   topic/wiring, and the first flight.
 - One forward TOF sensor supports stopping/backoff, not full directional
@@ -120,6 +122,9 @@ PX4/Gazebo/MAVSDK processes before retrying.
   PX4/Gazebo synthetic run with raw prompt boot detection, early-exit handling,
   process-group cleanup, motion/fault/recovery assertions, final CM5 zero,
   landing, and disarm. No simulator processes remained afterward.
+- 2026-07-29: Extended the same runner with `--image` for the production
+  RTP/YOLO/Kalman full-stack scenario. Both managed modes passed through PX4,
+  CM5 safety, landing, disarm, and process cleanup.
 - 2026-07-28: Completed the simplification and safety pass: CM5 and Mac timing
   boundaries reject invalid numeric configuration; synthetic SITL requires
   actual forward, lateral, and obstacle-backoff telemetry; failures attempt
