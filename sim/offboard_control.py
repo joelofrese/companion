@@ -1,5 +1,6 @@
 """Deterministic cognitive intent profile for SITL bring-up."""
 
+import math
 from dataclasses import dataclass
 
 from control.state_machine import State
@@ -14,6 +15,8 @@ SECOND_FOLLOW_START_S = 12.0
 SECOND_FOLLOW_END_S = 16.0
 THIRD_FOLLOW_START_S = 24.0
 THIRD_FOLLOW_END_S = 28.0
+INVALID_DISTANCE_START_S = 13.0
+INVALID_DISTANCE_END_S = 13.5
 
 
 @dataclass(frozen=True)
@@ -55,8 +58,10 @@ def demo_target() -> TrackEstimate:
 
 
 def demo_obstacle_distance_m(elapsed_s: float) -> float:
-    """Simulate a forward TOF obstacle for one second during following."""
+    """Simulate obstacle and malformed-reading windows during following."""
 
+    if INVALID_DISTANCE_START_S <= elapsed_s < INVALID_DISTANCE_END_S:
+        return math.nan
     return 0.5 if 2.0 <= elapsed_s < 3.0 else 2.0
 
 

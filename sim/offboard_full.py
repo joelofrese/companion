@@ -21,6 +21,8 @@ from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
     DistanceMessage,
     FOLLOW_END_S,
+    INVALID_DISTANCE_END_S,
+    INVALID_DISTANCE_START_S,
     SECOND_FOLLOW_END_S,
     SECOND_FOLLOW_START_S,
     PROFILE_DURATION_S,
@@ -240,6 +242,18 @@ async def run(image_path: str):
                 SECOND_FOLLOW_END_S,
                 lambda command: command.north_m_s > 0.0,
                 "following after hover",
+            ),
+            (
+                INVALID_DISTANCE_START_S,
+                INVALID_DISTANCE_END_S,
+                lambda command: command == VelocityCommand(),
+                "invalid obstacle sensor fail-safe",
+            ),
+            (
+                INVALID_DISTANCE_END_S + 0.1,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after invalid sensor",
             ),
             (
                 SECOND_FOLLOW_END_S,
