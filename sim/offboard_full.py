@@ -71,6 +71,7 @@ async def run(image_path: str):
     max_east_velocity = 0.0
     min_east_velocity = 0.0
     frames_received = 0
+    video_fault_reported = False
 
     def current_obstacle(timestamp_s):
         nonlocal obstacle_distance_m
@@ -129,8 +130,16 @@ async def run(image_path: str):
         flight_started_at = time.monotonic()
 
         async def read_frame():
-            nonlocal frames_received
+            nonlocal frames_received, video_fault_reported
             sample = await frame_reader.read()
+            if (
+                flight_started_at is not None
+                and time.monotonic() - flight_started_at >= PROFILE_DURATION_S - 3.0
+            ):
+                if not video_fault_reported:
+                    print("Video stream fault injected during final hover.")
+                    video_fault_reported = True
+                return time.monotonic(), None
             if sample[1] is not None:
                 frames_received += 1
             return sample
@@ -166,11 +175,19 @@ async def run(image_path: str):
                 min_east_velocity = min(min_east_velocity, velocity.east_m_s)
 
         telemetry_task = asyncio.create_task(observe_velocity())
-        await asyncio.sleep(PROFILE_DURATION_S)
+        await asyncio.sleep(PROFILE_DURATION_S + 2.0)
         await asyncio.wait_for(offboard_task, timeout=5.0)
         print("Offboard telemetry=verified through full Mac/CM5 stack.")
-        mac_stop.set()
-        await mac_task
+        try:
+            await asyncio.wait_for(mac_task, timeout=2.0)
+        except RuntimeError as error:
+            if str(error) != "video stream stalled before control shutdown":
+                raise
+            print("Video stall=verified; Mac sent zero and stopped.")
+        except asyncio.TimeoutError:
+            raise RuntimeError("full stack did not observe the video-stall shutdown")
+        else:
+            raise RuntimeError("full stack did not observe the video-stall shutdown")
         vision.close()
         cm5_stop.set()
         await cm5_task
