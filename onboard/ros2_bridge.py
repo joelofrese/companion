@@ -56,8 +56,14 @@ class LatestDistanceSensor:
             self._updated_at_s = self._clock()
 
     def read(self):
+        now = self._clock()
         with self._lock:
-            if self._updated_at_s is None or self._clock() - self._updated_at_s > self._timeout_s:
+            if (
+                self._updated_at_s is None
+                or not _finite_real(now)
+                or now < self._updated_at_s
+                or now - self._updated_at_s > self._timeout_s
+            ):
                 return math.nan
             return self._distance_m
 
