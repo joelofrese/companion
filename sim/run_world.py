@@ -30,15 +30,15 @@ def _read_output(process, ready, finished):
         finished.set()
 
 
-def _stop_process_group(process):
-    if process.poll() is not None:
-        return
+def _stop_process_group(process, process_group_id):
     try:
-        os.killpg(process.pid, signal.SIGTERM)
+        os.killpg(process_group_id, signal.SIGTERM)
         process.wait(timeout=10.0)
-    except (ProcessLookupError, subprocess.TimeoutExpired):
+    except ProcessLookupError:
+        return
+    except subprocess.TimeoutExpired:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(process_group_id, signal.SIGKILL)
         except ProcessLookupError:
             pass
 
@@ -60,6 +60,7 @@ def run(px4_dir: Path, companion_dir: Path, image_path: Optional[Path] = None) -
         bufsize=0,
         start_new_session=True,
     )
+    process_group_id = os.getpgid(process.pid)
     ready = threading.Event()
     finished = threading.Event()
     output_thread = threading.Thread(
@@ -82,7 +83,7 @@ def run(px4_dir: Path, companion_dir: Path, image_path: Optional[Path] = None) -
         result = subprocess.run(scenario, cwd=companion_dir, check=False)
         return result.returncode
     finally:
-        _stop_process_group(process)
+        _stop_process_group(process, process_group_id)
 
 
 def main(argv=None):

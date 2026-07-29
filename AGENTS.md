@@ -134,6 +134,9 @@ PX4/Gazebo/MAVSDK processes before retrying.
 - 2026-07-29: Made production verification logs explicitly report CM5 priming
   and in-flight visual-following/hover milestones; the managed run passed with
   those markers, obstacle backoff, landing, and disarm.
+- 2026-07-29: Hardened managed-run cleanup to terminate the dedicated PX4
+  process group even when `make` exits before the scenario starts, avoiding
+  broad name-based kills and partial-boot leftovers.
 - 2026-07-28: Completed the simplification and safety pass: CM5 and Mac timing
   boundaries reject invalid numeric configuration; synthetic SITL requires
   actual forward, lateral, and obstacle-backoff telemetry; failures attempt
