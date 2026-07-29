@@ -120,6 +120,9 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Strengthened `sim.world` to require actual forward PX4 telemetry,
+  not only a positive safe command, alongside its existing lateral and obstacle
+  motion assertions. The 36-check suite and complete synthetic SITL passed.
 - 2026-07-28: Hardened `sim.world` failure cleanup to attempt a landing after
   any post-arm assertion or service failure, matching the production verifier's
   safety lifecycle. Normal synthetic-world SITL still passed with complete

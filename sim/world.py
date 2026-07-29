@@ -248,6 +248,8 @@ async def run():
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):
                 raise RuntimeError(f"SITL did not observe {behavior}")
+        if max_north_velocity <= 0.02:
+            raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
         if min_north_velocity >= -0.05:
             raise RuntimeError(f"SITL did not observe obstacle backoff: {min_north_velocity:.2f}m/s")
         if max_east_velocity <= 0.02:
