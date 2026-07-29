@@ -59,7 +59,11 @@ async def run(
     frame_reader: Optional[FrameReader] = None,
 ):
     drone = System()
-    await prepare(drone)
+    try:
+        await prepare(drone)
+    except BaseException:
+        close_mavsdk(drone)
+        raise
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
     control = CompanionRuntime(vision or DemoVision(), controller=controller)
@@ -144,8 +148,10 @@ async def run(
         )
     print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
     print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
-    await land(drone)
-    close_mavsdk(drone)
+    try:
+        await land(drone)
+    finally:
+        close_mavsdk(drone)
     if flight_error is not None:
         raise flight_error
     if telemetry_error is not None:
