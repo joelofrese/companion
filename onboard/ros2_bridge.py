@@ -51,6 +51,13 @@ class LatestDistanceSensor:
                 and (isinstance(maximum_m, bool) or not isinstance(maximum_m, Real)
                      or not math.isfinite(maximum_m))
             )
+            or (minimum_m is not None and minimum_m < 0.0)
+            or (maximum_m is not None and maximum_m < 0.0)
+            or (
+                minimum_m is not None
+                and maximum_m is not None
+                and minimum_m > maximum_m
+            )
             or (minimum_m is not None and distance_m < minimum_m)
             or (maximum_m is not None and distance_m > maximum_m)
         ):
