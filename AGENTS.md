@@ -20,9 +20,9 @@ does not depend on hardware.
 Keeping the code this simple makes it easy for anyone to understand, debug,
 develop, and maintain.
 
-Remove dead code, unnecessary tests, speculative configuration, and abstractions
-that do not provide present value. Preserve unrelated user work. Refactor
-broadly when it makes the whole system cleaner.
+Remove dead code, speculative configuration, and abstractions that do not
+provide present value. Preserve unrelated user work. Refactor broadly when it
+makes the whole system cleaner.
 
 Continuously review the entire codebase for cleanliness and simplicity. Refactor
 freely when it improves the whole system, then develop new capabilities that
