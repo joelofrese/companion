@@ -6,10 +6,12 @@ from voice.pipeline import VoiceCommandPipeline
 
 
 SETPOINT_PERIOD_S = 0.05
-PROFILE_DURATION_S = 20.0
+PROFILE_DURATION_S = 32.0
 FOLLOW_END_S = 4.0
 SECOND_FOLLOW_START_S = 12.0
 SECOND_FOLLOW_END_S = 16.0
+THIRD_FOLLOW_START_S = 24.0
+THIRD_FOLLOW_END_S = 28.0
 
 
 class _DemoTranscriber:
@@ -26,6 +28,7 @@ def demo_state(elapsed_s: float) -> State:
     following = (
         0.0 <= elapsed_s < FOLLOW_END_S
         or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
+        or THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S
     )
     transcript = "follow me" if following else "hover"
     state = _demo_voice.handle(transcript)

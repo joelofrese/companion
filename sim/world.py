@@ -28,6 +28,8 @@ from sim.offboard_control import (
     SECOND_FOLLOW_END_S,
     SECOND_FOLLOW_START_S,
     SETPOINT_PERIOD_S,
+    THIRD_FOLLOW_END_S,
+    THIRD_FOLLOW_START_S,
     demo_state,
 )
 
@@ -238,6 +240,11 @@ async def run():
                     and "intent changed back to following" not in reported
                 ):
                     event = "intent changed back to following"
+                elif (
+                    THIRD_FOLLOW_START_S <= elapsed < THIRD_FOLLOW_END_S
+                    and "intent changed to following again" not in reported
+                ):
+                    event = "intent changed to following again"
                 elif elapsed >= HOVER_START_S and "intent changed to hover" not in reported:
                     event = "intent changed to hover"
                 if event is not None and event not in reported:
@@ -279,7 +286,9 @@ async def run():
             (INVALID_COMMAND_START_S, INVALID_COMMAND_END_S, lambda command: command == VelocityCommand(), "invalid-command rejection"),
             (HOVER_START_S, SECOND_FOLLOW_START_S, lambda command: command == VelocityCommand(), "first hover"),
             (SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S, lambda command: command.north_m_s > 0.0, "following after hover"),
-            (SECOND_FOLLOW_END_S, PROFILE_DURATION_S, lambda command: command == VelocityCommand(), "final hover"),
+            (SECOND_FOLLOW_END_S, THIRD_FOLLOW_START_S, lambda command: command == VelocityCommand(), "second hover"),
+            (THIRD_FOLLOW_START_S, THIRD_FOLLOW_END_S, lambda command: command.north_m_s > 0.0, "following after second hover"),
+            (THIRD_FOLLOW_END_S, PROFILE_DURATION_S, lambda command: command == VelocityCommand(), "final hover"),
         )
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):

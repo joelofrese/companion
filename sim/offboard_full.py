@@ -19,10 +19,13 @@ from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare
 from sim.offboard_control import (
+    FOLLOW_END_S,
     SECOND_FOLLOW_END_S,
     SECOND_FOLLOW_START_S,
     PROFILE_DURATION_S,
     SETPOINT_PERIOD_S,
+    THIRD_FOLLOW_END_S,
+    THIRD_FOLLOW_START_S,
     demo_obstacle_distance_m,
     demo_state,
 )
@@ -74,6 +77,7 @@ async def run(image_path: str):
     landed = False
     max_north_velocity = 0.0
     min_north_velocity = 0.0
+    frames_received = 0
 
     def current_obstacle(timestamp_s):
         nonlocal obstacle_distance_m
@@ -124,16 +128,24 @@ async def run(image_path: str):
                 VisualFollower(
                     FollowConfig(
                         frame_width_px=video_config.width,
-                        desired_target_height_px=video_config.height / 2.0,
+                        desired_target_height_px=video_config.height * 0.75,
                     )
                 )
             )
         )
         flight_started_at = time.monotonic()
+
+        async def read_frame():
+            nonlocal frames_received
+            sample = await frame_reader.read()
+            if sample[1] is not None:
+                frames_received += 1
+            return sample
+
         mac_service = UdpControlService(
             control,
             sender,
-            frame_reader.read,
+            read_frame,
             intent_provider=current_intent,
             obstacle_provider=current_obstacle,
             tick_period_s=SETPOINT_PERIOD_S,
@@ -165,6 +177,20 @@ async def run(image_path: str):
         if not safe_commands or safe_commands[-1][1] != VelocityCommand():
             raise RuntimeError("full stack did not observe CM5 shutdown zero")
         print("CM5 shutdown zero=verified.")
+        print(f"RTP frames received: {frames_received}.")
+        def forward_count(start_s, end_s):
+            return sum(
+                command.north_m_s > 0.0
+                for timestamp_s, command in safe_commands
+                if start_s <= timestamp_s - flight_started_at < end_s
+            )
+
+        print(
+            "Following commands by cycle: "
+            f"{forward_count(0.0, FOLLOW_END_S)}, "
+            f"{forward_count(SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S)}, "
+            f"{forward_count(THIRD_FOLLOW_START_S, THIRD_FOLLOW_END_S)}."
+        )
         if min_north_velocity >= -0.05:
             raise RuntimeError(
                 f"full stack did not observe obstacle backoff: {min_north_velocity:.2f}m/s"
@@ -186,7 +212,19 @@ async def run(image_path: str):
         ):
             raise RuntimeError("full stack did not observe following after hover at CM5")
         if not any(
-            SECOND_FOLLOW_END_S <= timestamp_s - flight_started_at < PROFILE_DURATION_S
+            SECOND_FOLLOW_END_S <= timestamp_s - flight_started_at < THIRD_FOLLOW_START_S
+            and command == VelocityCommand()
+            for timestamp_s, command in safe_commands
+        ):
+            raise RuntimeError("full stack did not observe second hover intent at CM5")
+        if not any(
+            THIRD_FOLLOW_START_S <= timestamp_s - flight_started_at < THIRD_FOLLOW_END_S
+            and command.north_m_s > 0.0
+            for timestamp_s, command in safe_commands
+        ):
+            raise RuntimeError("full stack did not observe following after second hover at CM5")
+        if not any(
+            THIRD_FOLLOW_END_S <= timestamp_s - flight_started_at < PROFILE_DURATION_S
             and command == VelocityCommand()
             for timestamp_s, command in safe_commands
         ):
