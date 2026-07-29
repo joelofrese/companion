@@ -146,6 +146,10 @@ PX4/Gazebo/MAVSDK processes before retrying.
   detector-only helpers; the managed synthetic and production verifiers are
   the single supported SITL paths. The focused suite and managed synthetic
   regression passed after the removal.
+- 2026-07-29: Reduced `sim.video_loopback` to the one image-sender builder
+  used by the production verifier, removing its unused test-sender and
+  standalone runner. The full focused suite and managed RTP/YOLO/Kalman SITL
+  scenario passed afterward.
 - 2026-07-29: Hardened managed-run cleanup to terminate the dedicated PX4
   process group even when `make` exits before the scenario starts, avoiding
   broad name-based kills and partial-boot leftovers.
