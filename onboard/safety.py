@@ -5,7 +5,7 @@ from numbers import Real
 from typing import Optional
 
 from control.command_packet import CommandPacket
-from control.state_machine import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
+from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 
 

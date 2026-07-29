@@ -6,6 +6,7 @@ from numbers import Real
 from typing import Optional
 
 from control.following import VisualFollower
+from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
 from control.tracking import TrackEstimate
 from control.velocity import VelocityCommand
 
@@ -13,19 +14,15 @@ from control.velocity import VelocityCommand
 class State(Enum):
     IDLE = auto()
     FOLLOWING = auto()
-    AVOIDING = auto()
     HOVERING = auto()
 
 
-OBSTACLE_STOP_M = 0.6
-BACKOFF_SPEED_M_S = 0.2
 TARGET_MAX_AGE_S = 0.5
 
 
 class ReactiveController:
     def __init__(self, follower: Optional[VisualFollower] = None):
         self.state = State.IDLE
-        self._intent_state = State.IDLE
         self.follower = follower or VisualFollower()
 
     def set_intent(self, state: State):
@@ -33,7 +30,6 @@ class ReactiveController:
 
         if not isinstance(state, State):
             raise ValueError("intent must be a State")
-        self._intent_state = state
         self.state = state
 
     def command(
@@ -52,11 +48,8 @@ class ReactiveController:
             if obstacle_distance_m < 0.0:
                 return VelocityCommand()
             if obstacle_distance_m < OBSTACLE_STOP_M:
-                self.state = State.AVOIDING
                 return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
 
-        if self.state is State.AVOIDING:
-            self.state = self._intent_state
         if (
             self.state is State.FOLLOWING
             and target_age_s is not None

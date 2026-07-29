@@ -15,6 +15,7 @@ from typing import Optional
 BOOT_MARKER = "pxh>"
 BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
+BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
 
 
@@ -55,7 +56,7 @@ def _stop_process_group(process, process_group_id):
         process.wait()
 
 
-def run(
+def _run_once(
     px4_dir: Path,
     companion_dir: Path,
     image_path: Optional[Path] = None,
@@ -108,6 +109,21 @@ def run(
         return result.returncode
     finally:
         _stop_process_group(process, process_group_id)
+
+
+def run(
+    px4_dir: Path,
+    companion_dir: Path,
+    image_path: Optional[Path] = None,
+    world: str = "default",
+) -> int:
+    for attempt in range(BOOT_RETRIES + 1):
+        try:
+            return _run_once(px4_dir, companion_dir, image_path, world)
+        except RuntimeError:
+            if attempt == BOOT_RETRIES:
+                raise
+            print("PX4 did not boot; retrying once.", file=sys.stderr)
 
 
 def main(argv=None):
