@@ -156,6 +156,9 @@ async def run(image_path: str):
         vision.close()
         cm5_stop.set()
         await cm5_task
+        if not safe_commands or safe_commands[-1][1] != VelocityCommand():
+            raise RuntimeError("full stack did not observe CM5 shutdown zero")
+        print("CM5 shutdown zero=verified.")
         if min_north_velocity >= -0.05:
             raise RuntimeError(
                 f"full stack did not observe obstacle backoff: {min_north_velocity:.2f}m/s"

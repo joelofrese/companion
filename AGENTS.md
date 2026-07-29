@@ -134,6 +134,10 @@ PX4/Gazebo/MAVSDK processes before retrying.
 - 2026-07-29: Made production verification logs explicitly report CM5 priming
   and in-flight visual-following/hover milestones; the managed run passed with
   those markers, obstacle backoff, landing, and disarm.
+- 2026-07-29: Production verification now asserts the observed CM5 command
+  stream ends with its shutdown zero. The managed RTP/YOLO/Kalman SITL run
+  passed with priming, following, hover, obstacle backoff, shutdown zero,
+  landing, and disarm.
 - 2026-07-29: Hardened managed-run cleanup to terminate the dedicated PX4
   process group even when `make` exits before the scenario starts, avoiding
   broad name-based kills and partial-boot leftovers.
