@@ -15,6 +15,7 @@ from typing import Optional
 BOOT_MARKER = "pxh>"
 BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
+SHUTDOWN_TIMEOUT_S = 10.0
 
 
 def _read_output(process, ready, finished):
@@ -33,14 +34,25 @@ def _read_output(process, ready, finished):
 def _stop_process_group(process, process_group_id):
     try:
         os.killpg(process_group_id, signal.SIGTERM)
-        process.wait(timeout=10.0)
     except ProcessLookupError:
         return
-    except subprocess.TimeoutExpired:
+    deadline = time.monotonic() + SHUTDOWN_TIMEOUT_S
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(process_group_id, 0)
+        except (ProcessLookupError, PermissionError):
+            break
+        time.sleep(0.1)
+    else:
         try:
             os.killpg(process_group_id, signal.SIGKILL)
         except ProcessLookupError:
             pass
+    try:
+        process.wait(timeout=1.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
 
 
 def run(
