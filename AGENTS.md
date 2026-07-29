@@ -15,19 +15,17 @@ not be described as proof of hardware behavior.
 
 ## Priorities
 
-1. Safety and observable behavior.
-2. The simplest coherent design.
-3. Readability and easy refactoring.
-4. Useful capability over feature count.
+1. Readability.
+2. Simplicity.
+3. Minimalism.
 
-Remove dead code, redundant tests, speculative configuration, and abstractions
-that do not provide present value. Preserve safety properties and unrelated
-user work. Refactor broadly when it makes the whole system clearer.
+Remove dead code, unnecessary tests, speculative configuration, and abstractions
+that do not provide present value. Preserve unrelated user work. Refactor
+broadly when it makes the whole system clearer.
 
-Work autonomously: choose the next valuable, reversible step, verify it, and
-checkpoint stable progress on the feature branch. If hardware or credentials
-block one path, continue with useful simulation. Read `STEERING.md` once when
-starting a meaningful milestone, if it exists; do not poll it during work.
+Continue iterating toward the project goal autonomously. When no meaningful
+work remains, sleep for 15 minutes, reread `STEERING.md`, and continue; repeat
+until new steering is given.
 
 ## How control works
 
