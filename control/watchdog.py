@@ -1,4 +1,4 @@
-"""Latched setpoint heartbeat watchdog for safety-critical offboard output."""
+"""Setpoint heartbeat watchdog for safety-critical offboard output."""
 
 import math
 from numbers import Real
@@ -7,7 +7,7 @@ from control.velocity import VelocityCommand
 
 
 class SetpointWatchdog:
-    """Replace commands with zero velocity after a missed setpoint deadline."""
+    """Replace a late setpoint with zero velocity until the stream recovers."""
 
     def __init__(self, max_interval_s: float = 0.15):
         if (
@@ -19,7 +19,6 @@ class SetpointWatchdog:
             raise ValueError("watchdog interval must be positive")
         self.max_interval_s = max_interval_s
         self._last_sent_at_s = None
-        self.tripped = False
 
     def emit(self, timestamp_s: float, desired: VelocityCommand) -> VelocityCommand:
         """Return the command allowed at this tick and latch any missed deadline."""
@@ -29,6 +28,7 @@ class SetpointWatchdog:
             if interval_s <= 0.0:
                 raise ValueError("watchdog timestamps must increase")
             if interval_s > self.max_interval_s:
-                self.tripped = True
+                self._last_sent_at_s = timestamp_s
+                return VelocityCommand()
         self._last_sent_at_s = timestamp_s
-        return VelocityCommand() if self.tripped else desired
+        return desired

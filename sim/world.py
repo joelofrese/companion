@@ -36,6 +36,8 @@ from sim.offboard_control import (
 
 TARGET_RIGHT_START_S = 1.0
 TARGET_RIGHT_END_S = 2.0
+CONTROL_PAUSE_START_S = 1.5
+CONTROL_PAUSE_END_S = 1.75
 TARGET_LOST_START_S = 2.0
 TARGET_LOST_END_S = 2.6
 OBSTACLE_START_S = 2.8
@@ -223,6 +225,12 @@ async def run():
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
                     reported.add(event)
+                if CONTROL_PAUSE_START_S <= elapsed < CONTROL_PAUSE_END_S:
+                    if "Mac control pause" not in reported:
+                        print("Mac control pause; watchdog holds zero.")
+                        reported.add("Mac control pause")
+                    await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
+                    continue
                 send_packet(elapsed, now)
                 await asyncio.sleep(SETPOINT_PERIOD_S)
         finally:
@@ -265,6 +273,8 @@ async def run():
         checks = (
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),
             (TARGET_RIGHT_START_S, TARGET_RIGHT_END_S, lambda command: command.east_m_s > 0.0, "lateral target tracking"),
+            (CONTROL_PAUSE_START_S, CONTROL_PAUSE_END_S + 0.1, lambda command: command == VelocityCommand(), "Mac heartbeat pause fail-safe"),
+            (CONTROL_PAUSE_END_S + 0.1, TARGET_RIGHT_END_S, lambda command: command.east_m_s > 0.0, "Mac heartbeat recovery"),
             (2.1, TARGET_LOST_END_S, lambda command: command == VelocityCommand(), "hold after target loss"),
             (OBSTACLE_START_S, OBSTACLE_END_S, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
             (OBSTACLE_END_S, RECOVERY_END_S, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
