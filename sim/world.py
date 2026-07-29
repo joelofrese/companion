@@ -229,6 +229,8 @@ async def run():
                 offboard_started = False
 
         commands = [(timestamp_s - started_at, command) for timestamp_s, command in safe_commands]
+        if not safe_commands or safe_commands[-1][1] != VelocityCommand():
+            raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
 
         def observed(start_s, end_s, predicate):
             return any(start_s <= elapsed_s < end_s and predicate(command) for elapsed_s, command in commands)

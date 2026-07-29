@@ -120,6 +120,9 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Extended `sim.world` to require the real CM5 service shutdown
+  path to forward one final zero command before PX4 cleanup. The 36-check suite
+  and complete synthetic SITL passed with the shutdown invariant.
 - 2026-07-28: Strengthened the shared SITL landing lifecycle to verify PX4
   telemetry reports both `ON_GROUND` and disarmed before a run passes. The
   synthetic world passed with the new explicit disarm evidence.
