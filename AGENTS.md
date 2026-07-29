@@ -65,11 +65,9 @@ most progress requires no physical flight. A meaningful scenario must be
 confirmed from output or telemetry, including connection, readiness, arming,
 offboard setpoints, expected motion, safety intervention, landing, and disarm.
 
-Avoid unit tests. Add one only when it is genuinely essential to a safety
-invariant or an important boundary that cannot be protected reliably another
-way. Delete redundant tests instead of preserving code for them; never grow a
-rigid test harness for coverage. Integrated simulation outranks unit-test
-completeness.
+Do not add unit tests. Keep verification in Gazebo and through end-to-end
+behavior. Remove existing unit tests when their behavior is covered by the
+simulation; do not preserve code or architecture to support them.
 
 From `companion/`, the normal simulation loop is:
 
