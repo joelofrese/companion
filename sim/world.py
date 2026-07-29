@@ -63,9 +63,17 @@ class SyntheticWorld:
             target_height_px=120.0 / north_distance_m,
         )
 
-    def step(self, elapsed_s: float) -> WorldStep:
+    def step(
+        self,
+        elapsed_s: float,
+        vehicle_position_m: Optional[tuple[float, float]] = None,
+    ) -> WorldStep:
         if 2.8 <= elapsed_s < 3.8:
-            return WorldStep(State.FOLLOWING, obstacle_distance_m=0.5)
+            north_m = vehicle_position_m[0] if vehicle_position_m is not None else 0.0
+            return WorldStep(
+                State.FOLLOWING,
+                obstacle_distance_m=max(0.2, 0.5 - north_m),
+            )
         if 3.9 <= elapsed_s < 4.0:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
         if 4.0 <= elapsed_s < 4.5:
@@ -150,7 +158,7 @@ async def run():
         )
 
         def send_packet(elapsed_s: float, timestamp_s: float):
-            step = world.step(elapsed_s)
+            step = world.step(elapsed_s, vehicle_position_m)
             command = control.tick(
                 frame=None,
                 timestamp_s=timestamp_s,
@@ -179,12 +187,14 @@ async def run():
         try:
             while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
                 now = time.monotonic()
-                step = world.step(elapsed)
+                step = world.step(elapsed, vehicle_position_m)
                 obstacle_distance_m = step.obstacle_distance_m
                 event = (
                     "target moved right" if 1.0 <= elapsed < 2.0 else
                     "target lost; holding" if 2.0 <= elapsed < 2.6 else
-                    "obstacle detected; backing off" if obstacle_distance_m == 0.5 else
+                    "obstacle detected; backing off" if (
+                        obstacle_distance_m is not None and obstacle_distance_m < 0.6
+                    ) else
                     "invalid obstacle reading" if isinstance(obstacle_distance_m, float) and math.isnan(obstacle_distance_m) else
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None

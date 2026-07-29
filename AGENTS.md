@@ -125,8 +125,8 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   hold, obstacle backoff, malformed-obstacle fail-safe, command-dropout expiry
   and recovery, invalid-command rejection, hover recovery, and clean landing
   through the production Mac→CM5 safety path. Target geometry now responds to
-  the vehicle's actual simulated NED position, and the scenario verifies saved
-  following intent
+  the vehicle's actual simulated NED position; the obstacle distance is
+  position-coupled too. The scenario verifies saved following intent
   resumes after obstacle backoff. The verifier explicitly closes its MAVSDK
   helper for clean repeated runs.
 - 2026-07-28: Tightened `sim.offboard_full` so its production RTP/YOLO scenario
