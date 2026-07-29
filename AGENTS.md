@@ -65,10 +65,11 @@ most progress requires no physical flight. A meaningful scenario must be
 confirmed from output or telemetry, including connection, readiness, arming,
 offboard setpoints, expected motion, safety intervention, landing, and disarm.
 
-Unit tests are optional supporting checks, not a project goal. Keep only small
-checks that protect a distinct safety property or active interface; never keep
-an architecture, abstraction, or test merely for coverage. Integrated
-simulation outranks unit-test completeness.
+Avoid unit tests by default. Use them only when a behavior cannot be exercised
+clearly in Gazebo or when a very small safety or interface check provides
+substantial value. Delete redundant tests instead of preserving code for them;
+never grow a rigid test harness for coverage. Integrated simulation outranks
+unit-test completeness.
 
 From `companion/`, the normal simulation loop is:
 
