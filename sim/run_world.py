@@ -43,7 +43,12 @@ def _stop_process_group(process, process_group_id):
             pass
 
 
-def run(px4_dir: Path, companion_dir: Path, image_path: Optional[Path] = None) -> int:
+def run(
+    px4_dir: Path,
+    companion_dir: Path,
+    image_path: Optional[Path] = None,
+    world: str = "default",
+) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
         raise RuntimeError("stdbuf is required to observe PX4 boot output")
@@ -51,6 +56,12 @@ def run(px4_dir: Path, companion_dir: Path, image_path: Optional[Path] = None) -
         raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
     if image_path is not None and not image_path.is_file():
         raise RuntimeError(f"scenario image does not exist: {image_path}")
+    world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
+    if not world_file.is_file():
+        raise RuntimeError(f"Gazebo world does not exist: {world_file}")
+
+    environment = os.environ.copy()
+    environment["PX4_GZ_WORLD"] = world
 
     process = subprocess.Popen(
         [stdbuf, "-oL", "-eL", "make", "px4_sitl", "gz_x500"],
@@ -59,6 +70,7 @@ def run(px4_dir: Path, companion_dir: Path, image_path: Optional[Path] = None) -
         stderr=subprocess.STDOUT,
         bufsize=0,
         start_new_session=True,
+        env=environment,
     )
     process_group_id = os.getpgid(process.pid)
     ready = threading.Event()
@@ -98,12 +110,14 @@ def main(argv=None):
         type=Path,
         help="run production RTP/YOLO full-stack verification with this person image",
     )
+    parser.add_argument("--world", default="default", help="Gazebo world name from PX4")
     args = parser.parse_args(argv)
     try:
         return run(
             args.px4_dir.expanduser().resolve(),
             Path(__file__).resolve().parent.parent,
             args.image.expanduser().resolve() if args.image else None,
+            args.world,
         )
     except KeyboardInterrupt:
         return 130

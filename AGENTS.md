@@ -83,6 +83,9 @@ scenario exercises decoded RTP/video, perception, Mac commands, onboard safety,
 and PX4. Neither scenario proves physical sensors, radio behavior, or
 hardware-specific transport.
 
+Pass `--world walls`, `forest`, `windy`, or another PX4 Gazebo world to repeat
+the same mission in a different environment.
+
 ## Current state
 
 Simulation is the main development environment, not a preliminary demo. Keep
