@@ -33,27 +33,34 @@ class WorldStep:
     command_override: Optional[VelocityCommand] = None
 
 
-def _target(x_px: float = 320.0) -> TrackEstimate:
-    return TrackEstimate(
-        x_px=x_px,
-        y_px=240.0,
-        vx_px_s=0.0,
-        vy_px_s=0.0,
-        predicted_x_px=x_px,
-        predicted_y_px=240.0,
-        target_height_px=60.0,
-    )
-
-
 class SyntheticWorld:
     """Provide repeatable target, obstacle, and transport events for SITL."""
 
-    def target(self, elapsed_s: float) -> Optional[TrackEstimate]:
+    def target(
+        self,
+        elapsed_s: float,
+        vehicle_position_m: Optional[tuple[float, float]],
+    ) -> Optional[TrackEstimate]:
         if 2.0 <= elapsed_s < 2.6:
             return None
-        if 1.0 <= elapsed_s < 2.0:
-            return _target(520.0)
-        return _target()
+        if vehicle_position_m is None:
+            return None
+        north_m, east_m = vehicle_position_m
+        target_north_m = 1.6
+        target_east_m = 0.8 if 1.0 <= elapsed_s < 2.0 else 0.0
+        north_distance_m = target_north_m - north_m
+        if north_distance_m <= 0.0:
+            return None
+        x_px = 320.0 + 320.0 * (target_east_m - east_m) / north_distance_m
+        return TrackEstimate(
+            x_px=x_px,
+            y_px=240.0,
+            vx_px_s=0.0,
+            vy_px_s=0.0,
+            predicted_x_px=x_px,
+            predicted_y_px=240.0,
+            target_height_px=120.0 / north_distance_m,
+        )
 
     def step(self, elapsed_s: float) -> WorldStep:
         if 2.6 <= elapsed_s < 3.6:
@@ -71,12 +78,16 @@ class SyntheticWorld:
 class WorldVision:
     """Expose synthetic-world target truth through the normal vision interface."""
 
-    def __init__(self, world: SyntheticWorld, started_at_s: float):
+    def __init__(self, world: SyntheticWorld, started_at_s: float, position):
         self.world = world
         self.started_at_s = started_at_s
+        self.position = position
 
     def process(self, frame, timestamp_s: float) -> Optional[TrackEstimate]:
-        return self.world.target(max(0.0, timestamp_s - self.started_at_s))
+        return self.world.target(
+            max(0.0, timestamp_s - self.started_at_s),
+            self.position(),
+        )
 
 
 async def run():
@@ -88,6 +99,7 @@ async def run():
     service_task = None
     service_stop = asyncio.Event()
     telemetry_task = None
+    position_task = None
     obstacle_distance_m = None
     safe_commands = []
     try:
@@ -112,6 +124,25 @@ async def run():
         await drone.action.takeoff()
         await _wait_until_in_air(drone)
 
+        origin = None
+        vehicle_position_m = None
+        position_ready = asyncio.Event()
+
+        async def observe_position():
+            nonlocal origin, vehicle_position_m
+            async for position_velocity in drone.telemetry.position_velocity_ned():
+                position = position_velocity.position
+                if origin is None:
+                    origin = position.north_m, position.east_m
+                vehicle_position_m = (
+                    position.north_m - origin[0],
+                    position.east_m - origin[1],
+                )
+                position_ready.set()
+
+        position_task = asyncio.create_task(observe_position())
+        await asyncio.wait_for(position_ready.wait(), timeout=5.0)
+
         forwarder = MavsdkVelocityForwarder(drone)
 
         class ObservingForwarder:
@@ -130,7 +161,9 @@ async def run():
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         started_at = time.monotonic()
         world = SyntheticWorld()
-        control = CompanionRuntime(WorldVision(world, started_at))
+        control = CompanionRuntime(
+            WorldVision(world, started_at, lambda: vehicle_position_m)
+        )
 
         def send_packet(elapsed_s: float, timestamp_s: float):
             step = world.step(elapsed_s)
@@ -182,6 +215,8 @@ async def run():
             await service_task
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
+            position_task.cancel()
+            await asyncio.gather(position_task, return_exceptions=True)
             try:
                 await drone.offboard.stop()
             except OffboardError:
@@ -220,6 +255,9 @@ async def run():
         if service_task is not None and not service_task.done():
             service_stop.set()
             await service_task
+        if position_task is not None:
+            position_task.cancel()
+            await asyncio.gather(position_task, return_exceptions=True)
 
 
 if __name__ == "__main__":

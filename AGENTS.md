@@ -108,9 +108,10 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   command → watchdog → UDP. The CM5 path independently validates and forwards
   only safe commands.
 - `sim.world` is the autonomous behavioral harness: synthetic-world target truth
-  drives the real Mac, CM5, PX4, and Gazebo path through follow, lateral motion,
-  target loss, obstacle, command-dropout, and invalid-command scenarios. It is
-  deliberately not a claim of camera or TOF realism.
+  derives image geometry from PX4's simulated NED position, then drives the real
+  Mac, CM5, PX4, and Gazebo path through follow, lateral motion, target loss,
+  obstacle, command-dropout, and invalid-command scenarios. It is deliberately
+  not a claim of camera or TOF realism.
 - Hardware remains pending: real CM5 Wi-Fi video, DEXI ROS serial/PX4 response,
   TOF topic/wiring, and the first flight.
 - Open design question: one forward TOF sensor supports stopping/backoff but not
@@ -122,7 +123,8 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 - 2026-07-28: Added `python -m sim.world`, a deterministic PX4/Gazebo behavior
   scenario. It passed forward following, lateral target tracking, target-loss
   hold, obstacle backoff, command-dropout expiry, invalid-command rejection,
-  and clean landing through the production Mac→CM5 safety path.
+  and clean landing through the production Mac→CM5 safety path. Target geometry
+  now responds to the vehicle's actual simulated NED position.
 - 2026-07-28: Reduced deterministic coverage to 32 focused safety-contract
   checks across command validity, watchdog/obstacle fail-safe behavior, safe
   shutdown, vision liveness, and CM5/PX4 bridge seams. Removed component and
