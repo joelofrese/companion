@@ -128,7 +128,7 @@ class WorldVision:
 
 
 async def run():
-    """Fly the synthetic world through Mac control, CM5 safety, and PX4 SITL."""
+    """Run the companion recovery mission through the complete flight path."""
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
@@ -202,6 +202,7 @@ async def run():
         await asyncio.sleep(SETPOINT_PERIOD_S * 2)
         await drone.offboard.start()
         offboard_started = True
+        print("Mission: follow, recover, handle faults, hover, land, and disarm.")
         print("Offboard started through synthetic world and CM5 safety.")
 
         max_north_velocity = 0.0
@@ -283,6 +284,7 @@ async def run():
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):
                 raise RuntimeError(f"SITL did not observe {behavior}")
+            print(f"Mission objective passed: {behavior}.")
         if max_north_velocity <= 0.02:
             raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
         if min_north_velocity >= -0.05:
