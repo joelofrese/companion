@@ -6,7 +6,7 @@ from voice.pipeline import VoiceCommandPipeline
 
 
 SETPOINT_PERIOD_S = 0.05
-PROFILE_DURATION_S = 8.0
+PROFILE_DURATION_S = 20.0
 
 
 class _DemoTranscriber:

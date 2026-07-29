@@ -23,10 +23,9 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare
-from sim.offboard_control import SETPOINT_PERIOD_S
+from sim.offboard_control import PROFILE_DURATION_S, SETPOINT_PERIOD_S
 
 
-WORLD_DURATION_S = 20.0
 TARGET_RIGHT_START_S = 1.0
 TARGET_RIGHT_END_S = 2.0
 TARGET_LOST_START_S = 2.0
@@ -210,7 +209,7 @@ async def run():
         telemetry_task = asyncio.create_task(observe_velocity())
         reported = set()
         try:
-            while (elapsed := time.monotonic() - started_at) < WORLD_DURATION_S:
+            while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
                 now = time.monotonic()
                 step = world.step(elapsed, vehicle_position_m)
                 obstacle_distance_m = step.obstacle_distance_m
@@ -263,7 +262,7 @@ async def run():
             (DROPOUT_START_S + 0.15, DROPOUT_END_S, lambda command: command == VelocityCommand(), "command-dropout expiry"),
             (DROPOUT_END_S, LINK_RECOVERY_END_S, lambda command: command.north_m_s > 0.0, "command-link recovery"),
             (INVALID_COMMAND_START_S, INVALID_COMMAND_END_S, lambda command: command == VelocityCommand(), "invalid-command rejection"),
-            (HOVER_START_S, WORLD_DURATION_S, lambda command: command == VelocityCommand(), "long hover"),
+            (HOVER_START_S, PROFILE_DURATION_S, lambda command: command == VelocityCommand(), "long hover"),
         )
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):
