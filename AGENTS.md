@@ -142,6 +142,10 @@ PX4/Gazebo/MAVSDK processes before retrying.
   takeoff setup fails. Production priming evidence is recorded only after the
   MAVSDK forwarder accepts the setpoint, fixing a real `NO_SETPOINT_SET` race;
   synthetic and production managed SITL both passed afterward.
+- 2026-07-29: Removed the unreferenced `sim.offboard_video` path and its
+  detector-only helpers; the managed synthetic and production verifiers are
+  the single supported SITL paths. The focused suite and managed synthetic
+  regression passed after the removal.
 - 2026-07-29: Hardened managed-run cleanup to terminate the dedicated PX4
   process group even when `make` exits before the scenario starts, avoiding
   broad name-based kills and partial-boot leftovers.
