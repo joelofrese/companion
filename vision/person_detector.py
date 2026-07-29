@@ -35,7 +35,7 @@ def _box_coordinates(value: Any):
 
 
 class YoloPersonDetector:
-    """Return the highest-confidence person center from each image."""
+    """Return the largest valid person in each image."""
 
     def __init__(self, model_path: str = "yolov8n.pt", confidence_threshold: float = 0.5, model=None):
         if not _finite(confidence_threshold) or not 0.0 <= confidence_threshold <= 1.0:
@@ -46,12 +46,13 @@ class YoloPersonDetector:
             model = YOLO(model_path)
         self._model = model
         self.confidence_threshold = confidence_threshold
+        self._last_center = None
 
     def detect(self, frame: Any, timestamp_s: float) -> Optional[Detection]:
         """Run YOLO and return one person observation, or None when no person is found."""
 
         results = self._model(frame, verbose=False)
-        best = None
+        candidates = []
         for result in results:
             for box in result.boxes:
                 try:
@@ -72,15 +73,29 @@ class YoloPersonDetector:
                     continue
                 if class_id != PERSON_CLASS_ID or confidence < self.confidence_threshold:
                     continue
-                if best is None or confidence > best[0]:
-                    best = (confidence, coordinates)
+                area = (x2 - x1) * (y2 - y1)
+                candidates.append(
+                    (area, confidence, coordinates, (x1 + x2) / 2.0, (y1 + y2) / 2.0)
+                )
 
-        if best is None:
+        if not candidates:
             return None
-        confidence, coordinates = best
+        if self._last_center is None:
+            best = max(candidates, key=lambda candidate: candidate[0])
+        else:
+            best = min(
+                candidates,
+                key=lambda candidate: (
+                    (candidate[3] - self._last_center[0]) ** 2
+                    + (candidate[4] - self._last_center[1]) ** 2,
+                    -candidate[0],
+                ),
+            )
+        _, confidence, coordinates, center_x, center_y = best
+        self._last_center = (center_x, center_y)
         x1, y1, x2, y2 = coordinates
         return Detection(
-            x_px=(x1 + x2) / 2.0,
+            x_px=center_x,
             y_px=(y1 + y2) / 2.0,
             timestamp_s=timestamp_s,
             confidence=confidence,
