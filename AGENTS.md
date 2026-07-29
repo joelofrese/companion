@@ -125,6 +125,12 @@ PX4/Gazebo/MAVSDK processes before retrying.
 - 2026-07-29: Extended the same runner with `--image` for the production
   RTP/YOLO/Kalman full-stack scenario. Both managed modes passed through PX4,
   CM5 safety, landing, disarm, and process cleanup.
+- 2026-07-29: Strengthened the production full-stack verifier to require the
+  voice-derived hover intent to reach the CM5 boundary during flight, not only
+  the final shutdown zero. The managed production scenario passed again.
+- 2026-07-29: Replaced the production verifier's fixed offboard-start sleep
+  with an observed CM5 priming-setpoint condition, fixing an intermittent PX4
+  `NO_SETPOINT_SET` race. Managed production SITL passed with the source fix.
 - 2026-07-28: Completed the simplification and safety pass: CM5 and Mac timing
   boundaries reject invalid numeric configuration; synthetic SITL requires
   actual forward, lateral, and obstacle-backoff telemetry; failures attempt

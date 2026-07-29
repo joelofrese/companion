@@ -13,6 +13,7 @@ from control.runtime import CompanionRuntime
 from control.state_machine import ReactiveController
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
+from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
@@ -90,10 +91,17 @@ async def run(image_path: str):
         armed = True
 
         forwarder = MavsdkVelocityForwarder(drone)
+        safe_commands = []
+
+        class ObservingForwarder:
+            async def send(self, command):
+                safe_commands.append((time.monotonic(), command))
+                await forwarder.send(command)
+
         receiver.start()
         cm5_service = SafetyCommandService(
             receiver,
-            forwarder,
+            ObservingForwarder(),
             tick_period_s=SETPOINT_PERIOD_S,
             obstacle_distance=lambda: obstacle_distance_m,
         )
@@ -125,7 +133,11 @@ async def run(image_path: str):
             tick_period_s=SETPOINT_PERIOD_S,
         )
         mac_task = asyncio.create_task(mac_service.run(mac_stop))
-        await asyncio.sleep(0.2)
+        deadline = time.monotonic() + 5.0
+        while not safe_commands and time.monotonic() < deadline:
+            await asyncio.sleep(SETPOINT_PERIOD_S)
+        if not safe_commands:
+            raise RuntimeError("CM5 did not forward a priming setpoint")
         await drone.offboard.start()
         offboard_started = True
         print("Offboard started through full Mac/CM5 stack.")
@@ -151,6 +163,12 @@ async def run(image_path: str):
             raise RuntimeError(
                 f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
             )
+        if not any(
+            5.0 <= timestamp_s - flight_started_at < 7.0
+            and command == VelocityCommand()
+            for timestamp_s, command in safe_commands
+        ):
+            raise RuntimeError("full stack did not observe hover intent at CM5")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
         await drone.offboard.stop()
