@@ -233,6 +233,8 @@ async def run():
                     continue
                 send_packet(elapsed, now)
                 await asyncio.sleep(SETPOINT_PERIOD_S)
+            await asyncio.wait_for(offboard_task, timeout=5.0)
+            print("Offboard telemetry=verified through synthetic world and CM5 safety.")
         finally:
             sender.close()
             service_stop.set()
@@ -245,9 +247,6 @@ async def run():
                 except OffboardError:
                     pass
                 offboard_started = False
-
-        await asyncio.wait_for(offboard_task, timeout=5.0)
-        print("Offboard telemetry=verified through synthetic world and CM5 safety.")
 
         commands = [(timestamp_s - started_at, command) for timestamp_s, command in safe_commands]
         if not safe_commands or safe_commands[-1][1] != VelocityCommand():
