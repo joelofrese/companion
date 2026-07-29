@@ -138,6 +138,7 @@ async def run(image_path: str):
             await asyncio.sleep(SETPOINT_PERIOD_S)
         if not safe_commands:
             raise RuntimeError("CM5 did not forward a priming setpoint")
+        print("CM5 priming setpoint=verified.")
         await drone.offboard.start()
         offboard_started = True
         print("Offboard started through full Mac/CM5 stack.")
@@ -169,6 +170,7 @@ async def run(image_path: str):
             for timestamp_s, command in safe_commands
         ):
             raise RuntimeError("full stack did not observe hover intent at CM5")
+        print("Visual following and hover intent through CM5=verified.")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
         await drone.offboard.stop()

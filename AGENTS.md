@@ -131,6 +131,9 @@ PX4/Gazebo/MAVSDK processes before retrying.
 - 2026-07-29: Replaced the production verifier's fixed offboard-start sleep
   with an observed CM5 priming-setpoint condition, fixing an intermittent PX4
   `NO_SETPOINT_SET` race. Managed production SITL passed with the source fix.
+- 2026-07-29: Made production verification logs explicitly report CM5 priming
+  and in-flight visual-following/hover milestones; the managed run passed with
+  those markers, obstacle backoff, landing, and disarm.
 - 2026-07-28: Completed the simplification and safety pass: CM5 and Mac timing
   boundaries reject invalid numeric configuration; synthetic SITL requires
   actual forward, lateral, and obstacle-backoff telemetry; failures attempt
