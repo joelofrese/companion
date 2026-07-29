@@ -6,6 +6,12 @@ from onboard.safety import OnboardSafetyEnvelope
 
 
 class OnboardSafetyEnvelopeTests(unittest.TestCase):
+    def test_invalid_command_timeout_is_rejected(self):
+        for value in (0.0, float("nan"), True, "fast"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    OnboardSafetyEnvelope(command_timeout_s=value)
+
     def test_absent_or_stale_commands_are_zero(self):
         envelope = OnboardSafetyEnvelope()
         self.assertEqual(envelope.tick(1.0), VelocityCommand())

@@ -17,7 +17,12 @@ class OnboardSafetyEnvelope:
     """Expire stale Mac commands and apply the local forward obstacle override."""
 
     def __init__(self, command_timeout_s: float = 0.15):
-        if command_timeout_s <= 0.0:
+        if (
+            isinstance(command_timeout_s, bool)
+            or not isinstance(command_timeout_s, Real)
+            or not math.isfinite(command_timeout_s)
+            or command_timeout_s <= 0.0
+        ):
             raise ValueError("command timeout must be positive")
         self.command_timeout_s = command_timeout_s
         self._command: Optional[VelocityCommand] = None

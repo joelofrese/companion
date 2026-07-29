@@ -1,6 +1,8 @@
 """CM5 command service that applies local safety before forwarding to PX4."""
 
 import asyncio
+import math
+from numbers import Real
 from typing import Callable, Optional
 
 from control.velocity import VelocityCommand
@@ -17,7 +19,12 @@ class SafetyCommandService:
         tick_period_s: float = 0.02,
         obstacle_distance: Optional[Callable[[], Optional[float]]] = None,
     ):
-        if tick_period_s <= 0.0:
+        if (
+            isinstance(tick_period_s, bool)
+            or not isinstance(tick_period_s, Real)
+            or not math.isfinite(tick_period_s)
+            or tick_period_s <= 0.0
+        ):
             raise ValueError("tick period must be positive")
         self.receiver = receiver
         self.forwarder = forwarder

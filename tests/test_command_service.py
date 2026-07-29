@@ -39,6 +39,12 @@ class FailingForwarder:
 
 
 class SafetyCommandServiceTests(unittest.TestCase):
+    def test_invalid_tick_period_is_rejected(self):
+        for value in (0.0, float("nan"), True, "fast"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    SafetyCommandService(FakeReceiver(), object(), tick_period_s=value)
+
     def test_lifecycle_forwards_then_stops_with_zero(self):
         async def scenario():
             stop_event = asyncio.Event()

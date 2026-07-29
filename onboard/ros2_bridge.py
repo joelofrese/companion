@@ -19,7 +19,12 @@ class LatestDistanceSensor:
     """Thread-safe latest PX4 distance reading; no reading is unsafe."""
 
     def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
-        if timeout_s <= 0.0:
+        if (
+            isinstance(timeout_s, bool)
+            or not isinstance(timeout_s, Real)
+            or not math.isfinite(timeout_s)
+            or timeout_s <= 0.0
+        ):
             raise ValueError("distance timeout must be positive")
         self._distance_m = math.nan
         self._clock = clock

@@ -120,6 +120,15 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Hardened CM5 safety configuration so non-finite, boolean, and
+  non-numeric command timeouts, distance freshness windows, and service tick
+  periods are rejected before a safety loop starts. The focused suite now has
+  34 checks; loopback, synthetic-world SITL, and production RTP/YOLO SITL all
+  passed afterward.
+- 2026-07-28: Widened the synthetic-world malformed-sensor and transport-fault
+  phases after one scheduler-sensitive run skipped a 100 ms fail-safe window.
+  The scenario now has distinct recovery intervals and passed with actual
+  forward, lateral, obstacle-backoff, and landing telemetry.
 - 2026-07-28: Added `python -m sim.world`, a deterministic PX4/Gazebo behavior
   scenario. It passed forward following, lateral target tracking, target-loss
   hold, obstacle backoff, malformed-obstacle fail-safe, command-dropout expiry

@@ -68,22 +68,22 @@ class SyntheticWorld:
         elapsed_s: float,
         vehicle_position_m: Optional[tuple[float, float]] = None,
     ) -> WorldStep:
-        if 2.8 <= elapsed_s < 3.8:
+        if 2.8 <= elapsed_s < 3.7:
             north_m = vehicle_position_m[0] if vehicle_position_m is not None else 0.0
             return WorldStep(
                 State.FOLLOWING,
                 obstacle_distance_m=max(0.2, 0.5 - north_m),
             )
-        if 3.9 <= elapsed_s < 4.0:
+        if 3.9 <= elapsed_s < 4.2:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
-        if 4.0 <= elapsed_s < 4.5:
+        if 4.2 <= elapsed_s < 4.7:
             return WorldStep(State.FOLLOWING, transmit=False)
-        if 4.65 <= elapsed_s < 4.95:
+        if 4.85 <= elapsed_s < 5.15:
             return WorldStep(
                 State.FOLLOWING,
                 command_override=VelocityCommand(north_m_s=1.0),
             )
-        return WorldStep(State.FOLLOWING if elapsed_s < 5.0 else State.HOVERING)
+        return WorldStep(State.FOLLOWING if elapsed_s < 5.2 else State.HOVERING)
 
 
 class WorldVision:
@@ -201,7 +201,7 @@ async def run():
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None
                 )
-                if elapsed >= 5.0 and "intent changed to hover" not in reported:
+                if elapsed >= 5.2 and "intent changed to hover" not in reported:
                     event = "intent changed to hover"
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
@@ -230,13 +230,13 @@ async def run():
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),
             (1.0, 2.0, lambda command: command.east_m_s > 0.0, "lateral target tracking"),
             (2.1, 2.6, lambda command: command == VelocityCommand(), "hold after target loss"),
-            (2.8, 3.8, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
-            (3.8, 4.0, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
-            (3.9, 4.0, lambda command: command == VelocityCommand(), "invalid obstacle fail-safe"),
-            (4.15, 4.5, lambda command: command == VelocityCommand(), "command-dropout expiry"),
-            (4.5, 4.65, lambda command: command.north_m_s > 0.0, "command-link recovery"),
-            (4.65, 4.95, lambda command: command == VelocityCommand(), "invalid-command rejection"),
-            (5.0, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),
+            (2.8, 3.7, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
+            (3.7, 3.9, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
+            (3.9, 4.2, lambda command: command == VelocityCommand(), "invalid obstacle fail-safe"),
+            (4.35, 4.7, lambda command: command == VelocityCommand(), "command-dropout expiry"),
+            (4.7, 4.85, lambda command: command.north_m_s > 0.0, "command-link recovery"),
+            (4.85, 5.15, lambda command: command == VelocityCommand(), "invalid-command rejection"),
+            (5.2, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),
         )
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):

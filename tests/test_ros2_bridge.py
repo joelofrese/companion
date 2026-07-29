@@ -82,8 +82,10 @@ class Ros2DistanceSensorTests(unittest.TestCase):
         self.assertTrue(math.isnan(sensor.read()))
 
     def test_non_positive_timeout_is_rejected(self):
-        with self.assertRaises(ValueError):
-            LatestDistanceSensor(timeout_s=0.0)
+        for value in (0.0, float("nan"), True, "slow"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    LatestDistanceSensor(timeout_s=value)
 
     def test_out_of_range_or_malformed_readings_become_unsafe(self):
         sensor = LatestDistanceSensor(clock=lambda: 10.0)
