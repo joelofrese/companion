@@ -16,7 +16,7 @@ from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
-from sim.flight import close_mavsdk, land, prepare
+from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
     FOLLOW_END_S,
     SECOND_FOLLOW_END_S,
@@ -58,6 +58,7 @@ async def run(image_path: str):
     cm5_task = None
     mac_task = None
     telemetry_task = None
+    offboard_task = None
     cm5_stop = asyncio.Event()
     mac_stop = asyncio.Event()
     obstacle_distance_m = 2.0
@@ -149,6 +150,8 @@ async def run(image_path: str):
         print("CM5 priming setpoint=verified.")
         await drone.offboard.start()
         offboard_started = True
+        offboard_task = asyncio.create_task(wait_for_offboard(drone))
+        flight_started_at = time.monotonic()
         print("Offboard started through full Mac/CM5 stack.")
 
         async def observe_velocity():
@@ -159,6 +162,8 @@ async def run(image_path: str):
 
         telemetry_task = asyncio.create_task(observe_velocity())
         await asyncio.sleep(PROFILE_DURATION_S)
+        await asyncio.wait_for(offboard_task, timeout=5.0)
+        print("Offboard telemetry=verified through full Mac/CM5 stack.")
         mac_stop.set()
         await mac_task
         vision.close()
@@ -242,6 +247,9 @@ async def run(image_path: str):
         if telemetry_task is not None:
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
+        if offboard_task is not None and not offboard_task.done():
+            offboard_task.cancel()
+            await asyncio.gather(offboard_task, return_exceptions=True)
         if vision is not None:
             vision.close()
         if offboard_started:

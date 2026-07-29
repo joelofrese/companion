@@ -1,5 +1,6 @@
 """Shared PX4 SITL connection and flight lifecycle."""
 
+from mavsdk.telemetry import FlightMode
 from mavsdk.telemetry import LandedState
 
 
@@ -57,6 +58,14 @@ async def land(drone):
     async for armed in drone.telemetry.armed():
         if not armed:
             print("Disarmed.")
+            return
+
+
+async def wait_for_offboard(drone):
+    """Wait for PX4 telemetry to confirm offboard mode is active."""
+
+    async for mode in drone.telemetry.flight_mode():
+        if mode is FlightMode.OFFBOARD:
             return
 
 
