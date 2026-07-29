@@ -23,7 +23,13 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare
-from sim.offboard_control import PROFILE_DURATION_S, SETPOINT_PERIOD_S
+from sim.offboard_control import (
+    PROFILE_DURATION_S,
+    SECOND_FOLLOW_END_S,
+    SECOND_FOLLOW_START_S,
+    SETPOINT_PERIOD_S,
+    demo_state,
+)
 
 
 TARGET_RIGHT_START_S = 1.0
@@ -85,10 +91,11 @@ class SyntheticWorld:
         elapsed_s: float,
         vehicle_position_m: Optional[tuple[float, float]] = None,
     ) -> WorldStep:
+        intent = demo_state(elapsed_s)
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
             north_m = vehicle_position_m[0] if vehicle_position_m is not None else 0.0
             return WorldStep(
-                State.FOLLOWING,
+                intent,
                 obstacle_distance_m=max(0.2, 0.5 - north_m),
             )
         if INVALID_SENSOR_START_S <= elapsed_s < INVALID_SENSOR_END_S:
@@ -100,7 +107,7 @@ class SyntheticWorld:
                 State.FOLLOWING,
                 command_override=VelocityCommand(north_m_s=1.0),
             )
-        return WorldStep(State.FOLLOWING if elapsed_s < HOVER_START_S else State.HOVERING)
+        return WorldStep(intent)
 
 
 class WorldVision:
@@ -223,7 +230,12 @@ async def run():
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None
                 )
-                if elapsed >= HOVER_START_S and "intent changed to hover" not in reported:
+                if (
+                    SECOND_FOLLOW_START_S <= elapsed < SECOND_FOLLOW_END_S
+                    and "intent changed back to following" not in reported
+                ):
+                    event = "intent changed back to following"
+                elif elapsed >= HOVER_START_S and "intent changed to hover" not in reported:
                     event = "intent changed to hover"
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
@@ -262,7 +274,9 @@ async def run():
             (DROPOUT_START_S + 0.15, DROPOUT_END_S, lambda command: command == VelocityCommand(), "command-dropout expiry"),
             (DROPOUT_END_S, LINK_RECOVERY_END_S, lambda command: command.north_m_s > 0.0, "command-link recovery"),
             (INVALID_COMMAND_START_S, INVALID_COMMAND_END_S, lambda command: command == VelocityCommand(), "invalid-command rejection"),
-            (HOVER_START_S, PROFILE_DURATION_S, lambda command: command == VelocityCommand(), "long hover"),
+            (HOVER_START_S, SECOND_FOLLOW_START_S, lambda command: command == VelocityCommand(), "first hover"),
+            (SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S, lambda command: command.north_m_s > 0.0, "following after hover"),
+            (SECOND_FOLLOW_END_S, PROFILE_DURATION_S, lambda command: command == VelocityCommand(), "final hover"),
         )
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):

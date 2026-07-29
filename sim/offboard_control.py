@@ -7,6 +7,9 @@ from voice.pipeline import VoiceCommandPipeline
 
 SETPOINT_PERIOD_S = 0.05
 PROFILE_DURATION_S = 20.0
+FOLLOW_END_S = 4.0
+SECOND_FOLLOW_START_S = 12.0
+SECOND_FOLLOW_END_S = 16.0
 
 
 class _DemoTranscriber:
@@ -18,9 +21,13 @@ _demo_voice = VoiceCommandPipeline(_DemoTranscriber())
 
 
 def demo_state(elapsed_s: float) -> State:
-    """Follow for four seconds, then ask the reactive layer to hover."""
+    """Repeat a short follow-and-hover behavior cycle."""
 
-    transcript = "follow me" if 0.0 <= elapsed_s < 4.0 else "hover"
+    following = (
+        0.0 <= elapsed_s < FOLLOW_END_S
+        or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
+    )
+    transcript = "follow me" if following else "hover"
     state = _demo_voice.handle(transcript)
     if state is None:
         raise RuntimeError(f"demo transcript produced no state: {transcript!r}")
