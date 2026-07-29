@@ -6,6 +6,7 @@ the vehicle still flies in Gazebo through the production command path.
 """
 
 import asyncio
+import math
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -65,6 +66,8 @@ class SyntheticWorld:
     def step(self, elapsed_s: float) -> WorldStep:
         if 2.8 <= elapsed_s < 3.8:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=0.5)
+        if 3.9 <= elapsed_s < 4.0:
+            return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
         if 4.0 <= elapsed_s < 4.5:
             return WorldStep(State.FOLLOWING, transmit=False)
         if 4.5 <= elapsed_s < 4.8:
@@ -182,6 +185,7 @@ async def run():
                     "target moved right" if 1.0 <= elapsed < 2.0 else
                     "target lost; holding" if 2.0 <= elapsed < 2.6 else
                     "obstacle detected; backing off" if obstacle_distance_m == 0.5 else
+                    "invalid obstacle reading" if isinstance(obstacle_distance_m, float) and math.isnan(obstacle_distance_m) else
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None
                 )
@@ -216,6 +220,7 @@ async def run():
             (2.1, 2.6, lambda command: command == VelocityCommand(), "hold after target loss"),
             (2.8, 3.8, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
             (3.8, 4.0, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
+            (3.9, 4.0, lambda command: command == VelocityCommand(), "invalid obstacle fail-safe"),
             (4.15, 4.5, lambda command: command == VelocityCommand(), "command-dropout expiry"),
             (4.5, 4.8, lambda command: command == VelocityCommand(), "invalid-command rejection"),
             (5.0, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),

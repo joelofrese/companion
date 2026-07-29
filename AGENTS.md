@@ -122,11 +122,12 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 - 2026-07-28: Added `python -m sim.world`, a deterministic PX4/Gazebo behavior
   scenario. It passed forward following, lateral target tracking, target-loss
-  hold, obstacle backoff, command-dropout expiry, invalid-command rejection,
-  and clean landing through the production Mac→CM5 safety path. Target geometry
-  now responds to the vehicle's actual simulated NED position, and the scenario
-  verifies saved following intent resumes after obstacle backoff. The verifier
-  explicitly closes its MAVSDK helper for clean repeated runs.
+  hold, obstacle backoff, malformed-obstacle fail-safe, command-dropout expiry,
+  invalid-command rejection, hover recovery, and clean landing through the
+  production Mac→CM5 safety path. Target geometry now responds to the vehicle's
+  actual simulated NED position, and the scenario verifies saved following intent
+  resumes after obstacle backoff. The verifier explicitly closes its MAVSDK
+  helper for clean repeated runs.
 - 2026-07-28: Tightened `sim.offboard_full` so its production RTP/YOLO scenario
   must observe both nonzero visual-following motion and obstacle backoff before
   it can pass. The bundled YOLO person fixture produced 0.04 m/s forward,
