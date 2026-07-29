@@ -68,6 +68,8 @@ async def run(image_path: str):
     landed = False
     max_north_velocity = 0.0
     min_north_velocity = 0.0
+    max_east_velocity = 0.0
+    min_east_velocity = 0.0
     frames_received = 0
 
     def current_obstacle(timestamp_s):
@@ -156,9 +158,12 @@ async def run(image_path: str):
 
         async def observe_velocity():
             nonlocal max_north_velocity, min_north_velocity
+            nonlocal max_east_velocity, min_east_velocity
             async for velocity in drone.telemetry.velocity_ned():
                 max_north_velocity = max(max_north_velocity, velocity.north_m_s)
                 min_north_velocity = min(min_north_velocity, velocity.north_m_s)
+                max_east_velocity = max(max_east_velocity, velocity.east_m_s)
+                min_east_velocity = min(min_east_velocity, velocity.east_m_s)
 
         telemetry_task = asyncio.create_task(observe_velocity())
         await asyncio.sleep(PROFILE_DURATION_S)
@@ -194,6 +199,11 @@ async def run(image_path: str):
         if max_north_velocity <= 0.02:
             raise RuntimeError(
                 f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
+            )
+        if max_east_velocity <= 0.02 and min_east_velocity >= -0.02:
+            raise RuntimeError(
+                "full stack did not observe lateral visual tracking: "
+                f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
             )
 
         def observed(start_s, end_s, predicate):
@@ -237,6 +247,10 @@ async def run(image_path: str):
         print("Repeated following and hover intent through CM5=verified.")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
+        print(
+            "Observed east velocity range: "
+            f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
+        )
         await drone.offboard.stop()
         offboard_started = False
         await land(drone)
