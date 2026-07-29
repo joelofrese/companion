@@ -79,6 +79,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m unittest discover
 PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice tests
 python -m sim.command_loopback
 python -m sim.world
+python -m sim.run_world
 python -m sim.offboard_full .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
@@ -120,6 +121,13 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Added `python -m sim.run_world`, a single process-group-aware
+  command that launches PX4/Gazebo, waits for `pxh>`, runs the synthetic world,
+  and cleans up PX4/Gazebo afterward. Its raw-output boot reader handles PX4's
+  carriage-return prompt stream and fails fast if `make` exits early. A managed
+  run passed with motion, fault recovery, landing, disarm, and no leftover
+  simulator processes. The existing `sim.world` remains the scenario itself;
+  the runner only removes manual simulator orchestration.
 - 2026-07-28: Extended `sim.world` to require the real CM5 service shutdown
   path to forward one final zero command before PX4 cleanup. The 36-check suite
   and complete synthetic SITL passed with the shutdown invariant.
