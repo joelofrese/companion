@@ -15,7 +15,6 @@ class State(Enum):
     FOLLOWING = auto()
     AVOIDING = auto()
     HOVERING = auto()
-    RESPONDING = auto()
 
 
 OBSTACLE_STOP_M = 0.6

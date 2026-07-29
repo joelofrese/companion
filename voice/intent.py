@@ -30,7 +30,6 @@ def parse_intent(transcript: str) -> Optional[State]:
 
     intents = {
         State.FOLLOWING: ("follow", "come with me", "come along"),
-        State.RESPONDING: ("respond", "face me", "turn to me", "look at me"),
         State.IDLE: ("idle", "sleep"),
     }
     matches = [
