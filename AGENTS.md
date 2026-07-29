@@ -7,11 +7,11 @@ only decisions, constraints, and evidence that future work needs.
 
 Build an autonomous indoor companion drone that behaves naturally: it should
 notice, decide, move deliberately, stay safe, and remain useful without a
-human translating every observation into the next action.
+human translating every observation into the next action. Continuously develop
+its capabilities so it can learn and become more useful over time.
 
-The system should be freely developed in simulation first and later refined
-with hardware evidence. Simulation may stand in for missing hardware, but must
-not be described as proof of hardware behavior.
+Develop and test it autonomously in simulation whenever possible, so progress
+does not depend on hardware.
 
 ## Priorities
 
