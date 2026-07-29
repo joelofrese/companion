@@ -125,6 +125,9 @@ PX4/Gazebo/MAVSDK processes before retrying.
   actual forward, lateral, and obstacle-backoff telemetry; failures attempt
   landing; shared lifecycle verifies disarm; and the focused suite has 36
   checks. Production RTP/YOLO/Kalman SITL and UDP loopback pass.
+- 2026-07-29: Consolidated the synthetic-world timeline into named phase
+  constants shared by generation and assertions, removing repeated magic
+  windows. The managed world run passed with complete telemetry and cleanup.
 - 2026-07-28: Chose a deterministic synthetic behavioral world over a custom
   companion-owned Gazebo SDF. PX4's named worlds require external PX4 rebuild
   coupling and would not improve current control evidence; real camera, TOF,

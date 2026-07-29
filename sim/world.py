@@ -26,6 +26,23 @@ from sim.flight import close_mavsdk, land, prepare
 from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S
 
 
+TARGET_RIGHT_START_S = 1.0
+TARGET_RIGHT_END_S = 2.0
+TARGET_LOST_START_S = 2.0
+TARGET_LOST_END_S = 2.6
+OBSTACLE_START_S = 2.8
+OBSTACLE_END_S = 3.7
+RECOVERY_END_S = 3.9
+INVALID_SENSOR_START_S = 3.9
+INVALID_SENSOR_END_S = 4.2
+DROPOUT_START_S = 4.2
+DROPOUT_END_S = 4.7
+LINK_RECOVERY_END_S = 4.85
+INVALID_COMMAND_START_S = 4.85
+INVALID_COMMAND_END_S = 5.15
+HOVER_START_S = 5.2
+
+
 @dataclass(frozen=True)
 class WorldStep:
     intent: State
@@ -42,13 +59,13 @@ class SyntheticWorld:
         elapsed_s: float,
         vehicle_position_m: Optional[tuple[float, float]],
     ) -> Optional[TrackEstimate]:
-        if 2.0 <= elapsed_s < 2.6:
+        if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
             return None
         if vehicle_position_m is None:
             return None
         north_m, east_m = vehicle_position_m
         target_north_m = 1.6
-        target_east_m = 0.8 if 1.0 <= elapsed_s < 2.0 else 0.0
+        target_east_m = 0.8 if TARGET_RIGHT_START_S <= elapsed_s < TARGET_RIGHT_END_S else 0.0
         north_distance_m = target_north_m - north_m
         if north_distance_m <= 0.0:
             return None
@@ -68,22 +85,22 @@ class SyntheticWorld:
         elapsed_s: float,
         vehicle_position_m: Optional[tuple[float, float]] = None,
     ) -> WorldStep:
-        if 2.8 <= elapsed_s < 3.7:
+        if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
             north_m = vehicle_position_m[0] if vehicle_position_m is not None else 0.0
             return WorldStep(
                 State.FOLLOWING,
                 obstacle_distance_m=max(0.2, 0.5 - north_m),
             )
-        if 3.9 <= elapsed_s < 4.2:
+        if INVALID_SENSOR_START_S <= elapsed_s < INVALID_SENSOR_END_S:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
-        if 4.2 <= elapsed_s < 4.7:
+        if DROPOUT_START_S <= elapsed_s < DROPOUT_END_S:
             return WorldStep(State.FOLLOWING, transmit=False)
-        if 4.85 <= elapsed_s < 5.15:
+        if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
             return WorldStep(
                 State.FOLLOWING,
                 command_override=VelocityCommand(north_m_s=1.0),
             )
-        return WorldStep(State.FOLLOWING if elapsed_s < 5.2 else State.HOVERING)
+        return WorldStep(State.FOLLOWING if elapsed_s < HOVER_START_S else State.HOVERING)
 
 
 class WorldVision:
@@ -197,8 +214,8 @@ async def run():
                 step = world.step(elapsed, vehicle_position_m)
                 obstacle_distance_m = step.obstacle_distance_m
                 event = (
-                    "target moved right" if 1.0 <= elapsed < 2.0 else
-                    "target lost; holding" if 2.0 <= elapsed < 2.6 else
+                    "target moved right" if TARGET_RIGHT_START_S <= elapsed < TARGET_RIGHT_END_S else
+                    "target lost; holding" if TARGET_LOST_START_S <= elapsed < TARGET_LOST_END_S else
                     "obstacle detected; backing off" if (
                         obstacle_distance_m is not None and obstacle_distance_m < 0.6
                     ) else
@@ -206,7 +223,7 @@ async def run():
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None
                 )
-                if elapsed >= 5.2 and "intent changed to hover" not in reported:
+                if elapsed >= HOVER_START_S and "intent changed to hover" not in reported:
                     event = "intent changed to hover"
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
@@ -237,15 +254,15 @@ async def run():
 
         checks = (
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),
-            (1.0, 2.0, lambda command: command.east_m_s > 0.0, "lateral target tracking"),
-            (2.1, 2.6, lambda command: command == VelocityCommand(), "hold after target loss"),
-            (2.8, 3.7, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
-            (3.7, 3.9, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
-            (3.9, 4.2, lambda command: command == VelocityCommand(), "invalid obstacle fail-safe"),
-            (4.35, 4.7, lambda command: command == VelocityCommand(), "command-dropout expiry"),
-            (4.7, 4.85, lambda command: command.north_m_s > 0.0, "command-link recovery"),
-            (4.85, 5.15, lambda command: command == VelocityCommand(), "invalid-command rejection"),
-            (5.2, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),
+            (TARGET_RIGHT_START_S, TARGET_RIGHT_END_S, lambda command: command.east_m_s > 0.0, "lateral target tracking"),
+            (2.1, TARGET_LOST_END_S, lambda command: command == VelocityCommand(), "hold after target loss"),
+            (OBSTACLE_START_S, OBSTACLE_END_S, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
+            (OBSTACLE_END_S, RECOVERY_END_S, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
+            (INVALID_SENSOR_START_S, INVALID_SENSOR_END_S, lambda command: command == VelocityCommand(), "invalid obstacle fail-safe"),
+            (DROPOUT_START_S + 0.15, DROPOUT_END_S, lambda command: command == VelocityCommand(), "command-dropout expiry"),
+            (DROPOUT_END_S, LINK_RECOVERY_END_S, lambda command: command.north_m_s > 0.0, "command-link recovery"),
+            (INVALID_COMMAND_START_S, INVALID_COMMAND_END_S, lambda command: command == VelocityCommand(), "invalid-command rejection"),
+            (HOVER_START_S, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),
         )
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):
