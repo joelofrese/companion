@@ -15,6 +15,10 @@ from onboard.ros2_forwarder import Ros2VelocityForwarder
 DISTANCE_TIMEOUT_S = 0.15
 
 
+def _finite_real(value):
+    return not isinstance(value, bool) and isinstance(value, Real) and math.isfinite(value)
+
+
 class LatestDistanceSensor:
     """Thread-safe latest PX4 distance reading; no reading is unsafe."""
 
@@ -36,31 +40,16 @@ class LatestDistanceSensor:
         distance_m = getattr(message, "current_distance", math.nan)
         minimum_m = getattr(message, "min_distance", None)
         maximum_m = getattr(message, "max_distance", None)
-        if (
-            isinstance(distance_m, bool)
-            or not isinstance(distance_m, Real)
-            or not math.isfinite(distance_m)
-            or distance_m < 0.0
-            or (
-                minimum_m is not None
-                and (isinstance(minimum_m, bool) or not isinstance(minimum_m, Real)
-                     or not math.isfinite(minimum_m))
-            )
-            or (
-                maximum_m is not None
-                and (isinstance(maximum_m, bool) or not isinstance(maximum_m, Real)
-                     or not math.isfinite(maximum_m))
-            )
-            or (minimum_m is not None and minimum_m < 0.0)
-            or (maximum_m is not None and maximum_m < 0.0)
-            or (
-                minimum_m is not None
-                and maximum_m is not None
-                and minimum_m > maximum_m
-            )
-            or (minimum_m is not None and distance_m < minimum_m)
-            or (maximum_m is not None and distance_m > maximum_m)
-        ):
+        valid = (
+            _finite_real(distance_m)
+            and distance_m >= 0.0
+            and (minimum_m is None or (_finite_real(minimum_m) and minimum_m >= 0.0))
+            and (maximum_m is None or (_finite_real(maximum_m) and maximum_m >= 0.0))
+            and (minimum_m is None or maximum_m is None or minimum_m <= maximum_m)
+            and (minimum_m is None or distance_m >= minimum_m)
+            and (maximum_m is None or distance_m <= maximum_m)
+        )
+        if not valid:
             distance_m = math.nan
         with self._lock:
             self._distance_m = distance_m
