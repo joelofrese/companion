@@ -70,7 +70,7 @@ class SyntheticWorld:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
         if 4.0 <= elapsed_s < 4.5:
             return WorldStep(State.FOLLOWING, transmit=False)
-        if 4.5 <= elapsed_s < 4.8:
+        if 4.65 <= elapsed_s < 4.95:
             return WorldStep(
                 State.FOLLOWING,
                 command_override=VelocityCommand(north_m_s=1.0),
@@ -222,7 +222,8 @@ async def run():
             (3.8, 4.0, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
             (3.9, 4.0, lambda command: command == VelocityCommand(), "invalid obstacle fail-safe"),
             (4.15, 4.5, lambda command: command == VelocityCommand(), "command-dropout expiry"),
-            (4.5, 4.8, lambda command: command == VelocityCommand(), "invalid-command rejection"),
+            (4.5, 4.65, lambda command: command.north_m_s > 0.0, "command-link recovery"),
+            (4.65, 4.95, lambda command: command == VelocityCommand(), "invalid-command rejection"),
             (5.0, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),
         )
         for start_s, end_s, predicate, behavior in checks:
