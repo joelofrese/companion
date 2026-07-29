@@ -6,7 +6,6 @@ import sys
 import time
 
 from mavsdk import System
-from mavsdk.offboard import VelocityNedYaw
 
 from control.following import FollowConfig, VisualFollower
 from control.runtime import CompanionRuntime
@@ -45,15 +44,6 @@ async def _stop_task(task, stop_event):
             await task
         except Exception:
             pass
-
-
-def _mavsdk_velocity(command):
-    return VelocityNedYaw(
-        command.north_m_s,
-        command.east_m_s,
-        command.down_m_s,
-        command.yaw_deg,
-    )
 
 
 async def run(image_path: str):
