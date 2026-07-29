@@ -54,9 +54,7 @@ computer relays sensors and video, performs the final safety check, and
 forwards approved velocity setpoints to PX4. Keep hardware-specific code there
 so the Mac-side control behavior remains easy to simulate and test.
 
-Do not add hardware features, sensing directions, speed, or autonomy claims
-without a concrete need and evidence. Keep movement slow, deliberate, and easy
-to stop.
+Keep movement slow, deliberate, and easy to stop.
 
 ## Simulation and validation
 
