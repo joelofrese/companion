@@ -59,20 +59,10 @@ def _stop_process_group(process, process_group_id):
 def _run_once(
     px4_dir: Path,
     companion_dir: Path,
-    image_path: Optional[Path] = None,
-    world: str = "default",
+    image_path: Optional[Path],
+    world: str,
+    stdbuf: str,
 ) -> int:
-    stdbuf = shutil.which("stdbuf")
-    if stdbuf is None:
-        raise RuntimeError("stdbuf is required to observe PX4 boot output")
-    if not px4_dir.is_dir():
-        raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
-    if image_path is not None and not image_path.is_file():
-        raise RuntimeError(f"scenario image does not exist: {image_path}")
-    world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
-    if not world_file.is_file():
-        raise RuntimeError(f"Gazebo world does not exist: {world_file}")
-
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
 
@@ -117,9 +107,20 @@ def run(
     image_path: Optional[Path] = None,
     world: str = "default",
 ) -> int:
+    stdbuf = shutil.which("stdbuf")
+    if stdbuf is None:
+        raise RuntimeError("stdbuf is required to observe PX4 boot output")
+    if not px4_dir.is_dir():
+        raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
+    if image_path is not None and not image_path.is_file():
+        raise RuntimeError(f"scenario image does not exist: {image_path}")
+    world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
+    if not world_file.is_file():
+        raise RuntimeError(f"Gazebo world does not exist: {world_file}")
+
     for attempt in range(BOOT_RETRIES + 1):
         try:
-            return _run_once(px4_dir, companion_dir, image_path, world)
+            return _run_once(px4_dir, companion_dir, image_path, world, stdbuf)
         except RuntimeError:
             if attempt == BOOT_RETRIES:
                 raise

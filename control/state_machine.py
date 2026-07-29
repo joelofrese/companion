@@ -22,7 +22,7 @@ TARGET_MAX_AGE_S = 0.5
 
 class ReactiveController:
     def __init__(self, follower: Optional[VisualFollower] = None):
-        self.state = State.IDLE
+        self.intent = State.IDLE
         self.follower = follower or VisualFollower()
 
     def set_intent(self, state: State):
@@ -30,7 +30,7 @@ class ReactiveController:
 
         if not isinstance(state, State):
             raise ValueError("intent must be a State")
-        self.state = state
+        self.intent = state
 
     def command(
         self,
@@ -51,7 +51,7 @@ class ReactiveController:
                 return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
 
         if (
-            self.state is State.FOLLOWING
+            self.intent is State.FOLLOWING
             and target_age_s is not None
             and 0.0 <= target_age_s <= TARGET_MAX_AGE_S
             and target is not None
