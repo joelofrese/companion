@@ -7,7 +7,6 @@ import time
 
 from mavsdk import System
 from mavsdk.offboard import VelocityNedYaw
-from mavsdk.telemetry import LandedState
 
 from control.following import FollowConfig, VisualFollower
 from control.runtime import CompanionRuntime
@@ -17,7 +16,8 @@ from control.udp_sender import UdpCommandSender
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
-from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S, TAKEOFF_ALTITUDE, _wait_until_in_air
+from sim.flight import close_mavsdk, land, prepare
+from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S
 from sim.offboard_control import demo_obstacle_distance_m, demo_state
 from sim.video_loopback import image_sender_command
 from vision.latest import LatestVisionPipeline
@@ -86,27 +86,8 @@ async def run(image_path: str):
         )
         print("RTP camera loopback started.")
 
-        print("Waiting for drone connection...")
-        await drone.connect()
-        async for state in drone.core.connection_state():
-            if state.is_connected:
-                print("Connected.")
-                break
-
-        print("Waiting for vehicle to be ready to arm...")
-        async for health in drone.telemetry.health():
-            if (health.is_global_position_ok
-                    and health.is_home_position_ok
-                    and health.is_magnetometer_calibration_ok):
-                print("Ready.")
-                break
-
-        print("Arming...")
-        await drone.action.arm()
+        await prepare(drone)
         armed = True
-        await drone.action.set_takeoff_altitude(TAKEOFF_ALTITUDE)
-        await drone.action.takeoff()
-        await _wait_until_in_air(drone)
 
         forwarder = MavsdkVelocityForwarder(drone)
         receiver.start()
@@ -174,13 +155,8 @@ async def run(image_path: str):
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
         await drone.offboard.stop()
         offboard_started = False
-        print("Landing...")
-        await drone.action.land()
-        async for state in drone.telemetry.landed_state():
-            if state == LandedState.ON_GROUND:
-                landed = True
-                print("Landed.")
-                break
+        await land(drone)
+        landed = True
     finally:
         await _stop_task(mac_task, mac_stop)
         await _stop_task(cm5_task, cm5_stop)
@@ -196,10 +172,7 @@ async def run(image_path: str):
                 pass
         if armed and not landed:
             try:
-                await drone.action.land()
-                async for state in drone.telemetry.landed_state():
-                    if state == LandedState.ON_GROUND:
-                        break
+                await land(drone)
             except Exception:
                 pass
         receiver.close()
@@ -208,7 +181,7 @@ async def run(image_path: str):
             close_subprocess(camera_process)
         if sender is not None:
             sender.close()
-        drone._stop_mavsdk_server()
+        close_mavsdk(drone)
 
 
 if __name__ == "__main__":

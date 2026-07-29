@@ -6,15 +6,14 @@ from typing import Awaitable, Callable, Optional
 
 from mavsdk import System
 from mavsdk.offboard import OffboardError, VelocityNedYaw
-from mavsdk.telemetry import LandedState
 
 from control.runtime import CompanionRuntime
 from control.velocity import VelocityCommand
+from sim.flight import TAKEOFF_ALTITUDE, close_mavsdk, land, prepare
 from sim.offboard_control import DemoVision, demo_obstacle_distance_m, demo_state
 
 
 SETPOINT_PERIOD_S = 0.05
-TAKEOFF_ALTITUDE = 2.0
 PROFILE_DURATION_S = 8.0
 
 
@@ -25,12 +24,6 @@ def _mavsdk_velocity(command):
         command.down_m_s,
         command.yaw_deg,
     )
-
-
-async def _wait_until_in_air(drone):
-    async for state in drone.telemetry.landed_state():
-        if state == LandedState.IN_AIR:
-            return
 
 
 FrameReader = Callable[[], Awaitable[Optional[tuple[float, object]]]]
@@ -65,27 +58,8 @@ async def run(
     controller=None,
     frame_reader: Optional[FrameReader] = None,
 ):
-    print("Waiting for drone connection...")
     drone = System()
-    await drone.connect()
-    async for state in drone.core.connection_state():
-        if state.is_connected:
-            print("Connected.")
-            break
-
-    print("Waiting for vehicle to be ready to arm...")
-    async for health in drone.telemetry.health():
-        if (health.is_global_position_ok
-                and health.is_home_position_ok
-                and health.is_magnetometer_calibration_ok):
-            print("Ready.")
-            break
-
-    print("Arming...")
-    await drone.action.arm()
-    await drone.action.set_takeoff_altitude(TAKEOFF_ALTITUDE)
-    await drone.action.takeoff()
-    await _wait_until_in_air(drone)
+    await prepare(drone)
 
     # PX4 requires a setpoint before offboard.start and a continuous stream after it.
     control = CompanionRuntime(vision or DemoVision(), controller=controller)
@@ -170,12 +144,8 @@ async def run(
         )
     print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
     print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
-    print("Landing...")
-    await drone.action.land()
-    async for state in drone.telemetry.landed_state():
-        if state == LandedState.ON_GROUND:
-            print("Landed.")
-            break
+    await land(drone)
+    close_mavsdk(drone)
     if flight_error is not None:
         raise flight_error
     if telemetry_error is not None:

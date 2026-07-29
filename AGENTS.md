@@ -132,6 +132,10 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   it can pass. The bundled YOLO person fixture produced 0.04 m/s forward,
   -0.17 m/s backoff, and clean landing; non-person images are correctly rejected
   as visual-following evidence.
+- 2026-07-28: Consolidated PX4 connect/health/arm/takeoff/land and MAVSDK helper
+  cleanup into `sim.flight`, removing 130 duplicated lifecycle lines across
+  the four SITL entry points. World, full-stack, hover, and direct offboard
+  verification all passed afterward.
 - 2026-07-28: Reduced deterministic coverage to 32 focused safety-contract
   checks across command validity, watchdog/obstacle fail-safe behavior, safe
   shutdown, vision liveness, and CM5/PX4 bridge seams. Removed component and

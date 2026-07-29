@@ -12,7 +12,6 @@ from typing import Optional
 
 from mavsdk import System
 from mavsdk.offboard import OffboardError
-from mavsdk.telemetry import LandedState
 
 from control.runtime import CompanionRuntime
 from control.state_machine import State
@@ -22,7 +21,8 @@ from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
-from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S, TAKEOFF_ALTITUDE, _wait_until_in_air
+from sim.flight import close_mavsdk, land, prepare
+from sim.offboard import PROFILE_DURATION_S, SETPOINT_PERIOD_S
 
 
 @dataclass(frozen=True)
@@ -103,26 +103,7 @@ async def run():
     obstacle_distance_m = None
     safe_commands = []
     try:
-        print("Waiting for drone connection...")
-        await drone.connect()
-        async for state in drone.core.connection_state():
-            if state.is_connected:
-                print("Connected.")
-                break
-
-        print("Waiting for vehicle to be ready to arm...")
-        async for health in drone.telemetry.health():
-            if (health.is_global_position_ok
-                    and health.is_home_position_ok
-                    and health.is_magnetometer_calibration_ok):
-                print("Ready.")
-                break
-
-        print("Arming...")
-        await drone.action.arm()
-        await drone.action.set_takeoff_altitude(TAKEOFF_ALTITUDE)
-        await drone.action.takeoff()
-        await _wait_until_in_air(drone)
+        await prepare(drone)
 
         origin = None
         vehicle_position_m = None
@@ -246,12 +227,7 @@ async def run():
             raise RuntimeError(f"SITL did not observe obstacle backoff: {min_north_velocity:.2f}m/s")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
-        print("Landing...")
-        await drone.action.land()
-        async for state in drone.telemetry.landed_state():
-            if state == LandedState.ON_GROUND:
-                print("Landed.")
-                break
+        await land(drone)
     finally:
         receiver.close()
         if sender is not None:
@@ -262,7 +238,7 @@ async def run():
         if position_task is not None:
             position_task.cancel()
             await asyncio.gather(position_task, return_exceptions=True)
-        drone._stop_mavsdk_server()
+        close_mavsdk(drone)
 
 
 if __name__ == "__main__":
