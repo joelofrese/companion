@@ -144,6 +144,8 @@ class PersonTracker:
         if age_s < 0.0:
             raise ValueError("prediction timestamp must not precede the last measurement")
         if age_s > self.max_prediction_age_s:
+            self._state_timestamp_s = None
+            self._last_measurement_timestamp_s = None
             return None
         dt = timestamp_s - self._state_timestamp_s
         if dt > 0.0:
