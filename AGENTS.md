@@ -79,7 +79,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m unittest discover
 PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice tests
 python -m sim.command_loopback
 python -m sim.world
-python -m sim.offboard_full /path/to/person-image.jpg
+python -m sim.offboard_full .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
 Start PX4 SITL in `~/Code/Croppie/PX4-Autopilot` with
@@ -129,8 +129,9 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   explicitly closes its MAVSDK helper for clean repeated runs.
 - 2026-07-28: Tightened `sim.offboard_full` so its production RTP/YOLO scenario
   must observe both nonzero visual-following motion and obstacle backoff before
-  it can pass. A known person-containing fixture produced 0.04 m/s forward,
-  -0.17 m/s backoff, and clean landing.
+  it can pass. The bundled YOLO person fixture produced 0.04 m/s forward,
+  -0.17 m/s backoff, and clean landing; non-person images are correctly rejected
+  as visual-following evidence.
 - 2026-07-28: Reduced deterministic coverage to 32 focused safety-contract
   checks across command validity, watchdog/obstacle fail-safe behavior, safe
   shutdown, vision liveness, and CM5/PX4 bridge seams. Removed component and
