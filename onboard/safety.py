@@ -33,6 +33,12 @@ class OnboardSafetyEnvelope:
     def receive(self, timestamp_s: float, command: VelocityCommand):
         """Record one command using the CM5 receive timestamp."""
 
+        if (
+            isinstance(timestamp_s, bool)
+            or not isinstance(timestamp_s, Real)
+            or not math.isfinite(timestamp_s)
+        ):
+            raise ValueError("received command timestamp must be finite")
         if self._received_at_s is not None and timestamp_s <= self._received_at_s:
             raise ValueError("received command timestamps must increase")
         self._command = command
@@ -55,6 +61,12 @@ class OnboardSafetyEnvelope:
     ) -> VelocityCommand:
         """Return the command safe to forward to PX4 at this local tick."""
 
+        if (
+            isinstance(timestamp_s, bool)
+            or not isinstance(timestamp_s, Real)
+            or not math.isfinite(timestamp_s)
+        ):
+            return VelocityCommand()
         if self._last_tick_s is not None and timestamp_s <= self._last_tick_s:
             raise ValueError("safety tick timestamps must increase")
         self._last_tick_s = timestamp_s
