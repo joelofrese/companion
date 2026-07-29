@@ -20,6 +20,8 @@ from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
     DistanceMessage,
+    COMMAND_DROPOUT_END_S,
+    COMMAND_DROPOUT_START_S,
     FOLLOW_END_S,
     INVALID_DISTANCE_END_S,
     INVALID_DISTANCE_START_S,
@@ -79,6 +81,7 @@ async def run(image_path: str):
     frames_received = 0
     video_fault_reported = False
     target_loss_reported = False
+    command_dropout_reported = False
 
     def current_obstacle(timestamp_s):
         elapsed_s = max(0.0, timestamp_s - flight_started_at)
@@ -118,6 +121,25 @@ async def run(image_path: str):
         cm5_service.start()
         cm5_task = asyncio.create_task(cm5_service.run(cm5_stop))
         sender = UdpCommandSender("127.0.0.1", receiver.port)
+
+        class ScenarioSender:
+            def start(self):
+                sender.start()
+
+            def send(self, command):
+                nonlocal command_dropout_reported
+                elapsed_s = time.monotonic() - flight_started_at
+                if COMMAND_DROPOUT_START_S <= elapsed_s < COMMAND_DROPOUT_END_S:
+                    if not command_dropout_reported:
+                        print("Command packet loss injected during following.")
+                        command_dropout_reported = True
+                    return
+                sender.send(command)
+
+            def close(self):
+                sender.close()
+
+        mac_sender = ScenarioSender()
 
         vision = LatestVisionPipeline(
             PersonVisionPipeline(YoloPersonDetector(model_path="yolov8n.pt"))
@@ -162,7 +184,7 @@ async def run(image_path: str):
 
         mac_service = UdpControlService(
             control,
-            sender,
+            mac_sender,
             read_frame,
             intent_provider=current_intent,
             obstacle_provider=current_obstacle,
@@ -279,6 +301,18 @@ async def run(image_path: str):
                 SECOND_FOLLOW_END_S,
                 lambda command: command.north_m_s > 0.0,
                 "following recovery after target loss",
+            ),
+            (
+                COMMAND_DROPOUT_START_S + 0.2,
+                COMMAND_DROPOUT_END_S,
+                lambda command: command == VelocityCommand(),
+                "CM5 command-dropout fail-safe",
+            ),
+            (
+                COMMAND_DROPOUT_END_S + 0.1,
+                THIRD_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after command dropout",
             ),
             (
                 SECOND_FOLLOW_END_S,
