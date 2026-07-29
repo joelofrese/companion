@@ -1,7 +1,6 @@
 # Companion Drone
 
-This is a short, living guide. Keep it accurate, simple, and editable. Record
-only decisions, constraints, and evidence that future work needs.
+This is a short, living guide. Keep it accurate, simple, and editable.
 
 ## Goal
 
