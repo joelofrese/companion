@@ -84,9 +84,6 @@ decoded RTP/video, perception, Mac commands, onboard safety, and PX4. Neither
 scenario proves physical sensors, radio behavior, or hardware-specific
 transport.
 
-Fix failures at their source. Do not weaken simulation assertions or add
-retries merely to make a run pass.
-
 ## Current state
 
 Simulation is the main development environment, not a preliminary demo. Keep
