@@ -21,6 +21,7 @@ from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
+from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
@@ -56,9 +57,16 @@ HOVER_START_S = 5.8
 @dataclass(frozen=True)
 class WorldStep:
     intent: State
-    obstacle_distance_m: Optional[float] = None
+    obstacle_distance_m: Optional[float] = 2.0
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
+
+
+@dataclass(frozen=True)
+class DistanceMessage:
+    current_distance: float
+    min_distance: float = 0.0
+    max_distance: float = 10.0
 
 
 class SyntheticWorld:
@@ -133,7 +141,7 @@ async def run():
     offboard_started = False
     armed = False
     landed = False
-    obstacle_distance_m = None
+    distance_sensor = LatestDistanceSensor()
     safe_commands = []
     try:
         await prepare(drone)
@@ -150,7 +158,7 @@ async def run():
             receiver,
             ObservingForwarder(),
             tick_period_s=SETPOINT_PERIOD_S,
-            obstacle_distance=lambda: obstacle_distance_m,
+            obstacle_distance=distance_sensor.read,
         )
         service.start()
         service_task = asyncio.create_task(service.run(service_stop))
@@ -199,14 +207,20 @@ async def run():
             while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
                 now = time.monotonic()
                 step = world.step(elapsed)
-                obstacle_distance_m = step.obstacle_distance_m
+                distance_sensor.update(
+                    DistanceMessage(
+                        step.obstacle_distance_m
+                        if step.obstacle_distance_m is not None
+                        else math.nan
+                    )
+                )
                 event = (
                     "target moved right" if TARGET_RIGHT_START_S <= elapsed < TARGET_RIGHT_END_S else
                     "target lost; holding" if TARGET_LOST_START_S <= elapsed < TARGET_LOST_END_S else
                     "obstacle detected; backing off" if (
-                        obstacle_distance_m is not None and obstacle_distance_m < 0.6
+                        step.obstacle_distance_m is not None and step.obstacle_distance_m < 0.6
                     ) else
-                    "invalid obstacle reading" if isinstance(obstacle_distance_m, float) and math.isnan(obstacle_distance_m) else
+                    "invalid obstacle reading" if isinstance(step.obstacle_distance_m, float) and math.isnan(step.obstacle_distance_m) else
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None
                 )
