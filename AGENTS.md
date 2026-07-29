@@ -57,22 +57,22 @@ kept at that boundary so the Mac-side control behavior remains testable.
 Do not add hardware features, sensing directions, speed, or autonomy claims
 without a concrete need and evidence. Prefer deliberate, cancellable motion.
 
-## Development and validation
+## Simulation and validation
 
-Tests protect distinct observable behavior, safety properties, and active
-integration contracts. Keep them small and refactor-friendly; they support but
-do not replace integrated simulation.
+Gazebo with PX4 SITL is the primary development environment and the authority
+for software flight behavior. Develop, iterate, and review the system there so
+most progress requires no physical flight. A meaningful scenario must be
+confirmed from output or telemetry, including connection, readiness, arming,
+offboard setpoints, expected motion, safety intervention, landing, and disarm.
 
-The authoritative software-flight check is PX4 SITL with Gazebo. A meaningful
-flight pass must be confirmed from output or telemetry, including connection,
-readiness, arming, offboard setpoints, expected motion, safety intervention,
-landing, and disarm. Fix failures at their source; never weaken assertions or
-add retries merely to make a run pass.
+Unit tests are optional supporting checks, not a project goal. Keep only small
+checks that protect a distinct safety property or active interface; never keep
+an architecture, abstraction, or test merely for coverage. Integrated
+simulation outranks unit-test completeness.
 
-From `companion/`, the normal checks are:
+From `companion/`, the normal simulation loop is:
 
 ```sh
-PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m unittest discover -s tests -q
 PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice tests
 python -m sim.command_loopback
 python -m sim.run_world
@@ -82,9 +82,12 @@ python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/as
 `sim.run_world` manages PX4/Gazebo and cleanup. The synthetic world exercises
 the command path, motion, target loss, obstacle handling, malformed input,
 dropout, recovery, shutdown, landing, and disarm. The image scenario exercises
-the decoded RTP/video, perception, Mac command, onboard safety, and PX4 path.
-Neither scenario proves physical sensors, radio behavior, or hardware-specific
+decoded RTP/video, perception, Mac commands, onboard safety, and PX4. Neither
+scenario proves physical sensors, radio behavior, or hardware-specific
 transport.
+
+Fix failures at their source. Do not weaken simulation assertions or add
+retries merely to make a run pass.
 
 ## Current boundary
 
