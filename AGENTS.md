@@ -6,9 +6,8 @@ only decisions, constraints, and evidence that future work needs.
 ## Goal
 
 Build an autonomous indoor companion drone that behaves naturally: it should
-notice, decide, move deliberately, stay safe, and remain useful without a
-human translating every observation into the next action. Continuously develop
-its capabilities so it can learn and become more useful over time.
+notice, decide, move deliberately, and stay safe. Continuously develop its
+capabilities so it can learn over time.
 
 Develop and test it autonomously in simulation whenever possible, so progress
 does not depend on hardware.
