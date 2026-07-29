@@ -1,8 +1,8 @@
-"""Non-blocking CM5 UDP receiver for Mac velocity command packets."""
+"""Receive Mac commands and apply CM5 safety checks."""
 
 import socket
 import time
-from typing import Callable, Optional
+from typing import Optional
 
 from control.command_packet import MAX_PACKET_BYTES
 from control.velocity import VelocityCommand
@@ -10,14 +10,13 @@ from onboard.safety import OnboardSafetyEnvelope
 
 
 class UdpSafetyReceiver:
-    """Poll Mac packets and expose only commands approved by the CM5 envelope."""
+    """Read Mac packets and return only safe commands."""
 
     def __init__(
         self,
         bind_host: str = "0.0.0.0",
         port: int = 5001,
         safety: Optional[OnboardSafetyEnvelope] = None,
-        socket_factory: Optional[Callable[..., object]] = None,
     ):
         if (
             isinstance(port, bool)
@@ -29,15 +28,14 @@ class UdpSafetyReceiver:
         self.bind_host = bind_host
         self.port = port
         self.safety = safety or OnboardSafetyEnvelope()
-        self._socket_factory = socket_factory or socket.socket
         self._socket = None
 
     def start(self):
-        """Bind the receiver; port zero requests an available ephemeral port."""
+        """Bind the UDP socket."""
 
         if self._socket is not None:
             return
-        receiver_socket = self._socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
+        receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             receiver_socket.bind((self.bind_host, self.port))
             receiver_socket.setblocking(False)
@@ -48,7 +46,7 @@ class UdpSafetyReceiver:
         self.port = receiver_socket.getsockname()[1]
 
     def poll(self, obstacle_distance_m: Optional[float] = None) -> VelocityCommand:
-        """Drain available packets and return the safe command for this local tick."""
+        """Read available packets and return the safe command."""
 
         if self._socket is None:
             raise RuntimeError("receiver must be started before polling")
@@ -64,7 +62,7 @@ class UdpSafetyReceiver:
         return self.safety.tick(time.monotonic(), obstacle_distance_m=obstacle_distance_m)
 
     def close(self):
-        """Release the UDP socket."""
+        """Close the UDP socket."""
 
         if self._socket is None:
             return

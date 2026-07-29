@@ -1,4 +1,4 @@
-"""CM5-side safety envelope for commands received from the Mac."""
+"""Check Mac commands on the CM5 before forwarding them."""
 
 import math
 from numbers import Real
@@ -14,7 +14,7 @@ MAX_VERTICAL_SPEED_M_S = 0.3
 
 
 class OnboardSafetyEnvelope:
-    """Expire stale Mac commands and apply the local forward obstacle override."""
+    """Expire old commands and stop for a forward obstacle."""
 
     def __init__(self, command_timeout_s: float = 0.15):
         if (

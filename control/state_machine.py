@@ -1,4 +1,4 @@
-"""Minimal reactive state machine: intent selects behavior, obstacles override it."""
+"""Turn intent and sensors into one safe command."""
 
 import math
 from enum import Enum, auto
@@ -29,7 +29,7 @@ class ReactiveController:
         self.follower = follower or VisualFollower()
 
     def set_intent(self, state: State):
-        """Apply cognitive intent; obstacle safety is evaluated when commanding."""
+        """Set the requested behavior."""
 
         if not isinstance(state, State):
             raise ValueError("intent must be a State")
@@ -42,7 +42,7 @@ class ReactiveController:
         target_age_s: Optional[float] = None,
         target: Optional[TrackEstimate] = None,
     ) -> VelocityCommand:
-        """Return one safe velocity command for the current sensor snapshot."""
+        """Return one safe velocity command."""
 
         if obstacle_distance_m is not None:
             if isinstance(obstacle_distance_m, bool) or not isinstance(obstacle_distance_m, Real):

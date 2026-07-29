@@ -1,10 +1,24 @@
-"""Shared PX4 SITL connection and flight lifecycle."""
+"""Shared PX4 flight steps for the simulations."""
+
+import time
 
 from mavsdk.telemetry import FlightMode
 from mavsdk.telemetry import LandedState
 
 
 TAKEOFF_ALTITUDE = 2.0
+
+
+class RecordingForwarder:
+    """Forward commands and keep them for later checks."""
+
+    def __init__(self, forwarder):
+        self.forwarder = forwarder
+        self.commands = []
+
+    async def send(self, command):
+        await self.forwarder.send(command)
+        self.commands.append((time.monotonic(), command))
 
 
 async def prepare(drone):

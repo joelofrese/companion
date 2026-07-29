@@ -1,4 +1,4 @@
-"""Keep expensive vision inference off the reactive command-loop thread."""
+"""Run vision inference away from the control loop."""
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
@@ -8,18 +8,19 @@ from control.tracking import TrackEstimate
 
 
 class LatestVisionPipeline:
-    """Run at most one inference at a time and expose its latest aged estimate."""
+    """Run one inference at a time and return the newest estimate."""
 
     def __init__(self, pipeline):
         self.pipeline = pipeline
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future: Optional[Future] = None
+        self._submitted_timestamp_s: Optional[float] = None
         self._estimate: Optional[TrackEstimate] = None
         self._estimate_timestamp_s: Optional[float] = None
         self._closed = False
 
     def process(self, frame: Any, timestamp_s: float) -> Optional[TrackEstimate]:
-        """Submit a frame when idle and return the freshest estimate without waiting."""
+        """Submit a frame when idle and return the newest estimate."""
 
         self._collect()
         if frame is not None and self._future is None and not self._closed:
@@ -46,7 +47,7 @@ class LatestVisionPipeline:
         self._estimate_timestamp_s = self._submitted_timestamp_s
 
     def close(self):
-        """Stop accepting work without blocking shutdown on model inference."""
+        """Stop accepting new frames."""
 
         if self._closed:
             return

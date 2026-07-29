@@ -1,4 +1,4 @@
-"""One Mac-side tick from vision and intent to a safe velocity command."""
+"""Run one Mac control step."""
 
 from typing import Any, Optional, Protocol
 
@@ -14,7 +14,7 @@ class VisionPipeline(Protocol):
 
 
 class CompanionRuntime:
-    """Run one complete cognitive-to-reactive control tick."""
+    """Turn one frame, intent, and sensor reading into one command."""
 
     def __init__(
         self,
@@ -33,7 +33,7 @@ class CompanionRuntime:
         intent: Optional[State] = None,
         obstacle_distance_m: Optional[float] = None,
     ) -> VelocityCommand:
-        """Return one watchdog-protected command for the current sensor snapshot."""
+        """Return the safe command for this control step."""
 
         target = self.vision.process(frame, timestamp_s)
         if intent is not None:

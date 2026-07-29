@@ -1,4 +1,4 @@
-"""Mac entry point for the production Companion control stack."""
+"""Run the Mac control program."""
 
 import argparse
 import asyncio

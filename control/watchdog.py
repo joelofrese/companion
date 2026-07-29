@@ -1,4 +1,4 @@
-"""Setpoint heartbeat watchdog for safety-critical offboard output."""
+"""Stop motion when a Mac command arrives too late."""
 
 import math
 from numbers import Real
@@ -7,7 +7,7 @@ from control.velocity import VelocityCommand
 
 
 class SetpointWatchdog:
-    """Replace a late setpoint with zero velocity until the stream recovers."""
+    """Send zero once when a command misses its deadline."""
 
     def __init__(self, max_interval_s: float = 0.15):
         if (
@@ -21,7 +21,7 @@ class SetpointWatchdog:
         self._last_sent_at_s = None
 
     def emit(self, timestamp_s: float, desired: VelocityCommand) -> VelocityCommand:
-        """Return the command allowed at this tick and latch any missed deadline."""
+        """Return the command allowed at this time."""
 
         if self._last_sent_at_s is not None:
             interval_s = timestamp_s - self._last_sent_at_s

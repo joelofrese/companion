@@ -1,4 +1,4 @@
-"""Build the local RTP/H.264 image sender used by the production verifier."""
+"""Build the local RTP/H.264 image sender."""
 
 from pathlib import Path
 
@@ -6,7 +6,7 @@ from vision.video_stream import H264StreamConfig
 
 
 def image_sender_command(config: H264StreamConfig, image_path: str):
-    """Return a sender that repeatedly transmits one real JPEG camera frame."""
+    """Return a command that repeats one JPEG frame."""
 
     if not Path(image_path).is_file():
         raise ValueError(f"image path does not exist: {image_path}")

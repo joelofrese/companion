@@ -1,4 +1,4 @@
-"""YOLOv8n adapter that emits the tracker’s narrow person-observation type."""
+"""Find people with YOLO and return one detection."""
 
 import math
 from numbers import Real
@@ -16,7 +16,7 @@ def _finite(value: object) -> bool:
 
 
 def _scalar(value: Any) -> float:
-    """Convert a tensor scalar or ordinary numeric value without importing NumPy."""
+    """Turn a tensor value into a Python number."""
 
     if hasattr(value, "item"):
         return float(value.item())
@@ -38,20 +38,18 @@ def _box_coordinates(value: Any):
 class YoloPersonDetector:
     """Return the largest valid person in each image."""
 
-    def __init__(self, model_path: str = "yolov8n.pt", confidence_threshold: float = 0.5, model=None):
+    def __init__(self, model_path: str = "yolov8n.pt", confidence_threshold: float = 0.5):
         if not _finite(confidence_threshold) or not 0.0 <= confidence_threshold <= 1.0:
             raise ValueError("confidence threshold must be between 0 and 1")
-        if model is None:
-            from ultralytics import YOLO
+        from ultralytics import YOLO
 
-            model = YOLO(model_path)
-        self._model = model
+        self._model = YOLO(model_path)
         self.confidence_threshold = confidence_threshold
         self._last_center = None
         self._last_detection_timestamp_s = None
 
     def detect(self, frame: Any, timestamp_s: float) -> Optional[Detection]:
-        """Run YOLO and return one person observation, or None when no person is found."""
+        """Return one person detection, or none."""
 
         if not _finite(timestamp_s):
             raise ValueError("detection timestamp must be finite")

@@ -1,4 +1,4 @@
-"""Conservative transcript-to-state mapping for cognitive voice commands."""
+"""Turn voice transcripts into safe states."""
 
 import re
 from typing import Optional
@@ -13,7 +13,7 @@ def _contains_phrase(words: list[str], phrase: str) -> bool:
 
 
 def parse_intent(transcript: str) -> Optional[State]:
-    """Map an untrusted transcript to a state, or reject it as ambiguous."""
+    """Return one clear state, or none."""
 
     if not isinstance(transcript, str):
         return None

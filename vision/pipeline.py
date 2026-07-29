@@ -1,4 +1,4 @@
-"""Composition of person detection and short-horizon tracking."""
+"""Join person detection and tracking."""
 
 from typing import Any, Optional, Protocol
 
@@ -11,14 +11,14 @@ class PersonDetector(Protocol):
 
 
 class PersonVisionPipeline:
-    """Turn camera frames into filtered, predicted person observations."""
+    """Turn frames into tracked person positions."""
 
     def __init__(self, detector: PersonDetector, tracker: Optional[PersonTracker] = None):
         self.detector = detector
         self.tracker = tracker or PersonTracker()
 
     def process(self, frame: Any, timestamp_s: float) -> Optional[TrackEstimate]:
-        """Detect and track one frame; no detection yields no target estimate."""
+        """Detect and track one frame."""
 
         if frame is None:
             return self.tracker.predict(timestamp_s)

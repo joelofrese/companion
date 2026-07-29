@@ -1,4 +1,4 @@
-"""Bounded image-space person-following behavior."""
+"""Turn a person's image position into slow velocity commands."""
 
 import math
 from dataclasses import dataclass
@@ -29,7 +29,7 @@ class FollowConfig:
 
 
 class VisualFollower:
-    """Use target size for distance and horizontal error for lateral motion."""
+    """Move forward based on target size and sideways based on target position."""
 
     def __init__(self, config: FollowConfig = FollowConfig()):
         if (

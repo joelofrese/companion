@@ -1,4 +1,4 @@
-"""ROS 2 composition boundary for the CM5 safety command process."""
+"""Connect the CM5 safety loop to ROS 2 and PX4."""
 
 import argparse
 import asyncio
@@ -20,7 +20,7 @@ def _finite_real(value):
 
 
 class LatestDistanceSensor:
-    """Thread-safe latest PX4 distance reading; no reading is unsafe."""
+    """Keep the newest distance reading; missing data is unsafe."""
 
     def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
         if (
@@ -69,11 +69,9 @@ class LatestDistanceSensor:
 
 
 class Ros2SafetyBridge:
-    """Compose ROS publishers and sensor input around the CM5 safety service.
+    """Connect ROS messages to the CM5 safety service.
 
-    ROS 2 itself is intentionally injected through a node-like object and
-    message classes. This keeps the Mac package importable while giving the
-    DEXI process one concrete lifecycle boundary to start and stop.
+    The ROS objects are passed in so this Mac package does not need ROS 2.
     """
 
     def __init__(
@@ -123,18 +121,18 @@ class Ros2SafetyBridge:
 
     @property
     def port(self) -> int:
-        """Return the bound UDP port after ``start``."""
+        """Return the UDP port."""
 
         return self._receiver.port
 
     @property
     def error(self):
-        """Return a service-thread failure after it has stopped, if any."""
+        """Return a service error, if one occurred."""
 
         return self._error
 
     def start(self):
-        """Bind before starting the service thread so senders cannot race it."""
+        """Start the service."""
 
         if self._thread is not None:
             return
@@ -149,7 +147,7 @@ class Ros2SafetyBridge:
             self._error = error
 
     def close(self):
-        """Stop the service and wait for its final zero command."""
+        """Stop the service."""
 
         if self._thread is None:
             self._receiver.close()
@@ -160,7 +158,7 @@ class Ros2SafetyBridge:
 
 
 def main(argv=None):
-    """Run the bridge on DEXI-OS where ROS 2 and px4_msgs are installed."""
+    """Run the bridge on DEXI-OS."""
 
     parser = argparse.ArgumentParser(description="Run the CM5 ROS 2 safety bridge")
     parser.add_argument("--bind-host", default="0.0.0.0")

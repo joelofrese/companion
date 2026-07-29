@@ -1,4 +1,4 @@
-"""Small dependency-free wire format for Mac-to-CM5 velocity commands."""
+"""Encode velocity commands for the Mac-to-CM5 link."""
 
 import json
 import math
@@ -14,7 +14,7 @@ MAX_PACKET_BYTES = 512
 
 @dataclass(frozen=True)
 class CommandPacket:
-    """A sequenced command; the receiver supplies the heartbeat timestamp."""
+    """One numbered velocity command."""
 
     sequence: int
     command: VelocityCommand

@@ -1,8 +1,7 @@
-"""Small deterministic world for closed-loop PX4 behavior scenarios.
+"""A small fixed world for PX4 behavior checks.
 
-This is ground-truth perception for control testing, not a replacement for
-camera or TOF hardware. It makes target motion and failures repeatable while
-the vehicle still flies in Gazebo through the production command path.
+It supplies repeatable targets and faults while the vehicle flies in Gazebo
+through the real command path.
 """
 
 import asyncio
@@ -23,7 +22,7 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
-from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
+from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
     DistanceMessage,
     PROFILE_DURATION_S,
@@ -64,7 +63,7 @@ class WorldStep:
 
 
 class SyntheticWorld:
-    """Provide repeatable target, obstacle, and transport events for SITL."""
+    """Provide fixed targets, sensors, and link faults."""
 
     def target(
         self,
@@ -112,7 +111,7 @@ class SyntheticWorld:
 
 
 class WorldVision:
-    """Expose synthetic-world target truth through the normal vision interface."""
+    """Provide the world's target through the normal vision interface."""
 
     def __init__(self, world: SyntheticWorld, started_at_s: float):
         self.world = world
@@ -123,7 +122,7 @@ class WorldVision:
 
 
 async def run():
-    """Run the companion recovery mission through the complete flight path."""
+    """Run the complete synthetic mission."""
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
@@ -136,21 +135,17 @@ async def run():
     armed = False
     landed = False
     distance_sensor = LatestDistanceSensor()
-    safe_commands = []
     try:
         await prepare(drone)
         armed = True
 
         forwarder = MavsdkVelocityForwarder(drone)
 
-        class ObservingForwarder:
-            async def send(self, command):
-                safe_commands.append((time.monotonic(), command))
-                await forwarder.send(command)
+        safe_commands = RecordingForwarder(forwarder)
 
         service = SafetyCommandService(
             receiver,
-            ObservingForwarder(),
+            safe_commands,
             tick_period_s=SETPOINT_PERIOD_S,
             obstacle_distance=distance_sensor.read,
         )
@@ -160,9 +155,7 @@ async def run():
         started_at = time.monotonic()
         world = SyntheticWorld()
         world_vision = WorldVision(world, started_at)
-        control = CompanionRuntime(
-            world_vision
-        )
+        control = CompanionRuntime(world_vision)
 
         def send_packet(elapsed_s: float, timestamp_s: float):
             step = world.step(elapsed_s)
@@ -197,6 +190,28 @@ async def run():
 
         telemetry_task = asyncio.create_task(observe_velocity())
         reported = set()
+
+        def event_for(elapsed_s, step):
+            if TARGET_RIGHT_START_S <= elapsed_s < TARGET_RIGHT_END_S:
+                return "target moved right"
+            if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
+                return "target lost; holding"
+            if step.obstacle_distance_m is not None and step.obstacle_distance_m < 0.6:
+                return "obstacle detected; backing off"
+            if isinstance(step.obstacle_distance_m, float) and math.isnan(step.obstacle_distance_m):
+                return "invalid obstacle reading"
+            if not step.transmit:
+                return "command link dropout"
+            if step.command_override is not None:
+                return "out-of-bounds command"
+            if SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S:
+                return "intent changed back to following"
+            if THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S:
+                return "intent changed to following again"
+            if elapsed_s >= HOVER_START_S:
+                return "intent changed to hover"
+            return None
+
         try:
             while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
                 now = time.monotonic()
@@ -208,28 +223,7 @@ async def run():
                         else math.nan
                     )
                 )
-                event = (
-                    "target moved right" if TARGET_RIGHT_START_S <= elapsed < TARGET_RIGHT_END_S else
-                    "target lost; holding" if TARGET_LOST_START_S <= elapsed < TARGET_LOST_END_S else
-                    "obstacle detected; backing off" if (
-                        step.obstacle_distance_m is not None and step.obstacle_distance_m < 0.6
-                    ) else
-                    "invalid obstacle reading" if isinstance(step.obstacle_distance_m, float) and math.isnan(step.obstacle_distance_m) else
-                    "command link dropout" if not step.transmit else
-                    "out-of-bounds command" if step.command_override is not None else None
-                )
-                if (
-                    SECOND_FOLLOW_START_S <= elapsed < SECOND_FOLLOW_END_S
-                    and "intent changed back to following" not in reported
-                ):
-                    event = "intent changed back to following"
-                elif (
-                    THIRD_FOLLOW_START_S <= elapsed < THIRD_FOLLOW_END_S
-                    and "intent changed to following again" not in reported
-                ):
-                    event = "intent changed to following again"
-                elif elapsed >= HOVER_START_S and "intent changed to hover" not in reported:
-                    event = "intent changed to hover"
+                event = event_for(elapsed, step)
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
                     reported.add(event)
@@ -256,15 +250,15 @@ async def run():
                     pass
                 offboard_started = False
 
-        commands = [(timestamp_s - started_at, command) for timestamp_s, command in safe_commands]
-        if not safe_commands or safe_commands[-1][1] != VelocityCommand():
+        commands = safe_commands.commands
+        if not commands or commands[-1][1] != VelocityCommand():
             raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
 
         def forward_count(start_s, end_s):
             return sum(
                 command.north_m_s > 0.0
-                for elapsed_s, command in commands
-                if start_s <= elapsed_s < end_s
+                for timestamp_s, command in commands
+                if start_s <= timestamp_s - started_at < end_s
             )
 
         print(
@@ -275,7 +269,10 @@ async def run():
         )
 
         def observed(start_s, end_s, predicate):
-            return any(start_s <= elapsed_s < end_s and predicate(command) for elapsed_s, command in commands)
+            return any(
+                start_s <= timestamp_s - started_at < end_s and predicate(command)
+                for timestamp_s, command in commands
+            )
 
         checks = (
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),

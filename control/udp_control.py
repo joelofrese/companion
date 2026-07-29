@@ -1,4 +1,4 @@
-"""Mac-side control service that streams reactive commands to the CM5."""
+"""Send Mac control commands to the CM5."""
 
 import asyncio
 import math
@@ -17,7 +17,7 @@ class FrameReader(Protocol):
 
 
 class UdpControlService:
-    """Run the Mac reactive heartbeat and send one explicit zero on shutdown."""
+    """Send commands at a fixed rate and send zero when stopping."""
 
     def __init__(
         self,
@@ -52,7 +52,7 @@ class UdpControlService:
         self.frame_timeout_s = frame_timeout_s
 
     async def run(self, stop_event: asyncio.Event):
-        """Run until stopped; ended or stalled video always fails safe."""
+        """Run until stopped or until the video is lost."""
 
         self.sender.start()
         last_frame_at_s = None

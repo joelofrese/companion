@@ -1,4 +1,4 @@
-"""Voice transcription and intent parsing boundary."""
+"""Connect transcription to state changes."""
 
 from typing import Any, Optional, Protocol
 
@@ -27,7 +27,7 @@ class VoiceCommandPipeline:
 
 
 class PushToTalkVoicePipeline:
-    """Capture one utterance and convert it into one optional cognitive state."""
+    """Capture one utterance and return its state."""
 
     def __init__(self, recorder: AudioRecorder, transcriber: Transcriber):
         self.recorder = recorder

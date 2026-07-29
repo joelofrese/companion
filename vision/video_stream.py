@@ -1,10 +1,10 @@
-"""Mac-side receiver for the drone's H.264 RTP video stream."""
+"""Receive the drone's H.264 video stream on the Mac."""
 
 import asyncio
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 
 def _positive_int(value: object) -> bool:
@@ -12,7 +12,7 @@ def _positive_int(value: object) -> bool:
 
 
 def close_subprocess(process):
-    """Terminate a media child, killing it if graceful shutdown stalls."""
+    """Stop a media process."""
 
     process.terminate()
     try:
@@ -34,7 +34,7 @@ class H264StreamConfig:
             raise ValueError("stream dimensions, port, and framerate must be positive")
 
     def sender_command(self, destination_host: str) -> Sequence[str]:
-        """Return the CM5 libcamera-to-RTP command for this stream format."""
+        """Return the CM5 camera command."""
 
         if not destination_host.strip():
             raise ValueError("destination host must not be empty")
@@ -64,19 +64,17 @@ class H264StreamConfig:
 
 
 class GStreamerH264Receiver:
-    """Decode RTP/H.264 into BGR frames using a GStreamer subprocess."""
+    """Decode RTP/H.264 into BGR frames."""
 
     def __init__(
         self,
         config: H264StreamConfig = H264StreamConfig(),
-        process_factory: Optional[Callable[..., object]] = None,
     ):
         self.config = config
-        self._process_factory = process_factory or subprocess.Popen
         self._process = None
 
     def command(self) -> Sequence[str]:
-        """Return the concrete GStreamer command used by the receiver."""
+        """Return the GStreamer receive command."""
 
         config = self.config
         return (
@@ -102,7 +100,7 @@ class GStreamerH264Receiver:
         )
 
     def _start(self):
-        self._process = self._process_factory(
+        self._process = subprocess.Popen(
             self.command(),
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -110,13 +108,13 @@ class GStreamerH264Receiver:
         )
 
     def start(self):
-        """Start the decoder before a sender is launched, if it is not running."""
+        """Start the decoder if needed."""
 
         if self._process is None:
             self._start()
 
     def read(self):
-        """Return ``(monotonic_timestamp_s, BGR_frame)`` or None at stream EOF."""
+        """Return a timestamp and frame, or none at end of stream."""
 
         self.start()
         frame_bytes = self._read_exact(self._process.stdout, self.config.width * self.config.height * 3)
@@ -150,7 +148,7 @@ class GStreamerH264Receiver:
 
 
 class AsyncLatestFrameReader:
-    """Poll a blocking receiver without delaying the reactive command loop."""
+    """Read frames without blocking the control loop."""
 
     def __init__(self, receiver: GStreamerH264Receiver):
         self.receiver = receiver
@@ -166,7 +164,7 @@ class AsyncLatestFrameReader:
         return timestamp_s, frame
 
     async def read(self):
-        """Return a new frame, or a timestamped empty sample when none is ready."""
+        """Return a frame, or an empty sample when none is ready."""
 
         if self._ended:
             return self._sample(time.monotonic(), None)

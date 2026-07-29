@@ -1,4 +1,4 @@
-"""CM5 command service that applies local safety before forwarding to PX4."""
+"""Run the CM5 safety loop."""
 
 import asyncio
 import math
@@ -10,7 +10,7 @@ from onboard.command_receiver import UdpSafetyReceiver
 
 
 class SafetyCommandService:
-    """Run the CM5 receive, safety, and forwarding loop at a fixed rate."""
+    """Read, check, and forward commands at a fixed rate."""
 
     def __init__(
         self,
@@ -32,12 +32,12 @@ class SafetyCommandService:
         self.obstacle_distance = obstacle_distance or (lambda: None)
 
     def start(self):
-        """Bind the receiver before the Mac is allowed to send packets."""
+        """Start the receiver."""
 
         self.receiver.start()
 
     async def run(self, stop_event: asyncio.Event):
-        """Forward safe commands until requested to stop, then send zero once."""
+        """Forward safe commands until stopped, then send zero."""
 
         self.start()
         try:

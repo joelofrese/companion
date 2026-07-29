@@ -1,4 +1,4 @@
-"""Launch PX4/Gazebo, run a companion scenario, and clean up as one command."""
+"""Run one PX4/Gazebo scenario and clean up."""
 
 import argparse
 import os

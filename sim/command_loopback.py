@@ -1,4 +1,4 @@
-"""Verify the Mac-to-CM5 command service over local UDP."""
+"""Verify the Mac-to-CM5 command link over local UDP."""
 
 import asyncio
 import time

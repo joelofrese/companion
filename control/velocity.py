@@ -1,11 +1,11 @@
-"""Velocity command shared by reactive control and vehicle adapters."""
+"""The velocity command shared by all control layers."""
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class VelocityCommand:
-    """North-east-down velocity and yaw in the PX4/MAVSDK convention."""
+    """North, east, down, and yaw setpoints."""
 
     north_m_s: float = 0.0
     east_m_s: float = 0.0

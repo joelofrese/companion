@@ -1,4 +1,4 @@
-"""Verify RTP vision, Mac UDP control, CM5 safety, and PX4 SITL together."""
+"""Verify the full camera-to-PX4 path in SITL."""
 
 import asyncio
 import subprocess
@@ -17,7 +17,7 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
-from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
+from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.offboard_control import (
     DistanceMessage,
     COMMAND_DROPOUT_END_S,
@@ -44,7 +44,7 @@ from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H
 
 
 async def _stop_task(task, stop_event):
-    """Request service shutdown and suppress only cleanup-time task errors."""
+    """Stop a service task during cleanup."""
 
     stop_event.set()
     if task is not None and not task.done():
@@ -104,17 +104,12 @@ async def run(image_path: str):
         armed = True
 
         forwarder = MavsdkVelocityForwarder(drone)
-        safe_commands = []
-
-        class ObservingForwarder:
-            async def send(self, command):
-                await forwarder.send(command)
-                safe_commands.append((time.monotonic(), command))
+        safe_commands = RecordingForwarder(forwarder)
 
         receiver.start()
         cm5_service = SafetyCommandService(
             receiver,
-            ObservingForwarder(),
+            safe_commands,
             tick_period_s=SETPOINT_PERIOD_S,
             obstacle_distance=distance_sensor.read,
         )
@@ -192,9 +187,9 @@ async def run(image_path: str):
         )
         mac_task = asyncio.create_task(mac_service.run(mac_stop))
         deadline = time.monotonic() + 5.0
-        while not safe_commands and time.monotonic() < deadline:
+        while not safe_commands.commands and time.monotonic() < deadline:
             await asyncio.sleep(SETPOINT_PERIOD_S)
-        if not safe_commands:
+        if not safe_commands.commands:
             raise RuntimeError("CM5 did not forward a priming setpoint")
         print("CM5 priming setpoint=verified.")
         await drone.offboard.start()
@@ -229,7 +224,7 @@ async def run(image_path: str):
         vision.close()
         cm5_stop.set()
         await cm5_task
-        if not safe_commands or safe_commands[-1][1] != VelocityCommand():
+        if not safe_commands.commands or safe_commands.commands[-1][1] != VelocityCommand():
             raise RuntimeError("full stack did not observe CM5 shutdown zero")
         if frames_received == 0:
             raise RuntimeError("full stack did not receive a decoded RTP frame")
@@ -239,7 +234,7 @@ async def run(image_path: str):
         def forward_count(start_s, end_s):
             return sum(
                 command.north_m_s > 0.0
-                for timestamp_s, command in safe_commands
+                for timestamp_s, command in safe_commands.commands
                 if start_s <= timestamp_s - flight_started_at < end_s
             )
 
@@ -267,7 +262,7 @@ async def run(image_path: str):
             return any(
                 start_s <= timestamp_s - flight_started_at < end_s
                 and predicate(command)
-                for timestamp_s, command in safe_commands
+                for timestamp_s, command in safe_commands.commands
             )
 
         objectives = (

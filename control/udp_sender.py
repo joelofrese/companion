@@ -1,20 +1,18 @@
-"""Mac-side UDP sender for the versioned CM5 command stream."""
+"""Send numbered velocity commands to the CM5."""
 
 import socket
-from typing import Callable, Optional
 
 from control.command_packet import CommandPacket
 from control.velocity import VelocityCommand
 
 
 class UdpCommandSender:
-    """Encode and send sequential velocity packets to the CM5 safety receiver."""
+    """Send numbered commands to the CM5 safety receiver."""
 
     def __init__(
         self,
         destination_host: str,
         destination_port: int = 5001,
-        socket_factory: Optional[Callable[..., object]] = None,
     ):
         if not destination_host.strip():
             raise ValueError("destination host must not be empty")
@@ -26,7 +24,6 @@ class UdpCommandSender:
         ):
             raise ValueError("destination port must be between 1 and 65535")
         self.destination = (destination_host, destination_port)
-        self._socket_factory = socket_factory or socket.socket
         self._socket = None
         self._sequence = 0
 
@@ -34,7 +31,7 @@ class UdpCommandSender:
         """Open the sender socket once; repeated starts are harmless."""
 
         if self._socket is None:
-            self._socket = self._socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def send(self, command: VelocityCommand):
         """Send one packet and advance its sequence only after a successful send."""

@@ -1,4 +1,4 @@
-"""MAVSDK velocity sink used by the CM5-to-PX4 integration seam."""
+"""Send approved velocity commands to PX4 through MAVSDK."""
 
 from mavsdk.offboard import VelocityNedYaw
 
@@ -6,13 +6,13 @@ from control.velocity import VelocityCommand
 
 
 class MavsdkVelocityForwarder:
-    """Forward only already-approved NED commands to an active MAVSDK vehicle."""
+    """Send approved commands to an active vehicle."""
 
     def __init__(self, drone):
         self.drone = drone
 
     async def send(self, command: VelocityCommand):
-        """Send one velocity setpoint; mode and arming remain flight-loop concerns."""
+        """Send one velocity setpoint."""
 
         await self.drone.offboard.set_velocity_ned(
             VelocityNedYaw(

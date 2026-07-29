@@ -1,6 +1,5 @@
-"""ROS 2/PX4 velocity publisher seam for the DEXI CM5 process."""
+"""Publish velocity commands to PX4 through ROS 2."""
 
-import asyncio
 import math
 from typing import Callable
 
@@ -8,13 +7,7 @@ from control.velocity import VelocityCommand
 
 
 class Ros2VelocityForwarder:
-    """Publish velocity-only PX4 setpoints and their offboard heartbeat.
-
-    ROS 2 message classes and publishers are injected so the Mac-side package
-    stays independent of the DEXI ROS installation. The DEXI node supplies
-    ``px4_msgs.msg.OffboardControlMode`` and ``TrajectorySetpoint`` factories,
-    publishers, and its ROS clock in microseconds.
-    """
+    """Publish velocity setpoints and the PX4 offboard heartbeat."""
 
     def __init__(
         self,
@@ -31,7 +24,7 @@ class Ros2VelocityForwarder:
         self.timestamp_us = timestamp_us
 
     async def send(self, command: VelocityCommand):
-        """Publish one velocity heartbeat/setpoint pair."""
+        """Publish one heartbeat and setpoint."""
 
         timestamp_us = self.timestamp_us()
         heartbeat = self.heartbeat_factory()

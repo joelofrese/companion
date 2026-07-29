@@ -1,4 +1,4 @@
-"""Check the CM5 prerequisites before starting the companion services."""
+"""Check that the CM5 has what the companion needs."""
 
 import argparse
 import importlib.util

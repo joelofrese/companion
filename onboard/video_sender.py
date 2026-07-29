@@ -1,40 +1,37 @@
-"""Managed CM5 camera sender for the Mac RTP/H.264 receiver."""
+"""Send the CM5 camera to the Mac."""
 
 import argparse
 import subprocess
 import time
 from dataclasses import replace
-from typing import Callable, Optional
 
 from vision.video_stream import H264StreamConfig, close_subprocess
 
 
 class GStreamerH264Sender:
-    """Run the low-latency libcamera-to-RTP pipeline on the CM5."""
+    """Run the CM5 camera pipeline."""
 
     def __init__(
         self,
         destination_host: str,
         config: H264StreamConfig = H264StreamConfig(),
-        process_factory: Optional[Callable[..., object]] = None,
     ):
         if not destination_host.strip():
             raise ValueError("destination host must not be empty")
         self.destination_host = destination_host
         self.config = config
-        self._process_factory = process_factory or subprocess.Popen
         self._process = None
 
     def command(self):
-        """Return the concrete CM5 camera sender command."""
+        """Return the camera command."""
 
         return self.config.sender_command(self.destination_host)
 
     def start(self):
-        """Start the sender once; repeated starts are harmless."""
+        """Start the sender."""
 
         if self._process is None:
-            self._process = self._process_factory(
+            self._process = subprocess.Popen(
                 self.command(),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -42,12 +39,12 @@ class GStreamerH264Sender:
 
     @property
     def running(self):
-        """Whether the camera pipeline process is still alive."""
+        """Return whether the camera process is running."""
 
         return self._process is not None and self._process.poll() is None
 
     def close(self):
-        """Stop the sender and release its child process."""
+        """Stop the sender."""
 
         if self._process is None:
             return

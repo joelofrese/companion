@@ -1,4 +1,4 @@
-"""Lightweight constant-velocity Kalman tracker for detector measurements."""
+"""Track a person in image coordinates."""
 
 import math
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class Detection:
-    """A person's image-plane center in pixels and its capture timestamp."""
+    """One person found in an image."""
 
     x_px: float
     y_px: float
@@ -20,7 +20,7 @@ class Detection:
 
 @dataclass(frozen=True)
 class TrackEstimate:
-    """Filtered position, velocity, and short-horizon predicted position."""
+    """The current and predicted position of a person."""
 
     x_px: float
     y_px: float
@@ -38,7 +38,7 @@ def _finite(value: object) -> bool:
 
 
 class _AxisFilter:
-    """One position/velocity Kalman filter; two instances form the 2D tracker."""
+    """Filter one image axis."""
 
     def __init__(self, process_noise: float, measurement_noise: float):
         self.process_noise = process_noise
@@ -80,7 +80,7 @@ class _AxisFilter:
 
 
 class PersonTracker:
-    """Track a detected person's center and predict a short time into the future."""
+    """Track a person and predict its short-term position."""
 
     def __init__(self, prediction_horizon_s: float = 0.3, max_prediction_age_s: float = 0.5):
         if not _finite(prediction_horizon_s) or prediction_horizon_s < 0.0:
@@ -97,7 +97,7 @@ class PersonTracker:
         self._target_height_px = 0.0
 
     def update(self, detection: Detection) -> TrackEstimate:
-        """Consume one detector measurement and return its filtered estimate."""
+        """Add one detection and return the updated estimate."""
 
         values = (
             detection.x_px,
@@ -134,7 +134,7 @@ class PersonTracker:
         return self._estimate(age_s=0.0)
 
     def predict(self, timestamp_s: float) -> Optional[TrackEstimate]:
-        """Advance without a measurement, expiring the track after a bounded gap."""
+        """Predict without a new detection."""
 
         if not _finite(timestamp_s):
             raise ValueError("prediction timestamp must be finite")

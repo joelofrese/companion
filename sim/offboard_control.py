@@ -1,4 +1,4 @@
-"""Deterministic cognitive intent profile for SITL bring-up."""
+"""The fixed intent and sensor schedule used by SITL."""
 
 import math
 from dataclasses import dataclass
@@ -25,7 +25,7 @@ COMMAND_DROPOUT_END_S = 24.5
 
 @dataclass(frozen=True)
 class DistanceMessage:
-    """Small simulation equivalent of PX4's distance-sensor message."""
+    """Distance data used by the simulation."""
 
     current_distance: float
     min_distance: float = 0.0
@@ -41,7 +41,7 @@ _demo_voice = VoiceCommandPipeline(_DemoTranscriber())
 
 
 def demo_state(elapsed_s: float) -> State:
-    """Repeat a short follow-and-hover behavior cycle."""
+    """Repeat following and hovering."""
 
     following = (
         0.0 <= elapsed_s < FOLLOW_END_S
@@ -56,13 +56,13 @@ def demo_state(elapsed_s: float) -> State:
 
 
 def demo_target() -> TrackEstimate:
-    """Represent a fresh, stable target for the deterministic flight scenario."""
+    """Return a fresh target for the simulation."""
 
     return TrackEstimate(320.0, 240.0, 0.0, 0.0, 320.0, 240.0, target_height_px=60.0)
 
 
 def demo_obstacle_distance_m(elapsed_s: float) -> float:
-    """Simulate obstacle and malformed-reading windows during following."""
+    """Return the simulated obstacle distance."""
 
     if INVALID_DISTANCE_START_S <= elapsed_s < INVALID_DISTANCE_END_S:
         return math.nan
