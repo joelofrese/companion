@@ -64,9 +64,10 @@ most progress requires no physical flight. A meaningful scenario must be
 confirmed from output or telemetry, including connection, readiness, arming,
 offboard setpoints, expected motion, safety intervention, landing, and disarm.
 
-Do not add unit tests. Keep verification in Gazebo and through end-to-end
-behavior. Remove existing unit tests when their behavior is covered by the
-simulation; do not preserve code or architecture to support them.
+Do not add unit tests; keeping them out keeps the codebase simpler and less
+rigid. Keep verification in Gazebo and through end-to-end behavior. Remove
+existing unit tests when their behavior is covered by the simulation; do not
+preserve code or architecture to support them.
 
 From `companion/`, the normal simulation loop is:
 
