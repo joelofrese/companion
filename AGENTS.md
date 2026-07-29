@@ -15,13 +15,13 @@ not be described as proof of hardware behavior.
 
 ## Priorities
 
-1. Readability.
-2. Simplicity.
-3. Minimalism.
+1. Readable code and design.
+2. Simple code and design.
+3. Minimal code and design.
 
 Remove dead code, unnecessary tests, speculative configuration, and abstractions
 that do not provide present value. Preserve unrelated user work. Refactor
-broadly when it makes the whole system clearer.
+broadly when it makes the whole system cleaner.
 
 Continue iterating toward the project goal autonomously. When no meaningful
 work remains, sleep for 15 minutes, reread `STEERING.md`, and continue; repeat
