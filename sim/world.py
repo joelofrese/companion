@@ -63,11 +63,11 @@ class SyntheticWorld:
         )
 
     def step(self, elapsed_s: float) -> WorldStep:
-        if 2.6 <= elapsed_s < 3.6:
+        if 2.8 <= elapsed_s < 3.8:
             return WorldStep(State.FOLLOWING, obstacle_distance_m=0.5)
-        if 3.6 <= elapsed_s < 4.1:
+        if 4.0 <= elapsed_s < 4.5:
             return WorldStep(State.FOLLOWING, transmit=False)
-        if 4.1 <= elapsed_s < 4.4:
+        if 4.5 <= elapsed_s < 4.8:
             return WorldStep(
                 State.FOLLOWING,
                 command_override=VelocityCommand(north_m_s=1.0),
@@ -204,6 +204,8 @@ async def run():
                     "command link dropout" if not step.transmit else
                     "out-of-bounds command" if step.command_override is not None else None
                 )
+                if elapsed >= 5.0 and "intent changed to hover" not in reported:
+                    event = "intent changed to hover"
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
                     reported.add(event)
@@ -231,9 +233,11 @@ async def run():
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),
             (1.0, 2.0, lambda command: command.east_m_s > 0.0, "lateral target tracking"),
             (2.1, 2.6, lambda command: command == VelocityCommand(), "hold after target loss"),
-            (2.6, 3.6, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
-            (3.8, 4.1, lambda command: command == VelocityCommand(), "command-dropout expiry"),
-            (4.1, 4.4, lambda command: command == VelocityCommand(), "invalid-command rejection"),
+            (2.8, 3.8, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
+            (3.8, 4.0, lambda command: command.north_m_s > 0.0, "following recovery after obstacle"),
+            (4.15, 4.5, lambda command: command == VelocityCommand(), "command-dropout expiry"),
+            (4.5, 4.8, lambda command: command == VelocityCommand(), "invalid-command rejection"),
+            (5.0, 5.8, lambda command: command == VelocityCommand(), "hover recovery"),
         )
         for start_s, end_s, predicate, behavior in checks:
             if not observed(start_s, end_s, predicate):
@@ -258,6 +262,7 @@ async def run():
         if position_task is not None:
             position_task.cancel()
             await asyncio.gather(position_task, return_exceptions=True)
+        drone._stop_mavsdk_server()
 
 
 if __name__ == "__main__":

@@ -124,7 +124,9 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
   scenario. It passed forward following, lateral target tracking, target-loss
   hold, obstacle backoff, command-dropout expiry, invalid-command rejection,
   and clean landing through the production Mac→CM5 safety path. Target geometry
-  now responds to the vehicle's actual simulated NED position.
+  now responds to the vehicle's actual simulated NED position, and the scenario
+  verifies saved following intent resumes after obstacle backoff. The verifier
+  explicitly closes its MAVSDK helper for clean repeated runs.
 - 2026-07-28: Reduced deterministic coverage to 32 focused safety-contract
   checks across command validity, watchdog/obstacle fail-safe behavior, safe
   shutdown, vision liveness, and CM5/PX4 bridge seams. Removed component and

@@ -204,6 +204,7 @@ async def run(image_path: str):
             close_subprocess(camera_process)
         if sender is not None:
             sender.close()
+        drone._stop_mavsdk_server()
 
 
 if __name__ == "__main__":
