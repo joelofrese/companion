@@ -29,7 +29,7 @@ checkpoint stable progress on the feature branch. If hardware or credentials
 block one path, continue with useful simulation. Read `STEERING.md` once when
 starting a meaningful milestone, if it exists; do not poll it during work.
 
-## Control boundary
+## How control works
 
 The control flow has four responsibilities:
 
@@ -45,7 +45,7 @@ interface is velocity-only; no absolute position or motor commands.
 
 The onboard safety path must remain safe when the Mac, vision, or Wi-Fi fails:
 stale or invalid input becomes zero motion, and a fresh obstacle reading may
-override normal intent. Safety behavior must be explicit and bounded.
+override normal intent. Keep these safety rules clear and limited.
 
 ## Where the parts run
 
