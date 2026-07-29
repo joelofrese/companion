@@ -57,6 +57,11 @@ class ReactiveController:
 
         if self.state is State.AVOIDING:
             self.state = self._intent_state
-        if self.state is State.FOLLOWING and target_age_s is not None and 0.0 <= target_age_s <= TARGET_MAX_AGE_S and target is not None:
+        if (
+            self.state is State.FOLLOWING
+            and target_age_s is not None
+            and 0.0 <= target_age_s <= TARGET_MAX_AGE_S
+            and target is not None
+        ):
             return self.follower.command(target)
         return VelocityCommand()

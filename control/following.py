@@ -48,7 +48,11 @@ class VisualFollower:
         self.config = config
 
     def command(self, target: TrackEstimate) -> VelocityCommand:
-        if not _finite(target.predicted_x_px) or not _finite(target.target_height_px) or target.target_height_px <= 0.0:
+        if (
+            not _finite(target.predicted_x_px)
+            or not _finite(target.target_height_px)
+            or target.target_height_px <= 0.0
+        ):
             return VelocityCommand()
         distance_error = (
             self.config.desired_target_height_px - target.target_height_px

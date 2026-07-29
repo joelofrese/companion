@@ -99,7 +99,12 @@ class OnboardSafetyEnvelope:
             command.down_m_s,
             command.yaw_deg,
         )
-        if any(isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value) for value in values):
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, Real)
+            or not math.isfinite(value)
+            for value in values
+        ):
             return False
         return (
             abs(command.north_m_s) <= MAX_HORIZONTAL_SPEED_M_S

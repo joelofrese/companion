@@ -92,7 +92,11 @@ class GStreamerH264Receiver:
             "!",
             "videoconvert",
             "!",
-            f"video/x-raw,format=BGR,width={config.width},height={config.height},framerate={config.framerate}/1",
+            (
+                "video/x-raw,format=BGR,"
+                f"width={config.width},height={config.height},"
+                f"framerate={config.framerate}/1"
+            ),
             "!",
             "fdsink",
             "fd=1",

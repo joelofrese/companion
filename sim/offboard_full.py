@@ -40,7 +40,12 @@ from sim.video_loopback import image_sender_command
 from vision.latest import LatestVisionPipeline
 from vision.person_detector import YoloPersonDetector
 from vision.pipeline import PersonVisionPipeline
-from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig, close_subprocess
+from vision.video_stream import (
+    AsyncLatestFrameReader,
+    GStreamerH264Receiver,
+    H264StreamConfig,
+    close_subprocess,
+)
 
 
 async def _stop_task(task, stop_event):
