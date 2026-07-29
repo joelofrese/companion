@@ -41,7 +41,11 @@ async def land(drone):
     await drone.action.land()
     async for state in drone.telemetry.landed_state():
         if state == LandedState.ON_GROUND:
-            print("Landed.")
+            break
+    print("Landed.")
+    async for armed in drone.telemetry.armed():
+        if not armed:
+            print("Disarmed.")
             return
 
 

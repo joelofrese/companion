@@ -120,6 +120,9 @@ omit that link. Clean orphaned PX4/Gazebo/MAVSDK processes before retrying.
 
 ## Recent record
 
+- 2026-07-28: Strengthened the shared SITL landing lifecycle to verify PX4
+  telemetry reports both `ON_GROUND` and disarmed before a run passes. The
+  synthetic world passed with the new explicit disarm evidence.
 - 2026-07-28: Strengthened `sim.world` to require actual forward PX4 telemetry,
   not only a positive safe command, alongside its existing lateral and obstacle
   motion assertions. The 36-check suite and complete synthetic SITL passed.
