@@ -17,7 +17,9 @@ does not depend on hardware.
 1. Readable code and design.
 2. Simple code and design.
 3. Minimal code and design.
-4. Keep the code easy to understand, debug, change, and maintain.
+
+Keeping the code this simple makes it easy for anyone to understand, debug,
+develop, and maintain.
 
 Remove dead code, unnecessary tests, speculative configuration, and abstractions
 that do not provide present value. Preserve unrelated user work. Refactor
