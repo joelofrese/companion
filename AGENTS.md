@@ -189,5 +189,8 @@ calibration, not replace the simulation-first development loop.
   priming setpoint before PX4 offboard start. A 45-second rendered-camera run
   in Gazebo's `forest` world then processed 723 frames, retained conscious
   visual memory, stayed bounded, and landed/disarmed cleanly.
+- **2026-07-30** — Re-ran the `walls` exploratory world with live dialogue:
+  `hover` and `follow me` changed conscious intent during flight, while
+  telemetry, visual memory, bounded motion, landing, and disarm all passed.
 
 as always, thank you, good luck, and i love you
