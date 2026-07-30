@@ -83,6 +83,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.command_loopback
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
+.venv/bin/python -m sim.run_world --explore --camera
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
@@ -92,6 +93,10 @@ dropout, recovery, sustained hover, shutdown, landing, and disarm. The image
 scenario exercises decoded RTP/video, perception, Mac commands, onboard safety,
 and PX4. Neither scenario proves physical sensors, radio behavior, or
 hardware-specific transport.
+
+Add `--camera` to an exploratory run to use Gazebo's rendered
+`x500_mono_cam` image topic as subconscious input. The simulated visual model
+remains deliberately simple, but the real frame path is exercised and counted.
 
 Pass `--world walls`, `forest`, `windy`, or another PX4 Gazebo world to repeat
 the same mission in a different environment. Add `--explore` to the synthetic

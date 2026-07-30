@@ -63,12 +63,20 @@ def _run_once(
     world: str,
     stdbuf: str,
     exploratory: bool,
+    camera: bool,
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
 
     process = subprocess.Popen(
-        [stdbuf, "-oL", "-eL", "make", "px4_sitl", "gz_x500"],
+        [
+            stdbuf,
+            "-oL",
+            "-eL",
+            "make",
+            "px4_sitl",
+            "gz_x500_mono_cam" if camera else "gz_x500",
+        ],
         cwd=px4_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -101,6 +109,8 @@ def _run_once(
             scenario += ["sim.world"]
             if exploratory:
                 scenario.append("--explore")
+            if camera:
+                scenario.append("--camera")
         result = subprocess.run(scenario, cwd=companion_dir, check=False)
         return result.returncode
     finally:
@@ -113,6 +123,7 @@ def run(
     image_path: Optional[Path] = None,
     world: str = "default",
     exploratory: bool = False,
+    camera: bool = False,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -134,6 +145,7 @@ def run(
                 world,
                 stdbuf,
                 exploratory,
+                camera,
             )
         except RuntimeError:
             if attempt == BOOT_RETRIES:
@@ -158,10 +170,17 @@ def main(argv=None):
         action="store_true",
         help="run the synthetic world with live dialogue and observation-only behavior",
     )
+    parser.add_argument(
+        "--camera",
+        action="store_true",
+        help="use Gazebo's x500_mono_cam and feed its rendered frames to the Mac brain",
+    )
     parser.add_argument("--world", default="default", help="Gazebo world name from PX4")
     args = parser.parse_args(argv)
     if args.explore and args.image:
         parser.error("--explore cannot be combined with --image")
+    if args.camera and args.image:
+        parser.error("--camera cannot be combined with --image")
     try:
         return run(
             args.px4_dir.expanduser().resolve(),
@@ -169,6 +188,7 @@ def main(argv=None):
             args.image.expanduser().resolve() if args.image else None,
             args.world,
             args.explore,
+            args.camera,
         )
     except KeyboardInterrupt:
         return 130

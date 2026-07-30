@@ -25,6 +25,7 @@ from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
+from sim.gazebo_camera import GazeboCamera
 from sim.offboard_control import (
     DistanceMessage,
     PROFILE_DURATION_S,
@@ -193,7 +194,7 @@ class WorldLanguageModel:
         )
 
 
-async def run(exploratory: bool = False):
+async def run(exploratory: bool = False, camera: bool = False):
     """Run the complete synthetic mission."""
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
@@ -206,6 +207,7 @@ async def run(exploratory: bool = False):
     telemetry_task = None
     offboard_task = None
     dialogue_input = DialogueInput() if exploratory else None
+    gazebo_camera = None
     control = None
     offboard_started = False
     armed = False
@@ -230,15 +232,26 @@ async def run(exploratory: bool = False):
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         started_at = time.monotonic()
         world = SyntheticWorld(exploratory)
+        if camera:
+            gazebo_camera = GazeboCamera(
+                "/world/default/model/x500_mono_cam_0/link/camera_link/sensor/camera/image"
+            )
+            gazebo_camera.start()
         visual_model = WorldVisualModel(world, started_at)
         language_model = WorldLanguageModel(exploratory)
         language_model.started_at_s = started_at
         control = MindRuntime(MacMind(visual_model, language_model))
 
+        camera_frames = 0
+
         def send_packet(elapsed_s: float, timestamp_s: float, intent=None):
+            nonlocal camera_frames
             step = world.step(elapsed_s)
+            frame = gazebo_camera.latest() if gazebo_camera else None
+            if frame is not None:
+                camera_frames += 1
             command = control.tick(
-                frame=step,
+                frame=frame if frame is not None else step,
                 timestamp_s=timestamp_s,
                 intent=intent,
                 obstacle_distance_m=step.obstacle_distance_m,
@@ -488,6 +501,10 @@ async def run(exploratory: bool = False):
                 f"north={min_north_velocity:.2f}..{max_north_velocity:.2f}, "
                 f"east={min_east_velocity:.2f}..{max_east_velocity:.2f}"
             )
+        if camera:
+            if camera_frames == 0:
+                raise RuntimeError("Gazebo did not provide a camera frame")
+            print(f"Gazebo camera frames=verified ({camera_frames}).")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
@@ -496,6 +513,8 @@ async def run(exploratory: bool = False):
         landed = True
     finally:
         receiver.close()
+        if gazebo_camera is not None:
+            gazebo_camera.close()
         if sender is not None:
             sender.close()
         if service_task is not None and not service_task.done():
@@ -527,5 +546,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
+    parser.add_argument("--camera", action="store_true")
     args = parser.parse_args()
-    asyncio.run(run(exploratory=args.explore))
+    asyncio.run(run(exploratory=args.explore, camera=args.camera))
