@@ -294,6 +294,14 @@ async def run():
         if not commands or commands[-1][1] != VelocityCommand():
             raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
 
+        decision = control.latest_decision
+        if decision is None:
+            raise RuntimeError("SITL did not observe a conscious Mac decision")
+        print(
+            "Conscious Mac decision=verified: "
+            f"intent={decision.intent}, focus={decision.focus or 'none'}."
+        )
+
         def forward_count(start_s, end_s):
             return sum(
                 command.north_m_s > 0.0
