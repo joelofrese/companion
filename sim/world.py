@@ -139,15 +139,17 @@ class WorldVisualModel:
     ) -> VisualObservation:
         elapsed_s = max(0.0, timestamp_s - self.started_at_s)
         target_offset_east_m = self.world.target_offset_east(elapsed_s)
-        if intent != "following" or target_offset_east_m is None:
+        if target_offset_east_m is None:
+            description = "no person is visible"
             movement = "stop"
-            description = "no movement target is available"
         elif target_offset_east_m > 0.0:
             movement = "right"
             description = "the person is to the right"
         else:
             movement = "forward"
             description = "the person is ahead"
+        if intent != "following":
+            movement = "stop"
         return VisualObservation(
             timestamp_s=timestamp_s,
             description=description,
@@ -168,7 +170,7 @@ class WorldLanguageModel:
 
     def think(self, information) -> ConsciousDecision:
         if self.intent is None:
-            self.intent = "hover" if self.exploratory else information.intent
+            self.intent = information.intent
         dialogue = ""
         if information.dialogue:
             intent = parse_intent(information.dialogue)

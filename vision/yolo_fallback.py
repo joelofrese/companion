@@ -107,8 +107,8 @@ class YoloVisualModel:
         telemetry: Telemetry,
     ) -> VisualObservation:
         person = self._detector.detect(image) if image is not None else None
-        if intent != "following" or person is None:
-            description = "no person is available to follow"
+        if person is None:
+            description = "no person is visible"
             movement = "stop"
         else:
             horizontal_error = (
@@ -125,6 +125,8 @@ class YoloVisualModel:
                 movement = "left"
             else:
                 description = "the person is centered"
+                movement = "stop"
+            if intent != "following":
                 movement = "stop"
         return VisualObservation(
             timestamp_s=timestamp_s,

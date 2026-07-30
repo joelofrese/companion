@@ -158,5 +158,10 @@ calibration, not replace the simulation-first development loop.
   seconds in Gazebo's `forest` world. Offboard telemetry, the conscious and
   visual boundaries, the exploratory speed envelope, landing, and disarm all
   passed.
+- **2026-07-30** — Made visual descriptions independent of the current intent:
+  the brain can notice a person before deciding whether to move. Exploratory
+  simulation now preserves its initial intent instead of silently forcing
+  `hover`; deterministic, RTP, and rendered-camera SITL runs passed again,
+  including landing and disarm.
 
 as always, thank you, good luck, and i love you
