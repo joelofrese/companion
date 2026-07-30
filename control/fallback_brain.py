@@ -8,8 +8,6 @@ class IntentLanguageModel:
 
     def think(self, information) -> ConsciousDecision:
         intent = information.intent
-        if intent == "hovering":
-            intent = "hover"
         return ConsciousDecision(
             intent=intent,
             focus="person" if intent == "following" else "",

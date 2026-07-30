@@ -49,7 +49,7 @@ class ConsciousDecision:
 
 
 @dataclass
-class MindState:
+class MindMemory:
     """The small shared memory between the two brain layers."""
 
     focus: str = ""
@@ -84,7 +84,7 @@ class MacMind:
     def __init__(self, visual_model: VisualModel, language_model: LanguageModel):
         self.visual_model = visual_model
         self.language_model = language_model
-        self.state = MindState()
+        self.memory = MindMemory()
         self._new_observations = deque[VisualObservation](maxlen=8)
         self._lock = threading.Lock()
 
@@ -94,7 +94,7 @@ class MacMind:
         if not isinstance(intent, str) or not intent.strip():
             raise ValueError("intent must be a non-empty string")
         with self._lock:
-            self.state.intent = intent
+            self.memory.intent = intent
 
     def see(
         self,
@@ -105,10 +105,10 @@ class MacMind:
         """Ask the VLM to describe one image."""
 
         with self._lock:
-            focus = self.state.focus
-            intent = self.state.intent
-            previous_movement = self.state.previous_movement
-            previous_observation = self.state.previous_observation
+            focus = self.memory.focus
+            intent = self.memory.intent
+            previous_movement = self.memory.previous_movement
+            previous_observation = self.memory.previous_observation
         observation = self.visual_model.observe(
             image,
             timestamp_s=timestamp_s,
@@ -119,8 +119,8 @@ class MacMind:
             telemetry=telemetry,
         )
         with self._lock:
-            self.state.previous_movement = observation.movement
-            self.state.previous_observation = observation.description
+            self.memory.previous_movement = observation.movement
+            self.memory.previous_observation = observation.description
             self._new_observations.append(observation)
         return observation
 
@@ -134,9 +134,9 @@ class MacMind:
         with self._lock:
             information = ConsciousInput(
                 new_observations=tuple(self._new_observations),
-                summary=self.state.summary,
-                intent=self.state.intent,
-                previous_movement=self.state.previous_movement,
+                summary=self.memory.summary,
+                intent=self.memory.intent,
+                previous_movement=self.memory.previous_movement,
                 dialogue=dialogue,
                 telemetry=telemetry,
             )
@@ -145,7 +145,7 @@ class MacMind:
         if not isinstance(decision.intent, str) or not decision.intent.strip():
             raise ValueError("language model returned an empty intent")
         with self._lock:
-            self.state.intent = decision.intent
-            self.state.focus = decision.focus
-            self.state.summary = decision.summary
+            self.memory.intent = decision.intent
+            self.memory.focus = decision.focus
+            self.memory.summary = decision.summary
         return decision

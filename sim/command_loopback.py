@@ -3,14 +3,18 @@
 import asyncio
 import time
 
-from control.runtime import CompanionRuntime
-from control.reactive import State
 from control.udp_sender import UdpCommandSender
 from control.udp_control import UdpControlService
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
-from sim.offboard_control import DemoVision
+
+
+class FixedCommandControl:
+    """Provide one normal Mac command for the transport loopback."""
+
+    def tick(self, frame, timestamp_s, intent=None, obstacle_distance_m=None):
+        return VelocityCommand(north_m_s=0.25)
 
 
 class RecordingForwarder:
@@ -58,10 +62,9 @@ async def run():
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         mac_task = asyncio.create_task(
             UdpControlService(
-                CompanionRuntime(DemoVision()),
+                FixedCommandControl(),
                 sender,
                 frame_reader,
-                intent_provider=lambda timestamp_s: State.FOLLOWING,
                 obstacle_provider=lambda timestamp_s: mac_obstacle_distance(),
                 tick_period_s=0.01,
             ).run(mac_stop_event)

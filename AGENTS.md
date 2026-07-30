@@ -126,5 +126,11 @@ calibration, not replace the simulation-first development loop.
   person-image mission, and Gazebo-camera exploratory mission all passed
   through landing and disarm. Non-person images correctly produce safe zero
   motion; following assertions require an image containing a person.
+- **2026-07-30** — Removed the obsolete state machine, tracker, follower, and
+  runtime layers. Intents are now plain strings, the temporary visual fallback
+  is frame-based, the production brain receives its initial intent once, and
+  PX4 stdin is isolated so exploratory dialogue is reliable. Verified the
+  walls world with live `follow me` and `hover` dialogue, plus the strict,
+  RTP, and rendered-camera scenarios through landing and disarm.
 
 as always, thank you, good luck, and i love you

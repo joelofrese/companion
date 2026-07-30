@@ -19,7 +19,7 @@ class ControlLoop(Protocol):
         self,
         frame: Any,
         timestamp_s: float,
-        intent: Optional[object] = None,
+        intent: Optional[str] = None,
         obstacle_distance_m: Optional[float] = None,
     ) -> VelocityCommand:
         ...
@@ -33,7 +33,7 @@ class UdpControlService:
         control: ControlLoop,
         sender: UdpCommandSender,
         frame_reader: FrameReader,
-        intent_provider: Optional[Callable[[float], Optional[object]]] = None,
+        intent_provider: Optional[Callable[[float], Optional[str]]] = None,
         obstacle_provider: Optional[Callable[[float], Optional[float]]] = None,
         tick_period_s: float = 0.05,
         frame_timeout_s: float = 2.0,

@@ -37,7 +37,7 @@ from sim.offboard_control import (
     demo_state,
 )
 from sim.video_loopback import image_sender_command
-from vision.legacy_yolo import YoloVisualModel
+from vision.yolo_fallback import YoloVisualModel
 from vision.video_stream import (
     AsyncLatestFrameReader,
     GStreamerH264Receiver,
@@ -94,7 +94,7 @@ async def run(image_path: str):
         return distance_sensor.read()
 
     def current_intent(timestamp_s):
-        return demo_state(max(0.0, timestamp_s - flight_started_at)).name.lower()
+        return demo_state(max(0.0, timestamp_s - flight_started_at))
 
     try:
         video_receiver.start()

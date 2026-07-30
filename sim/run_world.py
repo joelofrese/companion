@@ -80,6 +80,7 @@ def _run_once(
         cwd=px4_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
         bufsize=0,
         start_new_session=True,
         env=environment,

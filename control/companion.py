@@ -8,14 +8,14 @@ from control.mind import MacMind, Telemetry
 from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
-from vision.legacy_yolo import YoloVisualModel
+from vision.yolo_fallback import YoloVisualModel
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Run the Mac-side Companion control stack")
     parser.add_argument("cm5_host", help="CM5 IP address or hostname")
-    parser.add_argument("--state", choices=("idle", "following"), default="idle")
+    parser.add_argument("--intent", choices=("idle", "following"), default="idle")
     parser.add_argument(
         "--voice-once",
         action="store_true",
@@ -34,7 +34,7 @@ def build_parser():
 
 
 async def run(args):
-    intent = "following" if args.state == "following" else "idle"
+    intent = args.intent
     if args.voice_once:
         from voice.pipeline import PushToTalkVoicePipeline
         from voice.recorder import PushToTalkRecorder
@@ -48,7 +48,7 @@ async def run(args):
 
         voice_state = await asyncio.to_thread(listen_once)
         if voice_state is not None:
-            intent = voice_state.name.lower()
+            intent = voice_state
 
     video_config = H264StreamConfig(
         port=args.video_port,
@@ -66,13 +66,13 @@ async def run(args):
         ),
         IntentLanguageModel(),
     )
+    brain.set_intent(intent)
     control = MindRuntime(brain)
     sender = UdpCommandSender(args.cm5_host, args.command_port)
     service = UdpControlService(
         control,
         sender,
         frame_reader.read,
-        intent_provider=lambda timestamp_s: intent,
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()

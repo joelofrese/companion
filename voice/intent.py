@@ -1,9 +1,7 @@
-"""Turn voice transcripts into safe states."""
+"""Turn voice transcripts into safe intents."""
 
 import re
 from typing import Optional
-
-from control.reactive import State
 
 
 def _contains_phrase(words: list[str], phrase: str) -> bool:
@@ -12,8 +10,8 @@ def _contains_phrase(words: list[str], phrase: str) -> bool:
     return any(words[index:index + width] == phrase_words for index in range(len(words) - width + 1))
 
 
-def parse_intent(transcript: str) -> Optional[State]:
-    """Return one clear state, or none."""
+def parse_intent(transcript: str) -> Optional[str]:
+    """Return one clear intent, or none."""
 
     if not isinstance(transcript, str):
         return None
@@ -26,15 +24,15 @@ def parse_intent(transcript: str) -> Optional[State]:
         return None
 
     if any(_contains_phrase(words, phrase) for phrase in ("stop", "hover", "hold", "wait", "stay")):
-        return State.HOVERING
+        return "hover"
 
     intents = {
-        State.FOLLOWING: ("follow", "come with me", "come along"),
-        State.IDLE: ("idle", "sleep"),
+        "following": ("follow", "come with me", "come along"),
+        "idle": ("idle", "sleep"),
     }
     matches = [
-        state
-        for state, phrases in intents.items()
+        intent
+        for intent, phrases in intents.items()
         if any(_contains_phrase(words, phrase) for phrase in phrases)
     ]
     return matches[0] if len(matches) == 1 else None

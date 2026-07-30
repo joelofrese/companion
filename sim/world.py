@@ -171,11 +171,11 @@ class WorldLanguageModel:
             self.intent = "hover" if self.exploratory else information.intent
         dialogue = ""
         if information.dialogue:
-            state = parse_intent(information.dialogue)
-            if state is None:
+            intent = parse_intent(information.dialogue)
+            if intent is None:
                 dialogue = "I did not understand that request."
             else:
-                self.intent = state.name.lower()
+                self.intent = intent
                 dialogue = f"Intent changed to {self.intent}."
             print(dialogue, flush=True)
         if not self.exploratory:
