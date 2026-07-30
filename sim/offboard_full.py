@@ -7,9 +7,9 @@ import time
 
 from mavsdk import System
 
-from control.following import FollowConfig, VisualFollower
-from control.runtime import CompanionRuntime
-from control.reactive import ReactiveController
+from control.fallback_brain import IntentLanguageModel
+from control.mind import MacMind, Telemetry
+from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
@@ -37,9 +37,7 @@ from sim.offboard_control import (
     demo_state,
 )
 from sim.video_loopback import image_sender_command
-from vision.latest import LatestVisionPipeline
-from vision.legacy_yolo import YoloPersonDetector
-from vision.pipeline import PersonVisionPipeline
+from vision.legacy_yolo import YoloVisualModel
 from vision.video_stream import (
     AsyncLatestFrameReader,
     GStreamerH264Receiver,
@@ -67,13 +65,15 @@ async def run(image_path: str):
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
     drone = System()
-    vision = None
+    control = None
     cm5_task = None
     mac_task = None
+    mind_task = None
     telemetry_task = None
     offboard_task = None
     cm5_stop = asyncio.Event()
     mac_stop = asyncio.Event()
+    mind_stop = asyncio.Event()
     distance_sensor = LatestDistanceSensor()
     flight_started_at = None
     armed = False
@@ -94,7 +94,7 @@ async def run(image_path: str):
         return distance_sensor.read()
 
     def current_intent(timestamp_s):
-        return demo_state(max(0.0, timestamp_s - flight_started_at))
+        return demo_state(max(0.0, timestamp_s - flight_started_at)).name.lower()
 
     try:
         video_receiver.start()
@@ -141,21 +141,25 @@ async def run(image_path: str):
 
         mac_sender = ScenarioSender()
 
-        vision = LatestVisionPipeline(
-            PersonVisionPipeline(YoloPersonDetector(model_path="yolov8n.pt"))
-        )
-        control = CompanionRuntime(
-            vision,
-            ReactiveController(
-                VisualFollower(
-                    FollowConfig(
-                        frame_width_px=video_config.width,
-                        desired_target_height_px=video_config.height * 0.75,
-                    )
-                )
+        control = MindRuntime(
+            MacMind(
+                YoloVisualModel(
+                    model_path="yolov8n.pt",
+                    frame_width_px=video_config.width,
+                    target_height_px=video_config.height * 0.75,
+                ),
+                IntentLanguageModel(),
             )
         )
         flight_started_at = time.monotonic()
+        mind_task = asyncio.create_task(
+            control.think_loop(
+                mind_stop,
+                telemetry_provider=lambda: Telemetry(
+                    obstacle_distance_m=distance_sensor.read()
+                ),
+            )
+        )
 
         async def read_frame():
             nonlocal frames_received, target_loss_reported, video_fault_reported
@@ -216,6 +220,9 @@ async def run(image_path: str):
         await asyncio.sleep(PROFILE_DURATION_S + 2.0)
         await asyncio.wait_for(offboard_task, timeout=5.0)
         print("Offboard telemetry=verified through full Mac/CM5 stack.")
+        if control.latest_decision is None:
+            raise RuntimeError("full stack did not observe a conscious Mac decision")
+        print("Conscious Mac decision=verified through full Mac/CM5 stack.")
         try:
             await asyncio.wait_for(mac_task, timeout=2.0)
         except RuntimeError as error:
@@ -226,7 +233,9 @@ async def run(image_path: str):
             raise RuntimeError("full stack did not observe the video-stall shutdown")
         else:
             raise RuntimeError("full stack did not observe the video-stall shutdown")
-        vision.close()
+        mind_stop.set()
+        await mind_task
+        control.close()
         cm5_stop.set()
         await cm5_task
         if not safe_commands.commands or safe_commands.commands[-1][1] != VelocityCommand():
@@ -351,14 +360,17 @@ async def run(image_path: str):
     finally:
         await _stop_task(mac_task, mac_stop)
         await _stop_task(cm5_task, cm5_stop)
+        mind_stop.set()
+        if mind_task is not None and not mind_task.done():
+            await mind_task
         if telemetry_task is not None:
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
         if offboard_task is not None and not offboard_task.done():
             offboard_task.cancel()
             await asyncio.gather(offboard_task, return_exceptions=True)
-        if vision is not None:
-            vision.close()
+        if control is not None:
+            control.close()
         if offboard_started:
             try:
                 await drone.offboard.stop()

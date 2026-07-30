@@ -4,7 +4,10 @@ import math
 from numbers import Real
 from typing import Any, Optional
 
+from control.following import FollowConfig, VisualFollower
+from control.mind import Telemetry, VisualObservation
 from control.tracking import Detection
+from vision.pipeline import PersonVisionPipeline
 
 
 PERSON_CLASS_ID = 0
@@ -110,4 +113,55 @@ class YoloPersonDetector:
             confidence=confidence,
             width_px=x2 - x1,
             height_px=y2 - y1,
+        )
+
+
+class YoloVisualModel:
+    """Adapt temporary person tracking to the Mac subconscious interface."""
+
+    def __init__(self, model_path: str, frame_width_px: float, target_height_px: float):
+        self._pipeline = PersonVisionPipeline(
+            YoloPersonDetector(model_path=model_path)
+        )
+        self._follower = VisualFollower(
+            FollowConfig(
+                frame_width_px=frame_width_px,
+                desired_target_height_px=target_height_px,
+            )
+        )
+
+    def observe(
+        self,
+        image: Any,
+        timestamp_s: float,
+        focus: str,
+        intent: str,
+        previous_movement: str,
+        previous_observation: str,
+        telemetry: Telemetry,
+    ) -> VisualObservation:
+        target = self._pipeline.process(image, timestamp_s)
+        command = self._follower.command(target) if target is not None else None
+        if intent != "following" or command is None or target.age_s > 0.5:
+            movement = "stop"
+            description = "no person is available to follow"
+        elif command.north_m_s > 0.0:
+            movement = "forward"
+            description = "the person is ahead"
+        elif command.east_m_s > 0.02:
+            movement = "right"
+            description = "the person is to the right"
+        elif command.east_m_s < -0.02:
+            movement = "left"
+            description = "the person is to the left"
+        else:
+            movement = "stop"
+            description = "the person is centered"
+        return VisualObservation(
+            timestamp_s=timestamp_s,
+            description=description,
+            focused_answer=description if focus else "",
+            movement=movement,
+            next_focus=focus or "person",
+            confidence=1.0 if target is not None else 0.0,
         )

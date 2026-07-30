@@ -1,16 +1,15 @@
-"""Run the temporary YOLO-based Mac control fallback."""
+"""Run the Mac brain with a temporary YOLO visual fallback."""
 
 import argparse
 import asyncio
 
-from control.following import FollowConfig, VisualFollower
-from control.runtime import CompanionRuntime
-from control.reactive import ReactiveController, State
+from control.fallback_brain import IntentLanguageModel
+from control.mind import MacMind, Telemetry
+from control.mind_runtime import MindRuntime
+from control.reactive import State
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
-from vision.latest import LatestVisionPipeline
-from vision.legacy_yolo import YoloPersonDetector
-from vision.pipeline import PersonVisionPipeline
+from vision.legacy_yolo import YoloVisualModel
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
@@ -60,28 +59,34 @@ async def run(args):
     )
     receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(receiver)
-    vision = LatestVisionPipeline(
-        PersonVisionPipeline(YoloPersonDetector(model_path=args.yolo_model))
+    brain = MacMind(
+        YoloVisualModel(
+            model_path=args.yolo_model,
+            frame_width_px=video_config.width,
+            target_height_px=args.target_height,
+        ),
+        IntentLanguageModel(),
     )
-    control = CompanionRuntime(
-        vision,
-        ReactiveController(
-            VisualFollower(
-                FollowConfig(
-                    frame_width_px=video_config.width,
-                    desired_target_height_px=args.target_height,
-                )
-            )
-        )
-    )
+    control = MindRuntime(brain)
     sender = UdpCommandSender(args.cm5_host, args.command_port)
     service = UdpControlService(
         control,
         sender,
         frame_reader.read,
-        intent_provider=lambda timestamp_s: state,
+        intent_provider=lambda timestamp_s: {
+            State.IDLE: "idle",
+            State.FOLLOWING: "following",
+            State.HOVERING: "hover",
+        }[state],
     )
     stop_event = asyncio.Event()
+    mind_stop = asyncio.Event()
+    mind_task = asyncio.create_task(
+        control.think_loop(
+            mind_stop,
+            telemetry_provider=lambda: Telemetry(),
+        )
+    )
     try:
         receiver.start()
         print(
@@ -91,7 +96,9 @@ async def run(args):
         await service.run(stop_event)
     finally:
         receiver.close()
-        vision.close()
+        mind_stop.set()
+        await mind_task
+        control.close()
 
 
 def main(argv=None):

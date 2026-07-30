@@ -98,8 +98,9 @@ Add `--camera` to an exploratory run to use Gazebo's rendered
 `x500_mono_cam` image topic as subconscious input. The simulated visual model
 remains deliberately simple, but the real frame path is exercised and counted.
 
-The RTP image path still uses a temporary YOLO fallback until a concrete local
-VLM backend is selected; the Mac brain interfaces remain model-neutral.
+The RTP image path now runs through the Mac brain with a temporary YOLO visual
+adapter and intent-preserving language adapter until local VLM and LLM backends
+are selected.
 
 Pass `--world walls`, `forest`, `windy`, or another PX4 Gazebo world to repeat
 the same mission in a different environment. Add `--explore` to the synthetic
