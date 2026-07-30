@@ -8,6 +8,7 @@ import time
 
 from mavsdk import System
 
+from control.command_packet import CommandPacket
 from control.fallback_brain import IntentLanguageModel
 from control.mind import MacMind, Telemetry
 from control.mind_runtime import MindRuntime
@@ -91,6 +92,7 @@ async def run(image_path: str):
     target_loss_reported = False
     command_dropout_reported = False
     malformed_packet_reported = False
+    stale_packet_reported = False
     malformed_socket = None
 
     def current_obstacle(timestamp_s):
@@ -135,6 +137,7 @@ async def run(image_path: str):
 
             def send(self, command):
                 nonlocal command_dropout_reported, malformed_packet_reported
+                nonlocal stale_packet_reported
                 elapsed_s = time.monotonic() - flight_started_at
                 if COMMAND_DROPOUT_START_S <= elapsed_s < COMMAND_DROPOUT_END_S:
                     if not command_dropout_reported:
@@ -147,6 +150,16 @@ async def run(image_path: str):
                         )
                         print("Malformed command packet injected during dropout.")
                         malformed_packet_reported = True
+                    if not stale_packet_reported:
+                        malformed_socket.sendto(
+                            CommandPacket(
+                                0,
+                                VelocityCommand(north_m_s=0.5),
+                            ).encode(),
+                            ("127.0.0.1", receiver.port),
+                        )
+                        print("Stale command packet injected during dropout.")
+                        stale_packet_reported = True
                     return
                 sender.send(command)
 

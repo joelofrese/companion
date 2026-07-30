@@ -174,5 +174,8 @@ calibration, not replace the simulation-first development loop.
 - **2026-07-30** — Replaced one RTP dropout packet with malformed UDP input.
   The CM5 ignored it, expired the last valid heartbeat, recovered when valid
   packets returned, and still completed the full mission through disarm.
+- **2026-07-30** — Added a stale valid sequence packet beside the malformed
+  packet. The RTP mission now verifies both wire decoding and sequence freshness
+  at the CM5 boundary before confirming heartbeat expiry and recovery.
 
 as always, thank you, good luck, and i love you
