@@ -88,7 +88,7 @@ class MindRuntime:
         while not stop_event.is_set():
             dialogue = dialogue_provider() if dialogue_provider is not None else None
             try:
-                self._decision = await asyncio.to_thread(
+                decision = await asyncio.to_thread(
                     self.mind.think,
                     telemetry_provider(),
                     dialogue,
@@ -96,6 +96,9 @@ class MindRuntime:
             except Exception as error:
                 self._error = error
                 return
+            self._decision = decision
+            if decision.dialogue:
+                print(f"Companion: {decision.dialogue}", flush=True)
             await asyncio.sleep(period_s)
 
     def close(self):

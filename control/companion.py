@@ -6,6 +6,7 @@ import asyncio
 from control.mind import MacMind, Telemetry
 from control.mind_runtime import MindRuntime
 from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
+from control.dialogue import DialogueInput
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
@@ -19,6 +20,11 @@ def build_parser():
         "--voice-once",
         action="store_true",
         help="capture one push-to-talk utterance before starting flight control",
+    )
+    parser.add_argument(
+        "--dialogue",
+        action="store_true",
+        help="accept typed dialogue while flight control is running",
     )
     parser.add_argument("--whisper-model", default="tiny.en")
     parser.add_argument("--record-duration", type=float, default=3.0)
@@ -75,10 +81,12 @@ async def run(args):
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()
+    dialogue_input = DialogueInput() if args.dialogue else None
     mind_task = asyncio.create_task(
         control.think_loop(
             mind_stop,
             telemetry_provider=lambda: Telemetry(),
+            dialogue_provider=dialogue_input.next if dialogue_input else None,
         )
     )
     try:
@@ -88,6 +96,8 @@ async def run(args):
             f"commands {args.cm5_host}:{args.command_port}, intent={intent}, "
             f"VLM={args.vlm_model}, LLM={args.llm_model}."
         )
+        if dialogue_input:
+            dialogue_input.start()
         await service.run(stop_event)
     finally:
         receiver.close()

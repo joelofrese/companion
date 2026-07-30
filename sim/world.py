@@ -6,9 +6,6 @@ through the real command path.
 
 import asyncio
 import math
-import queue
-import sys
-import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -17,6 +14,7 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError
 
 from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
+from control.dialogue import DialogueInput
 from control.mind_runtime import MindRuntime
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
@@ -66,29 +64,6 @@ class WorldStep:
     distance_fresh: bool = True
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
-
-
-class DialogueInput:
-    """Read live dialogue without blocking the flight loop."""
-
-    def __init__(self):
-        self._messages = queue.SimpleQueue()
-
-    def start(self):
-        threading.Thread(target=self._read, daemon=True).start()
-
-    def _read(self):
-        print("Dialogue is live. Type follow me, hover, or stop.", flush=True)
-        for line in sys.stdin:
-            line = line.strip()
-            if line:
-                self._messages.put(line)
-
-    def next(self) -> Optional[str]:
-        try:
-            return self._messages.get_nowait()
-        except queue.Empty:
-            return None
 
 
 class SyntheticWorld:
@@ -184,7 +159,6 @@ class WorldLanguageModel:
             else:
                 self.intent = intent
                 dialogue = f"Intent changed to {self.intent}."
-            print(dialogue, flush=True)
         if not self.exploratory:
             elapsed_s = max(0.0, time.monotonic() - self.started_at_s)
             following = (

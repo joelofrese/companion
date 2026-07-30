@@ -110,10 +110,13 @@ After installing Ollama and pulling a local vision-capable model:
 ```sh
 ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip>
+.venv/bin/python -m control.companion <cm5-ip> --dialogue
 ```
 
 The production entry point uses separate VLM and LLM sessions. Set
 `--vlm-model` and `--llm-model` when different local models are preferred.
+Add `--dialogue` to type messages for the conscious LLM while flight control
+continues; replies are printed only when the model provides one.
 
 ## Current state
 
@@ -125,7 +128,8 @@ boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
 without replacing it. The voice path is a direct one-utterance pipeline, and
 the conscious model receives each visual observation’s focused answer and
-confidence.
+confidence. Typed dialogue now uses the same non-blocking input path in
+simulation and the production Mac entry point.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
