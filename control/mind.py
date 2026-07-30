@@ -101,6 +101,13 @@ class MacMind:
         with self._lock:
             self.memory.intent = intent
 
+    @property
+    def intent(self) -> str:
+        """Return the current high-level intent."""
+
+        with self._lock:
+            return self.memory.intent
+
     def see(
         self,
         image: Any,

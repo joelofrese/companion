@@ -32,6 +32,7 @@ capabilities. Repeat that loop without waiting for confirmation.
 - The Mac conscious LLM uses those observations, dialogue, telemetry, and
   memory to choose high-level intent.
 - Mac control turns the suggestion into slow velocity commands.
+- A changed intent invalidates older visual movement suggestions.
 - Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.

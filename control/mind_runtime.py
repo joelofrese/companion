@@ -24,7 +24,9 @@ class MindRuntime:
         self.watchdog = SetpointWatchdog()
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future: Optional[Future] = None
+        self._future_intent: Optional[str] = None
         self._observation = None
+        self._observation_intent: Optional[str] = None
         self._decision: Optional[ConsciousDecision] = None
         self._error: Optional[Exception] = None
         self._closed = False
@@ -56,6 +58,7 @@ class MindRuntime:
             self.mind.set_intent(intent)
         self._collect()
         if frame is not None and self._future is None and not self._closed:
+            self._future_intent = self.mind.intent
             self._future = self._executor.submit(
                 self.mind.see,
                 frame,
@@ -66,7 +69,8 @@ class MindRuntime:
         if self._observation is not None:
             age_s = timestamp_s - self._observation.timestamp_s
             if (
-                0.0 <= age_s <= 0.5
+                self._observation_intent == self.mind.intent
+                and 0.0 <= age_s <= 0.5
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
             ):
                 movement = self._observation.movement
@@ -79,6 +83,8 @@ class MindRuntime:
         future = self._future
         self._future = None
         self._observation = future.result()
+        self._observation_intent = self._future_intent
+        self._future_intent = None
 
     async def _think_or_stop(
         self,
