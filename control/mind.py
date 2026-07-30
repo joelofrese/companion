@@ -11,7 +11,6 @@ class Telemetry:
     """The vehicle information the brain can use."""
 
     obstacle_distance_m: Optional[float] = None
-    battery_percent: Optional[float] = None
 
 
 @dataclass(frozen=True)
