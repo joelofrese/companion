@@ -3,9 +3,8 @@
 import asyncio
 import math
 from numbers import Real
-from typing import Awaitable, Callable, Optional, Protocol
+from typing import Any, Awaitable, Callable, Optional, Protocol
 
-from control.runtime import CompanionRuntime
 from control.state_machine import State
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
@@ -16,12 +15,23 @@ class FrameReader(Protocol):
         ...
 
 
+class ControlLoop(Protocol):
+    def tick(
+        self,
+        frame: Any,
+        timestamp_s: float,
+        intent: Optional[object] = None,
+        obstacle_distance_m: Optional[float] = None,
+    ) -> VelocityCommand:
+        ...
+
+
 class UdpControlService:
     """Send commands at a fixed rate and send zero when stopping."""
 
     def __init__(
         self,
-        control: CompanionRuntime,
+        control: ControlLoop,
         sender: UdpCommandSender,
         frame_reader: FrameReader,
         intent_provider: Optional[Callable[[float], Optional[State]]] = None,

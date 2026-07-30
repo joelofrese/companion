@@ -13,9 +13,9 @@ from typing import Optional
 from mavsdk import System
 from mavsdk.offboard import OffboardError
 
-from control.runtime import CompanionRuntime
+from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
+from control.mind_runtime import MindRuntime
 from control.state_machine import State
-from control.tracking import TrackEstimate
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
@@ -65,24 +65,10 @@ class WorldStep:
 class SyntheticWorld:
     """Provide fixed targets, sensors, and link faults."""
 
-    def target(
-        self,
-        elapsed_s: float,
-    ) -> Optional[TrackEstimate]:
+    def target_offset_east(self, elapsed_s: float) -> Optional[float]:
         if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
             return None
-        target_distance_m = 8.0
-        target_offset_east_m = 0.8 if TARGET_RIGHT_START_S <= elapsed_s < TARGET_RIGHT_END_S else 0.0
-        x_px = 320.0 + 320.0 * target_offset_east_m / target_distance_m
-        return TrackEstimate(
-            x_px=x_px,
-            y_px=240.0,
-            vx_px_s=0.0,
-            vy_px_s=0.0,
-            predicted_x_px=x_px,
-            predicted_y_px=240.0,
-            target_height_px=120.0 / target_distance_m,
-        )
+        return 0.8 if TARGET_RIGHT_START_S <= elapsed_s < TARGET_RIGHT_END_S else 0.0
 
     def step(
         self,
@@ -110,15 +96,53 @@ class SyntheticWorld:
         return WorldStep(intent)
 
 
-class WorldVision:
-    """Provide the world's target through the normal vision interface."""
+class WorldVisualModel:
+    """Provide fixed scene descriptions to the Mac VLM boundary."""
 
     def __init__(self, world: SyntheticWorld, started_at_s: float):
         self.world = world
         self.started_at_s = started_at_s
 
-    def process(self, frame, timestamp_s: float) -> Optional[TrackEstimate]:
-        return self.world.target(max(0.0, timestamp_s - self.started_at_s))
+    def observe(
+        self,
+        image,
+        timestamp_s: float,
+        focus: str,
+        intent: str,
+        previous_movement: str,
+        previous_observation: str,
+        telemetry: Telemetry,
+    ) -> VisualObservation:
+        elapsed_s = max(0.0, timestamp_s - self.started_at_s)
+        target_offset_east_m = self.world.target_offset_east(elapsed_s)
+        if intent in {"idle", "hover", "hovering"} or target_offset_east_m is None:
+            movement = "stop"
+            description = "no movement target is available"
+        elif target_offset_east_m > 0.0:
+            movement = "right"
+            description = "the person is to the right"
+        else:
+            movement = "forward"
+            description = "the person is ahead"
+        return VisualObservation(
+            timestamp_s=timestamp_s,
+            description=description,
+            focused_answer=description if focus else "",
+            movement=movement,
+            next_focus=focus or "person",
+            confidence=1.0,
+        )
+
+
+class WorldLanguageModel:
+    """Keep the scripted intent while exercising the conscious boundary."""
+
+    def think(self, information) -> ConsciousDecision:
+        return ConsciousDecision(
+            intent=information.intent,
+            focus="person" if information.intent == "following" else "",
+            summary=information.summary or "The simulated world is running.",
+        )
 
 
 async def run():
@@ -128,9 +152,12 @@ async def run():
     sender = None
     drone = System()
     service_task = None
+    mind_task = None
     service_stop = asyncio.Event()
+    mind_stop = asyncio.Event()
     telemetry_task = None
     offboard_task = None
+    control = None
     offboard_started = False
     armed = False
     landed = False
@@ -154,15 +181,15 @@ async def run():
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         started_at = time.monotonic()
         world = SyntheticWorld()
-        world_vision = WorldVision(world, started_at)
-        control = CompanionRuntime(world_vision)
+        visual_model = WorldVisualModel(world, started_at)
+        control = MindRuntime(MacMind(visual_model, WorldLanguageModel()))
 
         def send_packet(elapsed_s: float, timestamp_s: float):
             step = world.step(elapsed_s)
             command = control.tick(
-                frame=None,
+                frame=step,
                 timestamp_s=timestamp_s,
-                intent=step.intent,
+                intent=step.intent.name.lower(),
                 obstacle_distance_m=step.obstacle_distance_m,
             )
             if step.transmit:
@@ -174,7 +201,16 @@ async def run():
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
         started_at = time.monotonic()
-        world_vision.started_at_s = started_at
+        visual_model.started_at_s = started_at
+        mind_task = asyncio.create_task(
+            control.think_loop(
+                mind_stop,
+                telemetry_provider=lambda: Telemetry(
+                    obstacle_distance_m=distance_sensor.read()
+                ),
+                period_s=1.0,
+            )
+        )
         print("Mission: follow, recover, handle faults, hover, land, and disarm.")
 
         max_north_velocity = 0.0
@@ -241,6 +277,10 @@ async def run():
             sender.close()
             service_stop.set()
             await service_task
+            mind_stop.set()
+            if mind_task is not None:
+                await mind_task
+            control.close()
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
             if offboard_started:
@@ -379,6 +419,11 @@ async def run():
         if service_task is not None and not service_task.done():
             service_stop.set()
             await service_task
+        mind_stop.set()
+        if mind_task is not None and not mind_task.done():
+            await mind_task
+        if control is not None:
+            control.close()
         if offboard_task is not None and not offboard_task.done():
             offboard_task.cancel()
             await asyncio.gather(offboard_task, return_exceptions=True)

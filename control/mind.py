@@ -2,6 +2,7 @@
 
 from collections import deque
 from dataclasses import dataclass
+import threading
 from typing import Any, Optional, Protocol
 
 
@@ -85,6 +86,15 @@ class MacMind:
         self.language_model = language_model
         self.state = MindState()
         self._new_observations = deque[VisualObservation](maxlen=8)
+        self._lock = threading.Lock()
+
+    def set_intent(self, intent: str):
+        """Set the high-level intent seen by the subconscious."""
+
+        if not isinstance(intent, str) or not intent.strip():
+            raise ValueError("intent must be a non-empty string")
+        with self._lock:
+            self.state.intent = intent
 
     def see(
         self,
@@ -94,18 +104,24 @@ class MacMind:
     ) -> VisualObservation:
         """Ask the VLM to describe one image."""
 
+        with self._lock:
+            focus = self.state.focus
+            intent = self.state.intent
+            previous_movement = self.state.previous_movement
+            previous_observation = self.state.previous_observation
         observation = self.visual_model.observe(
             image,
             timestamp_s=timestamp_s,
-            focus=self.state.focus,
-            intent=self.state.intent,
-            previous_movement=self.state.previous_movement,
-            previous_observation=self.state.previous_observation,
+            focus=focus,
+            intent=intent,
+            previous_movement=previous_movement,
+            previous_observation=previous_observation,
             telemetry=telemetry,
         )
-        self.state.previous_movement = observation.movement
-        self.state.previous_observation = observation.description
-        self._new_observations.append(observation)
+        with self._lock:
+            self.state.previous_movement = observation.movement
+            self.state.previous_observation = observation.description
+            self._new_observations.append(observation)
         return observation
 
     def think(
@@ -115,8 +131,8 @@ class MacMind:
     ) -> ConsciousDecision:
         """Ask the LLM to update intent, focus, dialogue, and summary."""
 
-        decision = self.language_model.think(
-            ConsciousInput(
+        with self._lock:
+            information = ConsciousInput(
                 new_observations=tuple(self._new_observations),
                 summary=self.state.summary,
                 intent=self.state.intent,
@@ -124,9 +140,10 @@ class MacMind:
                 dialogue=dialogue,
                 telemetry=telemetry,
             )
-        )
-        self.state.intent = decision.intent
-        self.state.focus = decision.focus
-        self.state.summary = decision.summary
-        self._new_observations.clear()
+            self._new_observations.clear()
+        decision = self.language_model.think(information)
+        with self._lock:
+            self.state.intent = decision.intent
+            self.state.focus = decision.focus
+            self.state.summary = decision.summary
         return decision
