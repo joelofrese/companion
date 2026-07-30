@@ -29,6 +29,8 @@ from sim.offboard_control import (
     SECOND_FOLLOW_START_S,
     PROFILE_DURATION_S,
     SETPOINT_PERIOD_S,
+    STALE_DISTANCE_END_S,
+    STALE_DISTANCE_START_S,
     TARGET_LOST_END_S,
     TARGET_LOST_START_S,
     THIRD_FOLLOW_END_S,
@@ -90,7 +92,8 @@ async def run(image_path: str):
 
     def current_obstacle(timestamp_s):
         elapsed_s = max(0.0, timestamp_s - flight_started_at)
-        distance_sensor.update(DistanceMessage(demo_obstacle_distance_m(elapsed_s)))
+        if not STALE_DISTANCE_START_S <= elapsed_s < STALE_DISTANCE_END_S:
+            distance_sensor.update(DistanceMessage(demo_obstacle_distance_m(elapsed_s)))
         return distance_sensor.read()
 
     def current_intent(timestamp_s):
@@ -301,6 +304,18 @@ async def run(image_path: str):
                 SECOND_FOLLOW_END_S,
                 lambda command: command.north_m_s > 0.0,
                 "following recovery after invalid sensor",
+            ),
+            (
+                STALE_DISTANCE_START_S + 0.2,
+                STALE_DISTANCE_END_S,
+                lambda command: command == VelocityCommand(),
+                "stale obstacle sensor fail-safe",
+            ),
+            (
+                STALE_DISTANCE_END_S + 0.1,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after stale obstacle sensor",
             ),
             (
                 TARGET_LOST_START_S + 0.55,

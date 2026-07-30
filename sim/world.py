@@ -54,6 +54,8 @@ DROPOUT_END_S = 5.2
 LINK_RECOVERY_END_S = 5.35
 INVALID_COMMAND_START_S = 5.35
 INVALID_COMMAND_END_S = 5.75
+STALE_SENSOR_START_S = 15.0
+STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 
@@ -61,6 +63,7 @@ MAX_EXPLORATORY_SPEED_M_S = 1.0
 @dataclass(frozen=True)
 class WorldStep:
     obstacle_distance_m: Optional[float] = 2.0
+    distance_fresh: bool = True
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
 
@@ -105,6 +108,8 @@ class SyntheticWorld:
     ) -> WorldStep:
         if self.exploratory:
             return WorldStep()
+        if STALE_SENSOR_START_S <= elapsed_s < STALE_SENSOR_END_S:
+            return WorldStep(distance_fresh=False)
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
             return WorldStep(obstacle_distance_m=0.3)
         if OBSTACLE_END_S <= elapsed_s < RECOVERY_END_S:
@@ -319,6 +324,8 @@ async def run(
                 return "target lost; holding"
             if step.obstacle_distance_m is not None and step.obstacle_distance_m < 0.6:
                 return "obstacle detected; backing off"
+            if not step.distance_fresh:
+                return "distance sensor dropout"
             if isinstance(step.obstacle_distance_m, float) and math.isnan(step.obstacle_distance_m):
                 return "invalid obstacle reading"
             if not step.transmit:
@@ -337,13 +344,14 @@ async def run(
             while (elapsed := time.monotonic() - started_at) < duration_s:
                 now = time.monotonic()
                 step = world.step(elapsed)
-                distance_sensor.update(
-                    DistanceMessage(
-                        step.obstacle_distance_m
-                        if step.obstacle_distance_m is not None
-                        else math.nan
+                if step.distance_fresh:
+                    distance_sensor.update(
+                        DistanceMessage(
+                            step.obstacle_distance_m
+                            if step.obstacle_distance_m is not None
+                            else math.nan
+                        )
                     )
-                )
                 event = None if exploratory else event_for(elapsed, step)
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
@@ -444,6 +452,18 @@ async def run(
                 INVALID_SENSOR_END_S,
                 lambda command: command == VelocityCommand(),
                 "invalid obstacle fail-safe",
+            ),
+            (
+                STALE_SENSOR_START_S + 0.2,
+                STALE_SENSOR_END_S,
+                lambda command: command == VelocityCommand(),
+                "stale obstacle fail-safe",
+            ),
+            (
+                STALE_SENSOR_END_S + 0.1,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after stale obstacle sensor",
             ),
             (
                 DROPOUT_START_S + 0.15,

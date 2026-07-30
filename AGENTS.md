@@ -163,5 +163,9 @@ calibration, not replace the simulation-first development loop.
   simulation now preserves its initial intent instead of silently forcing
   `hover`; deterministic, RTP, and rendered-camera SITL runs passed again,
   including landing and disarm.
+- **2026-07-30** — Added stale-distance faults to the deterministic and RTP
+  missions. Both now stop through the CM5 freshness timeout when distance data
+  goes silent, verify recovery when it returns, and still complete landing and
+  disarm.
 
 as always, thank you, good luck, and i love you
