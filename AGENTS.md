@@ -96,10 +96,10 @@ hardware-specific transport.
 Add `--camera` to an exploratory run to use Gazebo’s rendered camera topic as
 the VLM input. Add `--ollama` to send those frames through local Ollama VLM
 and LLM sessions. This is slower and exploratory, so it checks safety,
-bounded motion, landing, and disarm rather than exact decisions. Type
-`follow me`, `hover`, or `stop` during an exploratory synthetic run to change
-the conscious intent. Use `--world walls`, `forest`, `windy`, or another PX4
-Gazebo world, and `--duration` for a longer run.
+bounded motion, landing, and disarm rather than exact decisions. Type a
+request such as `follow me`, `hover`, or `stop` during an exploratory
+synthetic run to change the conscious intent. Use `--world walls`, `forest`,
+`windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
 
 The deterministic RTP scenario uses YOLO only as a repeatable person-image
 fixture. It is not the production brain. Production `control/` uses local
@@ -115,8 +115,9 @@ ollama pull gemma3:4b
 
 The production entry point uses separate VLM and LLM sessions. Set
 `--vlm-model` and `--llm-model` when different local models are preferred.
-Add `--dialogue` to type messages for the conscious LLM while flight control
-continues; replies are printed only when the model provides one.
+The initial `--intent` may be any short plain-language goal. Add `--dialogue`
+to type natural requests for the conscious LLM while flight control continues;
+replies are printed only when the model provides one.
 
 ## Current state
 

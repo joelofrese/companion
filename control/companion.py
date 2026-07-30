@@ -15,7 +15,11 @@ from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H
 def build_parser():
     parser = argparse.ArgumentParser(description="Run the Mac-side Companion control stack")
     parser.add_argument("cm5_host", help="CM5 IP address or hostname")
-    parser.add_argument("--intent", choices=("idle", "following"), default="idle")
+    parser.add_argument(
+        "--intent",
+        default="idle",
+        help="initial high-level intent in plain language (default: idle)",
+    )
     parser.add_argument(
         "--voice-once",
         action="store_true",

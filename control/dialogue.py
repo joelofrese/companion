@@ -16,7 +16,7 @@ class DialogueInput:
         threading.Thread(target=self._read, daemon=True).start()
 
     def _read(self):
-        print("Dialogue is live. Type follow me, hover, or stop.", flush=True)
+        print("Dialogue is live. Type any request for the companion.", flush=True)
         for line in sys.stdin:
             line = line.strip()
             if line:
