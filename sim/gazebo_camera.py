@@ -17,7 +17,7 @@ class GazeboCamera:
 
     def __init__(self, topic: str):
         self.topic = topic
-        self._frames = queue.SimpleQueue()
+        self._frames = queue.Queue(maxsize=1)
         self._process = None
         self._thread = None
 
@@ -50,19 +50,22 @@ class GazeboCamera:
                 step = int(message["step"])
                 image = np.frombuffer(frame, dtype=np.uint8).reshape(height, step)
                 image = image[:, : width * 3]
-                self._frames.put(image.reshape(height, width, 3)[:, :, ::-1])
+                image = image.reshape(height, width, 3)[:, :, ::-1]
+                try:
+                    self._frames.put_nowait(image)
+                except queue.Full:
+                    self._frames.get_nowait()
+                    self._frames.put_nowait(image)
             except (ValueError, KeyError, json.JSONDecodeError):
                 continue
 
     def latest(self) -> Optional[np.ndarray]:
         """Return the newest BGR frame, if Gazebo has produced one."""
 
-        newest = None
-        while True:
-            try:
-                newest = self._frames.get_nowait()
-            except queue.Empty:
-                return newest
+        try:
+            return self._frames.get_nowait()
+        except queue.Empty:
+            return None
 
     def close(self):
         if self._process is None:

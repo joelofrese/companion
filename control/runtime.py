@@ -2,7 +2,7 @@
 
 from typing import Any, Optional, Protocol
 
-from control.state_machine import ReactiveController, State
+from control.reactive import ReactiveController, State
 from control.tracking import TrackEstimate
 from control.velocity import VelocityCommand
 from control.watchdog import SetpointWatchdog

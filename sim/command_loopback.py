@@ -4,7 +4,7 @@ import asyncio
 import time
 
 from control.runtime import CompanionRuntime
-from control.state_machine import State
+from control.reactive import State
 from control.udp_sender import UdpCommandSender
 from control.udp_control import UdpControlService
 from control.velocity import VelocityCommand

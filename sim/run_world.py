@@ -111,6 +111,7 @@ def _run_once(
                 scenario.append("--explore")
             if camera:
                 scenario.append("--camera")
+            scenario += ["--world", world]
         result = subprocess.run(scenario, cwd=companion_dir, check=False)
         return result.returncode
     finally:

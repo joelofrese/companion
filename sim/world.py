@@ -194,7 +194,7 @@ class WorldLanguageModel:
         )
 
 
-async def run(exploratory: bool = False, camera: bool = False):
+async def run(exploratory: bool = False, camera: bool = False, world_name: str = "default"):
     """Run the complete synthetic mission."""
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
@@ -234,7 +234,7 @@ async def run(exploratory: bool = False, camera: bool = False):
         world = SyntheticWorld(exploratory)
         if camera:
             gazebo_camera = GazeboCamera(
-                "/world/default/model/x500_mono_cam_0/link/camera_link/sensor/camera/image"
+                f"/world/{world_name}/model/x500_mono_cam_0/link/camera_link/sensor/camera/image"
             )
             gazebo_camera.start()
         visual_model = WorldVisualModel(world, started_at)
@@ -547,5 +547,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
     parser.add_argument("--camera", action="store_true")
+    parser.add_argument("--world", default="default")
     args = parser.parse_args()
-    asyncio.run(run(exploratory=args.explore, camera=args.camera))
+    asyncio.run(
+        run(
+            exploratory=args.explore,
+            camera=args.camera,
+            world_name=args.world,
+        )
+    )

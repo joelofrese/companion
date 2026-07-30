@@ -3,7 +3,7 @@
 import math
 from dataclasses import dataclass
 
-from control.state_machine import State
+from control.reactive import State
 from control.tracking import TrackEstimate
 from voice.pipeline import VoiceCommandPipeline
 

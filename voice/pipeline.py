@@ -2,7 +2,7 @@
 
 from typing import Any, Optional, Protocol
 
-from control.state_machine import State
+from control.reactive import State
 from voice.intent import parse_intent
 
 

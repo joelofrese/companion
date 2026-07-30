@@ -3,7 +3,7 @@
 import re
 from typing import Optional
 
-from control.state_machine import State
+from control.reactive import State
 
 
 def _contains_phrase(words: list[str], phrase: str) -> bool:

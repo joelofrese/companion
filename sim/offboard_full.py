@@ -9,7 +9,7 @@ from mavsdk import System
 
 from control.following import FollowConfig, VisualFollower
 from control.runtime import CompanionRuntime
-from control.state_machine import ReactiveController
+from control.reactive import ReactiveController
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand

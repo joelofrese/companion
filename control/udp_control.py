@@ -5,7 +5,7 @@ import math
 from numbers import Real
 from typing import Any, Awaitable, Callable, Optional, Protocol
 
-from control.state_machine import State
+from control.reactive import State
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 
