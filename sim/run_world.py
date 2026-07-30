@@ -62,6 +62,7 @@ def _run_once(
     image_path: Optional[Path],
     world: str,
     stdbuf: str,
+    exploratory: bool,
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -94,7 +95,12 @@ def _run_once(
             if time.monotonic() >= deadline:
                 raise RuntimeError("PX4 did not reach pxh> before the boot timeout")
         scenario = [sys.executable, "-u", "-m"]
-        scenario += ["sim.offboard_full", str(image_path)] if image_path else ["sim.world"]
+        if image_path:
+            scenario += ["sim.offboard_full", str(image_path)]
+        else:
+            scenario += ["sim.world"]
+            if exploratory:
+                scenario.append("--explore")
         result = subprocess.run(scenario, cwd=companion_dir, check=False)
         return result.returncode
     finally:
@@ -106,6 +112,7 @@ def run(
     companion_dir: Path,
     image_path: Optional[Path] = None,
     world: str = "default",
+    exploratory: bool = False,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -120,7 +127,14 @@ def run(
 
     for attempt in range(BOOT_RETRIES + 1):
         try:
-            return _run_once(px4_dir, companion_dir, image_path, world, stdbuf)
+            return _run_once(
+                px4_dir,
+                companion_dir,
+                image_path,
+                world,
+                stdbuf,
+                exploratory,
+            )
         except RuntimeError:
             if attempt == BOOT_RETRIES:
                 raise
@@ -139,14 +153,22 @@ def main(argv=None):
         type=Path,
         help="run production RTP/YOLO full-stack verification with this person image",
     )
+    parser.add_argument(
+        "--explore",
+        action="store_true",
+        help="run the synthetic world with live dialogue and observation-only behavior",
+    )
     parser.add_argument("--world", default="default", help="Gazebo world name from PX4")
     args = parser.parse_args(argv)
+    if args.explore and args.image:
+        parser.error("--explore cannot be combined with --image")
     try:
         return run(
             args.px4_dir.expanduser().resolve(),
             Path(__file__).resolve().parent.parent,
             args.image.expanduser().resolve() if args.image else None,
             args.world,
+            args.explore,
         )
     except KeyboardInterrupt:
         return 130

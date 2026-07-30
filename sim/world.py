@@ -6,6 +6,9 @@ through the real command path.
 
 import asyncio
 import math
+import queue
+import sys
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -31,6 +34,7 @@ from sim.offboard_control import (
     THIRD_FOLLOW_END_S,
     THIRD_FOLLOW_START_S,
 )
+from voice.intent import parse_intent
 
 
 TARGET_RIGHT_START_S = 1.0
@@ -50,6 +54,7 @@ LINK_RECOVERY_END_S = 5.35
 INVALID_COMMAND_START_S = 5.35
 INVALID_COMMAND_END_S = 5.75
 HOVER_START_S = 5.8
+MAX_EXPLORATORY_SPEED_M_S = 1.0
 
 
 @dataclass(frozen=True)
@@ -59,8 +64,34 @@ class WorldStep:
     command_override: Optional[VelocityCommand] = None
 
 
+class DialogueInput:
+    """Read live dialogue without blocking the flight loop."""
+
+    def __init__(self):
+        self._messages = queue.SimpleQueue()
+
+    def start(self):
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        print("Dialogue is live. Type follow me, hover, or stop.", flush=True)
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                self._messages.put(line)
+
+    def next(self) -> Optional[str]:
+        try:
+            return self._messages.get_nowait()
+        except queue.Empty:
+            return None
+
+
 class SyntheticWorld:
     """Provide fixed targets, sensors, and link faults."""
+
+    def __init__(self, exploratory: bool = False):
+        self.exploratory = exploratory
 
     def target_offset_east(self, elapsed_s: float) -> Optional[float]:
         if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
@@ -71,6 +102,8 @@ class SyntheticWorld:
         self,
         elapsed_s: float,
     ) -> WorldStep:
+        if self.exploratory:
+            return WorldStep()
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
             return WorldStep(obstacle_distance_m=0.3)
         if OBSTACLE_END_S <= elapsed_s < RECOVERY_END_S:
@@ -125,27 +158,42 @@ class WorldVisualModel:
 
 
 class WorldLanguageModel:
-    """Choose the scripted intent while exercising the conscious boundary."""
+    """Choose simulated intent while exercising the conscious boundary."""
 
-    def __init__(self):
+    def __init__(self, exploratory: bool):
+        self.exploratory = exploratory
         self.started_at_s = 0.0
+        self.intent = None
 
     def think(self, information) -> ConsciousDecision:
-        elapsed_s = max(0.0, time.monotonic() - self.started_at_s)
-        following = (
-            elapsed_s < HOVER_START_S
-            or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
-            or THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S
-        )
-        intent = "following" if following else "hover"
+        if self.intent is None:
+            self.intent = "hover" if self.exploratory else information.intent
+        dialogue = ""
+        if information.dialogue:
+            state = parse_intent(information.dialogue)
+            if state is None:
+                dialogue = "I did not understand that request."
+            else:
+                self.intent = state.name.lower()
+                dialogue = f"Intent changed to {self.intent}."
+            print(dialogue, flush=True)
+        if not self.exploratory:
+            elapsed_s = max(0.0, time.monotonic() - self.started_at_s)
+            following = (
+                elapsed_s < HOVER_START_S
+                or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
+                or THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S
+            )
+            self.intent = "following" if following else "hover"
         return ConsciousDecision(
-            intent=intent,
-            focus="person" if intent == "following" else "",
+            intent=self.intent,
+            focus="person" if self.intent == "following" else "",
+            dialogue=dialogue,
             summary=information.summary or "The simulated world is running.",
         )
 
 
-async def run():
+async def run(exploratory: bool = False):
     """Run the complete synthetic mission."""
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
@@ -157,6 +205,7 @@ async def run():
     mind_stop = asyncio.Event()
     telemetry_task = None
     offboard_task = None
+    dialogue_input = DialogueInput() if exploratory else None
     control = None
     offboard_started = False
     armed = False
@@ -180,9 +229,9 @@ async def run():
         service_task = asyncio.create_task(service.run(service_stop))
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         started_at = time.monotonic()
-        world = SyntheticWorld()
+        world = SyntheticWorld(exploratory)
         visual_model = WorldVisualModel(world, started_at)
-        language_model = WorldLanguageModel()
+        language_model = WorldLanguageModel(exploratory)
         language_model.started_at_s = started_at
         control = MindRuntime(MacMind(visual_model, language_model))
 
@@ -211,21 +260,29 @@ async def run():
                 telemetry_provider=lambda: Telemetry(
                     obstacle_distance_m=distance_sensor.read()
                 ),
+                dialogue_provider=dialogue_input.next if dialogue_input else None,
                 period_s=1.0,
             )
         )
-        print("Mission: follow, recover, handle faults, hover, land, and disarm.")
+        if dialogue_input:
+            dialogue_input.start()
+            print("Exploratory mission: observe the brain, then land and disarm.")
+        else:
+            print("Mission: follow, recover, handle faults, hover, land, and disarm.")
 
         max_north_velocity = 0.0
         min_north_velocity = 0.0
         max_east_velocity = 0.0
+        min_east_velocity = 0.0
 
         async def observe_velocity():
-            nonlocal max_north_velocity, min_north_velocity, max_east_velocity
+            nonlocal max_north_velocity, min_north_velocity
+            nonlocal max_east_velocity, min_east_velocity
             async for velocity in drone.telemetry.velocity_ned():
                 max_north_velocity = max(max_north_velocity, velocity.north_m_s)
                 min_north_velocity = min(min_north_velocity, velocity.north_m_s)
                 max_east_velocity = max(max_east_velocity, velocity.east_m_s)
+                min_east_velocity = min(min_east_velocity, velocity.east_m_s)
 
         telemetry_task = asyncio.create_task(observe_velocity())
         reported = set()
@@ -262,11 +319,11 @@ async def run():
                         else math.nan
                     )
                 )
-                event = event_for(elapsed, step)
+                event = None if exploratory else event_for(elapsed, step)
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
                     reported.add(event)
-                if CONTROL_PAUSE_START_S <= elapsed < CONTROL_PAUSE_END_S:
+                if not exploratory and CONTROL_PAUSE_START_S <= elapsed < CONTROL_PAUSE_END_S:
                     if "Mac control pause" not in reported:
                         print("Mac control pause; watchdog holds zero.")
                         reported.add("Mac control pause")
@@ -312,12 +369,13 @@ async def run():
                 if start_s <= timestamp_s - started_at < end_s
             )
 
-        print(
-            "Following commands by cycle: "
-            f"{forward_count(0.0, 4.0)}, "
-            f"{forward_count(SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S)}, "
-            f"{forward_count(THIRD_FOLLOW_START_S, THIRD_FOLLOW_END_S)}."
-        )
+        if not exploratory:
+            print(
+                "Following commands by cycle: "
+                f"{forward_count(0.0, 4.0)}, "
+                f"{forward_count(SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S)}, "
+                f"{forward_count(THIRD_FOLLOW_START_S, THIRD_FOLLOW_END_S)}."
+            )
 
         def observed(start_s, end_s, predicate):
             return any(
@@ -325,7 +383,7 @@ async def run():
                 for timestamp_s, command in commands
             )
 
-        checks = (
+        checks = () if exploratory else (
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),
             (
                 TARGET_RIGHT_START_S,
@@ -412,15 +470,28 @@ async def run():
             if not observed(start_s, end_s, predicate):
                 raise RuntimeError(f"SITL did not observe {behavior}")
             print(f"Mission objective passed: {behavior}.")
-        if max_north_velocity <= 0.02:
-            raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
-        if min_north_velocity >= -0.05:
-            raise RuntimeError(f"SITL did not observe obstacle backoff: {min_north_velocity:.2f}m/s")
-        if max_east_velocity <= 0.02:
-            raise RuntimeError(f"SITL did not observe lateral following: {max_east_velocity:.2f}m/s")
+        if not exploratory:
+            if max_north_velocity <= 0.02:
+                raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
+            if min_north_velocity >= -0.05:
+                raise RuntimeError(f"SITL did not observe obstacle backoff: {min_north_velocity:.2f}m/s")
+            if max_east_velocity <= 0.02:
+                raise RuntimeError(f"SITL did not observe lateral following: {max_east_velocity:.2f}m/s")
+        if exploratory and max(
+            abs(max_north_velocity),
+            abs(min_north_velocity),
+            abs(max_east_velocity),
+            abs(min_east_velocity),
+        ) > MAX_EXPLORATORY_SPEED_M_S:
+            raise RuntimeError(
+                "exploratory flight exceeded its telemetry speed envelope: "
+                f"north={min_north_velocity:.2f}..{max_north_velocity:.2f}, "
+                f"east={min_east_velocity:.2f}..{max_east_velocity:.2f}"
+            )
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
+        print(f"Observed east velocity range: {min_east_velocity:.2f}..{max_east_velocity:.2f}m/s")
         await land(drone)
         landed = True
     finally:
@@ -452,4 +523,9 @@ async def run():
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run the synthetic companion world")
+    parser.add_argument("--explore", action="store_true")
+    args = parser.parse_args()
+    asyncio.run(run(exploratory=args.explore))

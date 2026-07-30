@@ -82,6 +82,7 @@ From `companion/`, the normal simulation loop is:
 PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice
 .venv/bin/python -m sim.command_loopback
 .venv/bin/python -m sim.run_world
+.venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
@@ -93,7 +94,9 @@ and PX4. Neither scenario proves physical sensors, radio behavior, or
 hardware-specific transport.
 
 Pass `--world walls`, `forest`, `windy`, or another PX4 Gazebo world to repeat
-the same mission in a different environment.
+the same mission in a different environment. Add `--explore` to the synthetic
+world to type live `follow me`, `hover`, or `stop` dialogue; exploratory runs
+observe behavior instead of checking an exact mission schedule.
 
 ## Current state
 
