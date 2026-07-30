@@ -149,5 +149,10 @@ calibration, not replace the simulation-first development loop.
   45-second rendered-camera run processed 823 Gazebo frames; the RTP run
   processed 274 decoded frames, and both completed their safety and landing
   checks.
+- **2026-07-30** — Kept every visual observation since the last conscious
+  thought instead of silently dropping older observations, normalized intent
+  text at the brain boundary, and made the simulated visual layer move only
+  for an explicit `following` intent. Deterministic, RTP, and rendered-camera
+  SITL missions all passed through landing and disarm again.
 
 as always, thank you, good luck, and i love you

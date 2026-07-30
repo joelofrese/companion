@@ -85,7 +85,7 @@ class MacMind:
         self.visual_model = visual_model
         self.language_model = language_model
         self.memory = MindMemory()
-        self._new_observations = deque[VisualObservation](maxlen=8)
+        self._new_observations = deque[VisualObservation]()
         self._lock = threading.Lock()
 
     def set_intent(self, intent: str):
@@ -93,6 +93,7 @@ class MacMind:
 
         if not isinstance(intent, str) or not intent.strip():
             raise ValueError("intent must be a non-empty string")
+        intent = intent.strip()
         with self._lock:
             self.memory.intent = intent
 
@@ -144,8 +145,15 @@ class MacMind:
         decision = self.language_model.think(information)
         if not isinstance(decision.intent, str) or not decision.intent.strip():
             raise ValueError("language model returned an empty intent")
+        intent = decision.intent.strip()
+        decision = ConsciousDecision(
+            intent=intent,
+            focus=decision.focus,
+            dialogue=decision.dialogue,
+            summary=decision.summary,
+        )
         with self._lock:
-            self.memory.intent = decision.intent
+            self.memory.intent = intent
             self.memory.focus = decision.focus
             self.memory.summary = decision.summary
         return decision
