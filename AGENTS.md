@@ -129,7 +129,8 @@ path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
 without replacing it. The voice path is a direct one-utterance pipeline, and
 the conscious model receives each visual observation’s focused answer and
 confidence. Typed dialogue now uses the same non-blocking input path in
-simulation and the production Mac entry point.
+simulation and the production Mac entry point. The CM5 also bounds yaw to
+±180° along with its velocity limits.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.

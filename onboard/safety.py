@@ -11,6 +11,7 @@ from control.velocity import VelocityCommand
 
 MAX_HORIZONTAL_SPEED_M_S = 0.5
 MAX_VERTICAL_SPEED_M_S = 0.3
+MAX_YAW_DEG = 180.0
 
 
 class OnboardSafetyEnvelope:
@@ -110,4 +111,5 @@ class OnboardSafetyEnvelope:
             abs(command.north_m_s) <= MAX_HORIZONTAL_SPEED_M_S
             and abs(command.east_m_s) <= MAX_HORIZONTAL_SPEED_M_S
             and abs(command.down_m_s) <= MAX_VERTICAL_SPEED_M_S
+            and abs(command.yaw_deg) <= MAX_YAW_DEG
         )

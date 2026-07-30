@@ -96,7 +96,7 @@ class SyntheticWorld:
         if DROPOUT_END_S <= elapsed_s < LINK_RECOVERY_END_S:
             return WorldStep()
         if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
-            return WorldStep(command_override=VelocityCommand(north_m_s=1.0))
+            return WorldStep(command_override=VelocityCommand(north_m_s=1.0, yaw_deg=181.0))
         return WorldStep()
 
 
