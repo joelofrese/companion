@@ -23,6 +23,7 @@ class MindRuntime:
         self._future: Optional[Future] = None
         self._observation = None
         self._decision: Optional[ConsciousDecision] = None
+        self._error: Optional[Exception] = None
         self._closed = False
 
     @property
@@ -40,6 +41,8 @@ class MindRuntime:
     ) -> VelocityCommand:
         """Run one subconscious step and return one safe command."""
 
+        if self._error is not None:
+            raise RuntimeError("conscious brain failed") from self._error
         if intent is not None:
             self.mind.set_intent(intent)
         self._collect()
@@ -78,11 +81,15 @@ class MindRuntime:
             raise ValueError("thinking period must be positive")
         while not stop_event.is_set():
             dialogue = dialogue_provider() if dialogue_provider is not None else None
-            self._decision = await asyncio.to_thread(
-                self.mind.think,
-                telemetry_provider(),
-                dialogue,
-            )
+            try:
+                self._decision = await asyncio.to_thread(
+                    self.mind.think,
+                    telemetry_provider(),
+                    dialogue,
+                )
+            except Exception as error:
+                self._error = error
+                return
             await asyncio.sleep(period_s)
 
     def close(self):
