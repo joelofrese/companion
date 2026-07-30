@@ -71,6 +71,11 @@ offboard setpoints, expected motion, safety intervention, landing, and disarm.
 Do not add unit tests; keeping them out keeps the codebase simpler and less
 rigid. Keep verification in Gazebo and through end-to-end behavior.
 
+Keep two kinds of simulation: deterministic missions prove flight and safety,
+while exploratory worlds let the brain operate and be observed. Exploratory
+runs must still confirm safety, landing, and disarm, but do not require exact
+movement or decisions.
+
 From `companion/`, the normal simulation loop is:
 
 ```sh

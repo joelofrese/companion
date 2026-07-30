@@ -142,6 +142,8 @@ class MacMind:
             )
             self._new_observations.clear()
         decision = self.language_model.think(information)
+        if not isinstance(decision.intent, str) or not decision.intent.strip():
+            raise ValueError("language model returned an empty intent")
         with self._lock:
             self.state.intent = decision.intent
             self.state.focus = decision.focus
