@@ -4,13 +4,12 @@ import math
 from numbers import Real
 from typing import Optional
 
-from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
+from control.safety_limits import OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 
 
 MOVEMENT_COMMANDS = {
     "forward": VelocityCommand(north_m_s=0.25),
-    "backward": VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S),
     "left": VelocityCommand(east_m_s=-0.2),
     "right": VelocityCommand(east_m_s=0.2),
     "up": VelocityCommand(down_m_s=-0.15),

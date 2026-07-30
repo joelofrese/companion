@@ -137,5 +137,9 @@ calibration, not replace the simulation-first development loop.
 - **2026-07-30** — Added an optional world duration so exploratory and
   deterministic SITL runs can continue beyond the scripted profile. A
   45-second exploratory run stayed safe and completed landing and disarm.
+- **2026-07-30** — Removed normal cognitive reverse motion; backward movement
+  is now reserved for the CM5 obstacle-safety override. The deterministic SITL
+  mission still passed every motion, fault, recovery, landing, and disarm
+  objective.
 
 as always, thank you, good luck, and i love you
