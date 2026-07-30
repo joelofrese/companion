@@ -17,8 +17,8 @@ def build_parser():
     parser.add_argument("cm5_host", help="CM5 IP address or hostname")
     parser.add_argument(
         "--intent",
-        default="idle",
-        help="initial high-level intent in plain language (default: idle)",
+        default="hover",
+        help="initial high-level intent in plain language (default: hover)",
     )
     parser.add_argument(
         "--voice-once",
