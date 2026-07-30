@@ -68,8 +68,9 @@ Keep two simulation modes:
 
 - Deterministic missions prove flight, perception fixtures, transport, and
   safety behavior.
-- Exploratory worlds let the brain and dialogue operate freely. They still
-  verify bounded motion, safety, landing, and disarm, but not exact decisions.
+- Exploratory worlds start hovering and let the brain and dialogue choose what
+  happens next. They still verify bounded motion, safety, landing, and disarm,
+  but not exact decisions.
 
 From `companion/`, use:
 

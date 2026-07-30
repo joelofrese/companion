@@ -280,7 +280,8 @@ async def run(
             if step.transmit:
                 sender.send(step.command_override or command)
 
-        send_packet(0.0, time.monotonic(), intent="following")
+        starting_intent = "hover" if exploratory else "following"
+        send_packet(0.0, time.monotonic(), intent=starting_intent)
         deadline = time.monotonic() + 5.0
         while len(safe_commands.commands) < 3 and time.monotonic() < deadline:
             await asyncio.sleep(SETPOINT_PERIOD_S)
