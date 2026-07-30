@@ -182,6 +182,8 @@ def main(argv=None):
         parser.error("--explore cannot be combined with --image")
     if args.camera and args.image:
         parser.error("--camera cannot be combined with --image")
+    if args.camera and not args.explore:
+        parser.error("--camera requires --explore")
     try:
         return run(
             args.px4_dir.expanduser().resolve(),

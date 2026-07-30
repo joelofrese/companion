@@ -20,6 +20,8 @@ class GazeboCamera:
         self._frames = queue.Queue(maxsize=1)
         self._process = None
         self._thread = None
+        self._closed = False
+        self._failed = False
 
     def start(self):
         gz = shutil.which("gz")
@@ -35,6 +37,8 @@ class GazeboCamera:
             bufsize=1,
             env=environment,
         )
+        self._closed = False
+        self._failed = False
         self._thread = threading.Thread(target=self._read, daemon=True)
         self._thread.start()
 
@@ -58,10 +62,14 @@ class GazeboCamera:
                     self._frames.put_nowait(image)
             except (ValueError, KeyError, json.JSONDecodeError):
                 continue
+        if not self._closed:
+            self._failed = True
 
     def latest(self) -> Optional[np.ndarray]:
         """Return the newest BGR frame, if Gazebo has produced one."""
 
+        if self._failed:
+            raise RuntimeError("Gazebo camera stream ended")
         try:
             return self._frames.get_nowait()
         except queue.Empty:
@@ -70,6 +78,7 @@ class GazeboCamera:
     def close(self):
         if self._process is None:
             return
+        self._closed = True
         self._process.terminate()
         try:
             self._process.wait(timeout=2.0)
