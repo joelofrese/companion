@@ -7,7 +7,7 @@ through the real command path.
 import asyncio
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from mavsdk import System
@@ -23,6 +23,7 @@ from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.gazebo_camera import GazeboCamera
+from sim.gazebo_range import GazeboRangefinder
 from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
@@ -191,6 +192,7 @@ class WorldLanguageModel:
 async def run(
     exploratory: bool = False,
     camera: bool = False,
+    lidar: bool = False,
     world_name: str = "default",
     duration_s: float = PROFILE_DURATION_S,
     ollama: bool = False,
@@ -198,12 +200,16 @@ async def run(
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
 ):
-    """Run the complete synthetic mission."""
+    """Run one complete Gazebo world simulation."""
 
     if not math.isfinite(duration_s) or duration_s <= 0.0:
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
+    if camera and lidar:
+        raise ValueError("camera and lidar simulation modes cannot run together")
+    if lidar and not exploratory:
+        raise ValueError("Gazebo lidar mode requires exploratory simulation")
     if ollama and not (exploratory and camera):
         raise ValueError("Ollama simulation requires exploratory camera mode")
 
@@ -225,6 +231,7 @@ async def run(
     offboard_task = None
     dialogue_input = DialogueInput() if exploratory else None
     gazebo_camera = None
+    gazebo_rangefinder = None
     control = None
     offboard_started = False
     armed = False
@@ -254,6 +261,12 @@ async def run(
                 f"/world/{world_name}/model/x500_mono_cam_0/link/camera_link/sensor/camera/image"
             )
             gazebo_camera.start()
+        if lidar:
+            gazebo_rangefinder = GazeboRangefinder(
+                f"/world/{world_name}/model/x500_lidar_front_0/"
+                "link/lidar_sensor_link/sensor/lidar/scan"
+            )
+            gazebo_rangefinder.start()
         if ollama_client is None:
             visual_model = WorldVisualModel(world, started_at)
             language_model = WorldLanguageModel(exploratory)
@@ -264,10 +277,36 @@ async def run(
         control = MindRuntime(MacMind(visual_model, language_model))
 
         camera_frames = 0
+        lidar_samples = 0
+        valid_lidar_samples = 0
 
-        def send_packet(elapsed_s: float, timestamp_s: float, intent=None):
-            nonlocal camera_frames
+        def read_step(elapsed_s: float):
+            nonlocal lidar_samples, valid_lidar_samples
             step = world.step(elapsed_s)
+            if gazebo_rangefinder is not None:
+                sample = gazebo_rangefinder.latest()
+                if sample is not None:
+                    distance_sensor.update(sample)
+                    lidar_samples += 1
+                    if math.isfinite(distance_sensor.read()):
+                        valid_lidar_samples += 1
+                return replace(
+                    step,
+                    obstacle_distance_m=distance_sensor.read(),
+                    distance_fresh=sample is not None,
+                )
+            if step.distance_fresh:
+                distance_sensor.update(
+                    DistanceMessage(
+                        step.obstacle_distance_m
+                        if step.obstacle_distance_m is not None
+                        else math.nan
+                    )
+                )
+            return replace(step, obstacle_distance_m=distance_sensor.read())
+
+        def send_packet(timestamp_s: float, step, intent=None):
+            nonlocal camera_frames
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
@@ -281,7 +320,11 @@ async def run(
                 sender.send(step.command_override or command)
 
         starting_intent = "hover" if exploratory else "following"
-        send_packet(0.0, time.monotonic(), intent=starting_intent)
+        send_packet(
+            time.monotonic(),
+            read_step(0.0),
+            intent=starting_intent,
+        )
         deadline = time.monotonic() + 5.0
         while len(safe_commands.commands) < 3 and time.monotonic() < deadline:
             await asyncio.sleep(SETPOINT_PERIOD_S)
@@ -357,15 +400,7 @@ async def run(
         try:
             while (elapsed := time.monotonic() - started_at) < duration_s:
                 now = time.monotonic()
-                step = world.step(elapsed)
-                if step.distance_fresh:
-                    distance_sensor.update(
-                        DistanceMessage(
-                            step.obstacle_distance_m
-                            if step.obstacle_distance_m is not None
-                            else math.nan
-                        )
-                    )
+                step = read_step(elapsed)
                 event = None if exploratory else event_for(elapsed, step)
                 if event is not None and event not in reported:
                     print(event.capitalize() + ".")
@@ -376,7 +411,7 @@ async def run(
                         reported.add("Mac control pause")
                     await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
                     continue
-                send_packet(elapsed, now)
+                send_packet(now, step)
                 await asyncio.sleep(SETPOINT_PERIOD_S)
             await asyncio.wait_for(offboard_task, timeout=5.0)
             print("Offboard telemetry=verified through synthetic world and CM5 safety.")
@@ -574,6 +609,13 @@ async def run(
             if camera_frames == 0:
                 raise RuntimeError("Gazebo did not provide a camera frame")
             print(f"Gazebo camera frames=verified ({camera_frames}).")
+        if lidar:
+            if not valid_lidar_samples:
+                raise RuntimeError("Gazebo did not provide a valid lidar reading")
+            print(
+                "Gazebo lidar samples=verified: "
+                f"{valid_lidar_samples} valid of {lidar_samples}."
+            )
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
@@ -584,6 +626,8 @@ async def run(
         receiver.close()
         if gazebo_camera is not None:
             gazebo_camera.close()
+        if gazebo_rangefinder is not None:
+            gazebo_rangefinder.close()
         if sender is not None:
             sender.close()
         if service_task is not None and not service_task.done():
@@ -616,6 +660,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
     parser.add_argument("--camera", action="store_true")
+    parser.add_argument("--lidar", action="store_true")
     parser.add_argument("--ollama", action="store_true")
     parser.add_argument("--vlm-model", default="gemma3:4b")
     parser.add_argument("--llm-model", default="gemma3:4b")
@@ -627,6 +672,7 @@ if __name__ == "__main__":
         run(
             exploratory=args.explore,
             camera=args.camera,
+            lidar=args.lidar,
             world_name=args.world,
             duration_s=args.duration,
             ollama=args.ollama,

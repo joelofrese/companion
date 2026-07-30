@@ -81,6 +81,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --explore --camera
+.venv/bin/python -m sim.run_world --explore --lidar --world walls
 .venv/bin/python -m sim.run_world --explore --camera --ollama
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
@@ -104,6 +105,10 @@ request such as `follow me`, `hover`, or `stop` during an exploratory
 synthetic run to change the conscious intent. Use `--world walls`, `forest`,
 `windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
 
+Add `--lidar` to an exploratory run to use PX4’s Gazebo `x500_lidar_front`
+model and feed its real forward ray readings into the CM5 safety path. The
+stock camera and lidar models are separate, so use them in separate runs.
+
 The deterministic RTP scenario uses YOLO only as a repeatable person-image
 fixture. It is not the production brain. Production `control/` uses local
 Ollama models; simulation-only fixtures live under `sim/`.
@@ -125,8 +130,9 @@ replies are printed only when the model provides one.
 ## Current state
 
 The deterministic mission, person and non-person RTP images, rendered Gazebo
-camera input, local Ollama camera input, live exploratory dialogue, command
-loopback, safety faults, recovery, landing, and disarm have been verified.
+camera input, Gazebo lidar input, local Ollama camera input, live exploratory
+dialogue, command loopback, safety faults, recovery, landing, and disarm have
+been verified.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence

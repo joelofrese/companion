@@ -70,6 +70,7 @@ def _run_once(
     stdbuf: str,
     exploratory: bool,
     camera: bool,
+    lidar: bool,
     duration_s: Optional[float],
     ollama: bool,
     vlm_model: str,
@@ -78,6 +79,11 @@ def _run_once(
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
+    model = "gz_x500"
+    if camera:
+        model = "gz_x500_mono_cam"
+    elif lidar:
+        model = "gz_x500_lidar_front"
 
     process = subprocess.Popen(
         [
@@ -86,7 +92,7 @@ def _run_once(
             "-eL",
             "make",
             "px4_sitl",
-            "gz_x500_mono_cam" if camera else "gz_x500",
+            model,
         ],
         cwd=px4_dir,
         stdout=subprocess.PIPE,
@@ -125,6 +131,8 @@ def _run_once(
                 scenario.append("--explore")
             if camera:
                 scenario.append("--camera")
+            if lidar:
+                scenario.append("--lidar")
             if ollama:
                 scenario += [
                     "--ollama",
@@ -152,6 +160,7 @@ def run(
     world: str = "default",
     exploratory: bool = False,
     camera: bool = False,
+    lidar: bool = False,
     duration_s: Optional[float] = None,
     ollama: bool = False,
     vlm_model: str = "gemma3:4b",
@@ -165,6 +174,10 @@ def run(
         raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
     if image_path is not None and not image_path.is_file():
         raise RuntimeError(f"scenario image does not exist: {image_path}")
+    if camera and lidar:
+        raise RuntimeError("camera and lidar simulation modes cannot run together")
+    if lidar and not exploratory:
+        raise RuntimeError("Gazebo lidar mode requires exploratory simulation")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
@@ -182,6 +195,7 @@ def run(
                 stdbuf,
                 exploratory,
                 camera,
+                lidar,
                 duration_s,
                 ollama,
                 vlm_model,
@@ -222,6 +236,11 @@ def main(argv=None):
         help="use Gazebo's x500_mono_cam and feed its rendered frames to the Mac brain",
     )
     parser.add_argument(
+        "--lidar",
+        action="store_true",
+        help="use Gazebo's x500_lidar_front and feed its range readings to CM5 safety",
+    )
+    parser.add_argument(
         "--ollama",
         action="store_true",
         help="use local Ollama VLM and LLM for an exploratory camera run",
@@ -240,8 +259,14 @@ def main(argv=None):
         parser.error("--explore cannot be combined with --image")
     if args.camera and args.image:
         parser.error("--camera cannot be combined with --image")
+    if args.lidar and args.image:
+        parser.error("--lidar cannot be combined with --image")
+    if args.camera and args.lidar:
+        parser.error("--camera and --lidar cannot be combined")
     if args.camera and not args.explore:
         parser.error("--camera requires --explore")
+    if args.lidar and not args.explore:
+        parser.error("--lidar requires --explore")
     if args.ollama and not args.camera:
         parser.error("--ollama requires --camera")
     if args.duration is not None and args.image:
@@ -259,6 +284,7 @@ def main(argv=None):
             args.world,
             args.explore,
             args.camera,
+            args.lidar,
             args.duration,
             args.ollama,
             args.vlm_model,
