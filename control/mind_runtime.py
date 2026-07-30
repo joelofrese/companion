@@ -10,6 +10,9 @@ from control.watchdog import SetpointWatchdog
 from control.velocity import VelocityCommand
 
 
+MIN_MOVEMENT_CONFIDENCE = 0.5
+
+
 class MindRuntime:
     """Turn VLM suggestions into safe Mac-side commands."""
 
@@ -62,7 +65,10 @@ class MindRuntime:
         movement = "stop"
         if self._observation is not None:
             age_s = timestamp_s - self._observation.timestamp_s
-            if 0.0 <= age_s <= 0.5:
+            if (
+                0.0 <= age_s <= 0.5
+                and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
+            ):
                 movement = self._observation.movement
         desired = movement_command(movement, obstacle_distance_m)
         return self.watchdog.emit(timestamp_s, desired)

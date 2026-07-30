@@ -52,6 +52,8 @@ DROPOUT_END_S = 5.2
 LINK_RECOVERY_END_S = 5.35
 INVALID_COMMAND_START_S = 5.35
 INVALID_COMMAND_END_S = 5.75
+LOW_CONFIDENCE_START_S = 12.4
+LOW_CONFIDENCE_END_S = 12.8
 STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
@@ -76,6 +78,14 @@ class SyntheticWorld:
         if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
             return None
         return 0.8 if TARGET_RIGHT_START_S <= elapsed_s < TARGET_RIGHT_END_S else 0.0
+
+    def vision_confidence(self, elapsed_s: float) -> float:
+        if (
+            not self.exploratory
+            and LOW_CONFIDENCE_START_S <= elapsed_s < LOW_CONFIDENCE_END_S
+        ):
+            return 0.0
+        return 1.0
 
     def step(
         self,
@@ -136,7 +146,7 @@ class WorldVisualModel:
             focused_answer=description if focus else "",
             movement=movement,
             next_focus=focus or "person",
-            confidence=1.0,
+            confidence=self.world.vision_confidence(elapsed_s),
         )
 
 
@@ -333,6 +343,8 @@ async def run(
                 return "command link dropout"
             if step.command_override is not None:
                 return "out-of-bounds command"
+            if LOW_CONFIDENCE_START_S <= elapsed_s < LOW_CONFIDENCE_END_S:
+                return "low-confidence vision; holding"
             if SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S:
                 return "intent changed back to following"
             if THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S:
@@ -461,6 +473,18 @@ async def run(
                 INVALID_SENSOR_END_S,
                 lambda command: command == VelocityCommand(),
                 "invalid obstacle fail-safe",
+            ),
+            (
+                LOW_CONFIDENCE_START_S,
+                LOW_CONFIDENCE_END_S + 0.1,
+                lambda command: command == VelocityCommand(),
+                "low-confidence visual stop",
+            ),
+            (
+                LOW_CONFIDENCE_END_S + 0.1,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after low-confidence vision",
             ),
             (
                 STALE_SENSOR_START_S + 0.2,

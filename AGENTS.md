@@ -32,6 +32,7 @@ capabilities. Repeat that loop without waiting for confirmation.
 - The Mac conscious LLM uses those observations, dialogue, telemetry, and
   memory to choose high-level intent.
 - Mac control turns the suggestion into slow velocity commands.
+- Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.
 - PX4 stabilizes the vehicle and controls the motors.
@@ -130,7 +131,8 @@ path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
 without replacing it. The voice path is a direct one-utterance pipeline, and
 the conscious model receives each visual observation’s focused answer and
 confidence. Typed dialogue now uses the same non-blocking input path in
-simulation and the production Mac entry point. The CM5 also bounds yaw to
+simulation and the production Mac entry point. Mac motion now requires at
+least 0.5 visual confidence. The CM5 also bounds yaw to
 ±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
 the onboard hardware path remains the ROS 2 forwarder.
 
