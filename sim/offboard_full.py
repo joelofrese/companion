@@ -222,7 +222,10 @@ async def run(image_path: str):
         print("Offboard telemetry=verified through full Mac/CM5 stack.")
         if control.latest_decision is None:
             raise RuntimeError("full stack did not observe a conscious Mac decision")
+        if control.latest_observation is None:
+            raise RuntimeError("full stack did not observe a Mac visual observation")
         print("Conscious Mac decision=verified through full Mac/CM5 stack.")
+        print("Mac visual observation=verified through full Mac/CM5 stack.")
         try:
             await asyncio.wait_for(mac_task, timeout=2.0)
         except RuntimeError as error:

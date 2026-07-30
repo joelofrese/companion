@@ -257,11 +257,11 @@ async def run(
         def send_packet(elapsed_s: float, timestamp_s: float, intent=None):
             nonlocal camera_frames
             step = world.step(elapsed_s)
-            frame = gazebo_camera.latest() if gazebo_camera else None
-            if frame is not None:
+            frame = gazebo_camera.latest() if gazebo_camera else step
+            if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
             command = control.tick(
-                frame=frame if frame is not None else step,
+                frame=frame,
                 timestamp_s=timestamp_s,
                 intent=intent,
                 obstacle_distance_m=step.obstacle_distance_m,
@@ -380,10 +380,13 @@ async def run(
         decision = control.latest_decision
         if decision is None:
             raise RuntimeError("SITL did not observe a conscious Mac decision")
+        if control.latest_observation is None:
+            raise RuntimeError("SITL did not observe a Mac visual observation")
         print(
             "Conscious Mac decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."
         )
+        print("Mac visual observation=verified.")
 
         def forward_count(start_s, end_s):
             return sum(

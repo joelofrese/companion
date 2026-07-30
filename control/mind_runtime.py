@@ -4,7 +4,7 @@ import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Callable, Optional
 
-from control.mind import ConsciousDecision, MacMind, Telemetry
+from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
 from control.mind_motion import movement_command
 from control.watchdog import SetpointWatchdog
 from control.velocity import VelocityCommand
@@ -31,6 +31,12 @@ class MindRuntime:
         """Return the newest conscious decision, if one exists."""
 
         return self._decision
+
+    @property
+    def latest_observation(self) -> Optional[VisualObservation]:
+        """Return the newest observation processed by the visual model."""
+
+        return self._observation
 
     def tick(
         self,

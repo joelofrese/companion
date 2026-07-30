@@ -144,5 +144,9 @@ calibration, not replace the simulation-first development loop.
 - **2026-07-30** — Repeated 45-second exploratory SITL in the `forest` and
   `windy` Gazebo worlds; both stayed within the exploratory speed envelope and
   completed landing and disarm.
+- **2026-07-30** — Removed the synthetic fallback from `--camera` gaps and
+  required a real Mac visual observation in camera and RTP scenarios. The
+  rendered-camera run processed 581 Gazebo frames; the RTP run processed 274
+  decoded frames, and both completed their safety and landing checks.
 
 as always, thank you, good luck, and i love you
