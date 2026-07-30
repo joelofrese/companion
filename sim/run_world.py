@@ -67,6 +67,10 @@ def _run_once(
     exploratory: bool,
     camera: bool,
     duration_s: Optional[float],
+    ollama: bool,
+    vlm_model: str,
+    llm_model: str,
+    ollama_timeout: float,
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -117,6 +121,16 @@ def _run_once(
                 scenario.append("--explore")
             if camera:
                 scenario.append("--camera")
+            if ollama:
+                scenario += [
+                    "--ollama",
+                    "--vlm-model",
+                    vlm_model,
+                    "--llm-model",
+                    llm_model,
+                    "--ollama-timeout",
+                    str(ollama_timeout),
+                ]
             scenario += ["--world", world]
             if duration_s is not None:
                 scenario += ["--duration", str(duration_s)]
@@ -135,6 +149,10 @@ def run(
     exploratory: bool = False,
     camera: bool = False,
     duration_s: Optional[float] = None,
+    ollama: bool = False,
+    vlm_model: str = "gemma3:4b",
+    llm_model: str = "gemma3:4b",
+    ollama_timeout: float = 60.0,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -161,6 +179,10 @@ def run(
                 exploratory,
                 camera,
                 duration_s,
+                ollama,
+                vlm_model,
+                llm_model,
+                ollama_timeout,
             )
         except RuntimeError:
             if attempt == BOOT_RETRIES:
@@ -196,6 +218,14 @@ def main(argv=None):
         help="use Gazebo's x500_mono_cam and feed its rendered frames to the Mac brain",
     )
     parser.add_argument(
+        "--ollama",
+        action="store_true",
+        help="use local Ollama VLM and LLM for an exploratory camera run",
+    )
+    parser.add_argument("--vlm-model", default="gemma3:4b")
+    parser.add_argument("--llm-model", default="gemma3:4b")
+    parser.add_argument("--ollama-timeout", type=float, default=60.0)
+    parser.add_argument(
         "--duration",
         type=float,
         help="world simulation duration in seconds (default: 32)",
@@ -208,6 +238,8 @@ def main(argv=None):
         parser.error("--camera cannot be combined with --image")
     if args.camera and not args.explore:
         parser.error("--camera requires --explore")
+    if args.ollama and not args.camera:
+        parser.error("--ollama requires --camera")
     if args.duration is not None and args.image:
         parser.error("--duration cannot be combined with --image")
     if args.expect_person and not args.image:
@@ -224,6 +256,10 @@ def main(argv=None):
             args.explore,
             args.camera,
             args.duration,
+            args.ollama,
+            args.vlm_model,
+            args.llm_model,
+            args.ollama_timeout,
         )
     except KeyboardInterrupt:
         return 130

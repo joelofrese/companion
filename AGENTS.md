@@ -84,6 +84,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --explore --camera
+.venv/bin/python -m sim.run_world --explore --camera --ollama
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
@@ -101,7 +102,10 @@ transport.
 
 Add `--camera` to an exploratory run to use Gazebo's rendered
 `x500_mono_cam` image topic as subconscious input. The simulated visual model
-remains deliberately simple, but the real frame path is exercised and counted.
+is deliberately simple by default, but the real frame path is exercised and
+counted. Add `--ollama` to send those frames through the local VLM and LLM;
+this mode is slower and exploratory, so it checks safety, landing, and disarm
+rather than exact decisions.
 
 The production Mac entry point uses separate local Ollama chat sessions for
 the subconscious VLM and conscious LLM. They use the same model by default but
@@ -153,6 +157,12 @@ calibration, not replace the simulation-first development loop.
   the VLM described and focused on the scene, and the LLM kept a concise
   intent and visual summary. This verifies the Mac brain backend, not flight
   behavior.
+- **2026-07-30** — Added `--explore --camera --ollama` so rendered Gazebo
+  frames can drive the real local VLM and LLM during an observation-first
+  flight. Deterministic missions still use their small repeatable fixtures.
+- **2026-07-30** — Ran the real-brain camera mission for 45 seconds: 534
+  Gazebo frames reached `gemma3:4b`, conscious intent and visual memory were
+  produced, motion stayed bounded, and PX4 landed and disarmed cleanly.
 - **2026-07-30** — Restored the SITL host after its Gazebo dependencies changed
   during the Ollama install. Supported OpenCV 4 and Gazebo 8.14 now load the
   optical-flow plugin, and the full deterministic mission passed again through

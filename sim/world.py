@@ -209,6 +209,10 @@ async def run(
     camera: bool = False,
     world_name: str = "default",
     duration_s: float = PROFILE_DURATION_S,
+    ollama: bool = False,
+    vlm_model: str = "gemma3:4b",
+    llm_model: str = "gemma3:4b",
+    ollama_timeout: float = 60.0,
 ):
     """Run the complete synthetic mission."""
 
@@ -216,6 +220,15 @@ async def run(
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
+    if ollama and not (exploratory and camera):
+        raise ValueError("Ollama simulation requires exploratory camera mode")
+
+    ollama_client = None
+    if ollama:
+        from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
+
+        ollama_client = OllamaClient(timeout_s=ollama_timeout)
+        await asyncio.to_thread(ollama_client.check)
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
@@ -257,9 +270,13 @@ async def run(
                 f"/world/{world_name}/model/x500_mono_cam_0/link/camera_link/sensor/camera/image"
             )
             gazebo_camera.start()
-        visual_model = WorldVisualModel(world, started_at)
-        language_model = WorldLanguageModel(exploratory)
-        language_model.started_at_s = started_at
+        if ollama_client is None:
+            visual_model = WorldVisualModel(world, started_at)
+            language_model = WorldLanguageModel(exploratory)
+            language_model.started_at_s = started_at
+        else:
+            visual_model = OllamaVisionModel(ollama_client, vlm_model)
+            language_model = OllamaLanguageModel(ollama_client, llm_model)
         control = MindRuntime(MacMind(visual_model, language_model))
 
         camera_frames = 0
@@ -291,8 +308,9 @@ async def run(
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
         started_at = time.monotonic()
-        visual_model.started_at_s = started_at
-        language_model.started_at_s = started_at
+        if ollama_client is None:
+            visual_model.started_at_s = started_at
+            language_model.started_at_s = started_at
         mind_task = asyncio.create_task(
             control.think_loop(
                 mind_stop,
@@ -409,6 +427,11 @@ async def run(
         )
         print("Conscious visual memory=verified.")
         print("Mac visual observation=verified.")
+        if ollama:
+            print(
+                "Local Ollama brain=verified: "
+                f"VLM={vlm_model}, LLM={llm_model}."
+            )
 
         def forward_count(start_s, end_s):
             return sum(
@@ -594,6 +617,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
     parser.add_argument("--camera", action="store_true")
+    parser.add_argument("--ollama", action="store_true")
+    parser.add_argument("--vlm-model", default="gemma3:4b")
+    parser.add_argument("--llm-model", default="gemma3:4b")
+    parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--world", default="default")
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     args = parser.parse_args()
@@ -603,5 +630,9 @@ if __name__ == "__main__":
             camera=args.camera,
             world_name=args.world,
             duration_s=args.duration,
+            ollama=args.ollama,
+            vlm_model=args.vlm_model,
+            llm_model=args.llm_model,
+            ollama_timeout=args.ollama_timeout,
         )
     )

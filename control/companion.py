@@ -25,7 +25,7 @@ def build_parser():
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     parser.add_argument("--vlm-model", default="gemma3:4b")
     parser.add_argument("--llm-model", default="gemma3:4b")
-    parser.add_argument("--ollama-timeout", type=float, default=30.0)
+    parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--command-port", type=int, default=5001)
     parser.add_argument("--video-port", type=int, default=5000)
     parser.add_argument("--width", type=int, default=640)

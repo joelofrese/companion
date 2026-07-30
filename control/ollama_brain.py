@@ -80,7 +80,7 @@ def _image_base64(image: Any) -> str:
 class OllamaClient:
     """Small standard-library client for one local Ollama server."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:11434", timeout_s: float = 30.0):
+    def __init__(self, base_url: str = "http://127.0.0.1:11434", timeout_s: float = 60.0):
         if not isinstance(base_url, str) or not base_url.strip():
             raise ValueError("Ollama URL must not be empty")
         if (
