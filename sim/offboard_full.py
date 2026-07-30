@@ -10,7 +10,6 @@ import time
 from mavsdk import System
 
 from control.command_packet import CommandPacket
-from control.fallback_brain import IntentLanguageModel
 from control.mind import MacMind, Telemetry
 from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
@@ -21,6 +20,7 @@ from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
 from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
+from sim.fixed_brain import FixedLanguageModel
 from sim.offboard_control import (
     DistanceMessage,
     COMMAND_DROPOUT_END_S,
@@ -42,7 +42,7 @@ from sim.offboard_control import (
     demo_state,
 )
 from sim.video_loopback import image_sender_command
-from vision.yolo_fallback import YoloVisualModel
+from sim.yolo_vision import YoloVisualModel
 from vision.video_stream import (
     AsyncLatestFrameReader,
     GStreamerH264Receiver,
@@ -176,7 +176,7 @@ async def run(image_path: str, expect_person: bool = False):
                     frame_width_px=video_config.width,
                     target_height_px=video_config.height * 0.75,
                 ),
-                IntentLanguageModel(),
+                FixedLanguageModel(),
             )
         )
         flight_started_at = time.monotonic()

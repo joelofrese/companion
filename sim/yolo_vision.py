@@ -1,4 +1,4 @@
-"""Temporary person-based visual fallback for the Mac brain."""
+"""Use YOLO as a repeatable person fixture for the RTP simulation."""
 
 import math
 from dataclasses import dataclass

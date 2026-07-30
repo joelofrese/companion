@@ -20,6 +20,10 @@ BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
 
 
+class _BootError(RuntimeError):
+    """A PX4 process failed before its shell became ready."""
+
+
 def _read_output(process, ready, finished):
     try:
         tail = b""
@@ -105,11 +109,11 @@ def _run_once(
         deadline = time.monotonic() + BOOT_TIMEOUT_S
         while not ready.is_set():
             if finished.wait(0.2):
-                raise RuntimeError(
+                raise _BootError(
                     f"PX4 exited before pxh> (code {process.poll()})"
                 )
             if time.monotonic() >= deadline:
-                raise RuntimeError("PX4 did not reach pxh> before the boot timeout")
+                raise _BootError("PX4 did not reach pxh> before the boot timeout")
         scenario = [sys.executable, "-u", "-m"]
         if image_path:
             scenario += ["sim.offboard_full", str(image_path)]
@@ -184,7 +188,7 @@ def run(
                 llm_model,
                 ollama_timeout,
             )
-        except RuntimeError:
+        except _BootError:
             if attempt == BOOT_RETRIES:
                 raise
             print("PX4 did not boot; retrying once.", file=sys.stderr)
