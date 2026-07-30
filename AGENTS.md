@@ -133,7 +133,8 @@ the conscious model receives each visual observation’s focused answer and
 confidence. Typed dialogue now uses the same non-blocking input path in
 simulation and the production Mac entry point. Mac motion now requires at
 least 0.5 visual confidence, and pending observations are bounded while the
-conscious summary carries longer context. The CM5 also bounds yaw to
+conscious summary carries longer context. Conscious shutdown is stop-aware,
+so a slow model cannot delay zero-command cleanup. The CM5 also bounds yaw to
 ±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
 the onboard hardware path remains the ROS 2 forwarder.
 

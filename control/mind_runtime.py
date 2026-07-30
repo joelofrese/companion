@@ -80,6 +80,28 @@ class MindRuntime:
         self._future = None
         self._observation = future.result()
 
+    async def _think_or_stop(
+        self,
+        stop_event: asyncio.Event,
+        telemetry: Telemetry,
+        dialogue: Optional[str],
+    ) -> Optional[ConsciousDecision]:
+        thought = asyncio.create_task(
+            asyncio.to_thread(self.mind.think, telemetry, dialogue)
+        )
+        stopped = asyncio.create_task(stop_event.wait())
+        done, _ = await asyncio.wait(
+            (thought, stopped),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if stopped in done:
+            thought.cancel()
+            await asyncio.gather(thought, return_exceptions=True)
+            return None
+        stopped.cancel()
+        await asyncio.gather(stopped, return_exceptions=True)
+        return thought.result()
+
     async def think_loop(
         self,
         stop_event: asyncio.Event,
@@ -94,18 +116,23 @@ class MindRuntime:
         while not stop_event.is_set():
             dialogue = dialogue_provider() if dialogue_provider is not None else None
             try:
-                decision = await asyncio.to_thread(
-                    self.mind.think,
+                decision = await self._think_or_stop(
+                    stop_event,
                     telemetry_provider(),
                     dialogue,
                 )
             except Exception as error:
                 self._error = error
                 return
+            if decision is None:
+                return
             self._decision = decision
             if decision.dialogue:
                 print(f"Companion: {decision.dialogue}", flush=True)
-            await asyncio.sleep(period_s)
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=period_s)
+            except asyncio.TimeoutError:
+                pass
 
     def close(self):
         """Stop background VLM work."""
