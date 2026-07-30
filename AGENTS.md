@@ -154,5 +154,9 @@ calibration, not replace the simulation-first development loop.
   text at the brain boundary, and made the simulated visual layer move only
   for an explicit `following` intent. Deterministic, RTP, and rendered-camera
   SITL missions all passed through landing and disarm again.
+- **2026-07-30** — Ran the exploratory synthetic brain continuously for 120
+  seconds in Gazebo's `forest` world. Offboard telemetry, the conscious and
+  visual boundaries, the exploratory speed envelope, landing, and disarm all
+  passed.
 
 as always, thank you, good luck, and i love you
