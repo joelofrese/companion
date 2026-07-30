@@ -6,7 +6,6 @@ import asyncio
 from control.fallback_brain import IntentLanguageModel
 from control.mind import MacMind, Telemetry
 from control.mind_runtime import MindRuntime
-from control.reactive import State
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from vision.legacy_yolo import YoloVisualModel
@@ -35,7 +34,7 @@ def build_parser():
 
 
 async def run(args):
-    state = State.FOLLOWING if args.state == "following" else State.IDLE
+    intent = "following" if args.state == "following" else "idle"
     if args.voice_once:
         from voice.pipeline import PushToTalkVoicePipeline
         from voice.recorder import PushToTalkRecorder
@@ -49,7 +48,7 @@ async def run(args):
 
         voice_state = await asyncio.to_thread(listen_once)
         if voice_state is not None:
-            state = voice_state
+            intent = voice_state.name.lower()
 
     video_config = H264StreamConfig(
         port=args.video_port,
@@ -73,11 +72,7 @@ async def run(args):
         control,
         sender,
         frame_reader.read,
-        intent_provider=lambda timestamp_s: {
-            State.IDLE: "idle",
-            State.FOLLOWING: "following",
-            State.HOVERING: "hover",
-        }[state],
+        intent_provider=lambda timestamp_s: intent,
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()
@@ -91,7 +86,7 @@ async def run(args):
         receiver.start()
         print(
             f"Companion ready: video :{video_config.port}, "
-            f"commands {args.cm5_host}:{args.command_port}, state={state.name.lower()}."
+            f"commands {args.cm5_host}:{args.command_port}, intent={intent}."
         )
         await service.run(stop_event)
     finally:

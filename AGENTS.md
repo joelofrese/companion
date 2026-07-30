@@ -119,4 +119,12 @@ Hardware bring-up later validates how well the simulated interfaces translate
 to the real camera, network, sensors, and vehicle. It should add evidence and
 calibration, not replace the simulation-first development loop.
 
+## Recent progress
+
+- **2026-07-30** — Removed the legacy reactive-state dependency from the Mac
+  UDP transport. The command loopback, deterministic SITL mission, full RTP
+  person-image mission, and Gazebo-camera exploratory mission all passed
+  through landing and disarm. Non-person images correctly produce safe zero
+  motion; following assertions require an image containing a person.
+
 as always, thank you, good luck, and i love you

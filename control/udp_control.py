@@ -5,7 +5,6 @@ import math
 from numbers import Real
 from typing import Any, Awaitable, Callable, Optional, Protocol
 
-from control.reactive import State
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 
@@ -34,7 +33,7 @@ class UdpControlService:
         control: ControlLoop,
         sender: UdpCommandSender,
         frame_reader: FrameReader,
-        intent_provider: Optional[Callable[[float], Optional[State]]] = None,
+        intent_provider: Optional[Callable[[float], Optional[object]]] = None,
         obstacle_provider: Optional[Callable[[float], Optional[float]]] = None,
         tick_period_s: float = 0.05,
         frame_timeout_s: float = 2.0,
