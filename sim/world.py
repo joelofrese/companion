@@ -194,8 +194,18 @@ class WorldLanguageModel:
         )
 
 
-async def run(exploratory: bool = False, camera: bool = False, world_name: str = "default"):
+async def run(
+    exploratory: bool = False,
+    camera: bool = False,
+    world_name: str = "default",
+    duration_s: float = PROFILE_DURATION_S,
+):
     """Run the complete synthetic mission."""
+
+    if not math.isfinite(duration_s) or duration_s <= 0.0:
+        raise ValueError("simulation duration must be positive")
+    if not exploratory and duration_s < PROFILE_DURATION_S:
+        raise ValueError("deterministic simulation duration cannot be shorter than its profile")
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
@@ -322,7 +332,7 @@ async def run(exploratory: bool = False, camera: bool = False, world_name: str =
             return None
 
         try:
-            while (elapsed := time.monotonic() - started_at) < PROFILE_DURATION_S:
+            while (elapsed := time.monotonic() - started_at) < duration_s:
                 now = time.monotonic()
                 step = world.step(elapsed)
                 distance_sensor.update(
@@ -548,11 +558,13 @@ if __name__ == "__main__":
     parser.add_argument("--explore", action="store_true")
     parser.add_argument("--camera", action="store_true")
     parser.add_argument("--world", default="default")
+    parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     args = parser.parse_args()
     asyncio.run(
         run(
             exploratory=args.explore,
             camera=args.camera,
             world_name=args.world,
+            duration_s=args.duration,
         )
     )

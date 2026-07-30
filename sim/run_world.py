@@ -1,6 +1,7 @@
 """Run one PX4/Gazebo scenario and clean up."""
 
 import argparse
+import math
 import os
 from pathlib import Path
 import signal
@@ -64,6 +65,7 @@ def _run_once(
     stdbuf: str,
     exploratory: bool,
     camera: bool,
+    duration_s: Optional[float],
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -113,6 +115,8 @@ def _run_once(
             if camera:
                 scenario.append("--camera")
             scenario += ["--world", world]
+            if duration_s is not None:
+                scenario += ["--duration", str(duration_s)]
         result = subprocess.run(scenario, cwd=companion_dir, check=False)
         return result.returncode
     finally:
@@ -126,6 +130,7 @@ def run(
     world: str = "default",
     exploratory: bool = False,
     camera: bool = False,
+    duration_s: Optional[float] = None,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -134,6 +139,8 @@ def run(
         raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
     if image_path is not None and not image_path.is_file():
         raise RuntimeError(f"scenario image does not exist: {image_path}")
+    if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
+        raise RuntimeError("simulation duration must be positive")
     world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
     if not world_file.is_file():
         raise RuntimeError(f"Gazebo world does not exist: {world_file}")
@@ -148,6 +155,7 @@ def run(
                 stdbuf,
                 exploratory,
                 camera,
+                duration_s,
             )
         except RuntimeError:
             if attempt == BOOT_RETRIES:
@@ -177,6 +185,11 @@ def main(argv=None):
         action="store_true",
         help="use Gazebo's x500_mono_cam and feed its rendered frames to the Mac brain",
     )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        help="world simulation duration in seconds (default: 32)",
+    )
     parser.add_argument("--world", default="default", help="Gazebo world name from PX4")
     args = parser.parse_args(argv)
     if args.explore and args.image:
@@ -185,6 +198,10 @@ def main(argv=None):
         parser.error("--camera cannot be combined with --image")
     if args.camera and not args.explore:
         parser.error("--camera requires --explore")
+    if args.duration is not None and args.image:
+        parser.error("--duration cannot be combined with --image")
+    if args.duration is not None and (args.duration <= 0.0 or not math.isfinite(args.duration)):
+        parser.error("--duration must be positive")
     try:
         return run(
             args.px4_dir.expanduser().resolve(),
@@ -193,6 +210,7 @@ def main(argv=None):
             args.world,
             args.explore,
             args.camera,
+            args.duration,
         )
     except KeyboardInterrupt:
         return 130

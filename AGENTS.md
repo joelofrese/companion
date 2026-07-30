@@ -84,6 +84,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --explore --camera
+.venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
 ```
 
@@ -105,7 +106,8 @@ are selected.
 Pass `--world walls`, `forest`, `windy`, or another PX4 Gazebo world to repeat
 the same mission in a different environment. Add `--explore` to the synthetic
 world to type live `follow me`, `hover`, or `stop` dialogue; exploratory runs
-observe behavior instead of checking an exact mission schedule.
+observe behavior instead of checking an exact mission schedule. Add
+`--duration` for a longer continuous run.
 
 ## Current state
 
@@ -132,5 +134,8 @@ calibration, not replace the simulation-first development loop.
   PX4 stdin is isolated so exploratory dialogue is reliable. Verified the
   walls world with live `follow me` and `hover` dialogue, plus the strict,
   RTP, and rendered-camera scenarios through landing and disarm.
+- **2026-07-30** — Added an optional world duration so exploratory and
+  deterministic SITL runs can continue beyond the scripted profile. A
+  45-second exploratory run stayed safe and completed landing and disarm.
 
 as always, thank you, good luck, and i love you
