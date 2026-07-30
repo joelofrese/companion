@@ -1,14 +1,13 @@
-"""Run the Mac brain with a temporary YOLO visual fallback."""
+"""Run the Mac brain with local VLM and LLM models."""
 
 import argparse
 import asyncio
 
-from control.fallback_brain import IntentLanguageModel
 from control.mind import MacMind, Telemetry
 from control.mind_runtime import MindRuntime
+from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
-from vision.yolo_fallback import YoloVisualModel
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
@@ -23,13 +22,15 @@ def build_parser():
     )
     parser.add_argument("--whisper-model", default="tiny.en")
     parser.add_argument("--record-duration", type=float, default=3.0)
-    parser.add_argument("--yolo-model", default="yolov8n.pt")
+    parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
+    parser.add_argument("--vlm-model", default="gemma3:4b")
+    parser.add_argument("--llm-model", default="gemma3:4b")
+    parser.add_argument("--ollama-timeout", type=float, default=30.0)
     parser.add_argument("--command-port", type=int, default=5001)
     parser.add_argument("--video-port", type=int, default=5000)
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--framerate", type=int, default=30)
-    parser.add_argument("--target-height", type=float, default=120.0)
     return parser
 
 
@@ -50,6 +51,8 @@ async def run(args):
         if voice_state is not None:
             intent = voice_state
 
+    client = OllamaClient(args.ollama_url, timeout_s=args.ollama_timeout)
+    await asyncio.to_thread(client.check)
     video_config = H264StreamConfig(
         port=args.video_port,
         width=args.width,
@@ -59,12 +62,8 @@ async def run(args):
     receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(receiver)
     brain = MacMind(
-        YoloVisualModel(
-            model_path=args.yolo_model,
-            frame_width_px=video_config.width,
-            target_height_px=args.target_height,
-        ),
-        IntentLanguageModel(),
+        OllamaVisionModel(client, args.vlm_model),
+        OllamaLanguageModel(client, args.llm_model),
     )
     brain.set_intent(intent)
     control = MindRuntime(brain)
@@ -86,7 +85,8 @@ async def run(args):
         receiver.start()
         print(
             f"Companion ready: video :{video_config.port}, "
-            f"commands {args.cm5_host}:{args.command_port}, intent={intent}."
+            f"commands {args.cm5_host}:{args.command_port}, intent={intent}, "
+            f"VLM={args.vlm_model}, LLM={args.llm_model}."
         )
         await service.run(stop_event)
     finally:

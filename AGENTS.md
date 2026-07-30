@@ -85,14 +85,17 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --explore --camera
 .venv/bin/python -m sim.run_world --explore --duration 120
-.venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg
+.venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
+.venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
 ```
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The synthetic world exercises
 the command path, motion, target loss, obstacle handling, invalid and stale
 sensor data, dropout, recovery, sustained hover, shutdown, landing, and
 disarm. The image scenario exercises decoded RTP/video, perception, Mac
-commands, malformed and stale wire packets, onboard safety, and PX4. Neither
+commands, malformed and stale wire packets, onboard safety, and PX4. Add
+`--expect-person` to require a person image to produce following and lateral
+motion; omit it to verify that a non-person image stays stopped. Neither
 scenario proves physical sensors, radio behavior, or hardware-specific
 transport.
 
@@ -100,9 +103,24 @@ Add `--camera` to an exploratory run to use Gazebo's rendered
 `x500_mono_cam` image topic as subconscious input. The simulated visual model
 remains deliberately simple, but the real frame path is exercised and counted.
 
-The RTP image path now runs through the Mac brain with a temporary YOLO visual
-adapter and intent-preserving language adapter until local VLM and LLM backends
-are selected.
+The production Mac entry point uses separate local Ollama chat sessions for
+the subconscious VLM and conscious LLM. They use the same model by default but
+have separate prompts and context. Set `--vlm-model` and `--llm-model` when
+different local models are preferred. The deterministic RTP image scenario
+still uses a temporary YOLO adapter only as a repeatable perception fixture;
+it is not the production brain.
+
+After installing Ollama and pulling a local vision-capable model, run the
+production Mac brain with:
+
+```sh
+ollama pull gemma3:4b
+.venv/bin/python -m control.companion <cm5-ip>
+```
+
+The Ollama server is local to the Mac. Its structured responses are translated
+into the same small visual-observation and conscious-decision interfaces used
+by simulation.
 
 Pass `--world walls`, `forest`, `windy`, or another PX4 Gazebo world to repeat
 the same mission in a different environment. Add `--explore` to the synthetic
@@ -124,6 +142,26 @@ calibration, not replace the simulation-first development loop.
 
 ## Recent progress
 
+- **2026-07-30** — Replaced the production YOLO brain with a small standard
+  library Ollama adapter. Separate VLM and LLM requests now accept images,
+  focus, telemetry, visual memory, and dialogue, and return structured JSON
+  through the existing Mac brain interfaces. YOLO remains only in the
+  deterministic RTP simulation fixture. The adapter compiles and the existing
+  simulation seams remain unchanged. The practical default is now the local
+  3.3 GB `gemma3:4b` multimodal model.
+- **2026-07-30** — Ran the real local `gemma3:4b` model against a camera image:
+  the VLM described and focused on the scene, and the LLM kept a concise
+  intent and visual summary. This verifies the Mac brain backend, not flight
+  behavior.
+- **2026-07-30** — Restored the SITL host after its Gazebo dependencies changed
+  during the Ollama install. Supported OpenCV 4 and Gazebo 8.14 now load the
+  optical-flow plugin, and the full deterministic mission passed again through
+  safety faults, recovery, landing, and disarm.
+- **2026-07-30** — Made RTP image expectations explicit: person fixtures can
+  require following with `--expect-person`, while non-person fixtures verify
+  safe stop. Both still run the complete camera, packet-fault, CM5, PX4,
+  landing, and disarm path. Strengthened both SITL startup barriers to require
+  consecutive CM5-forwarded setpoints before entering offboard.
 - **2026-07-30** — Removed the legacy reactive-state dependency from the Mac
   UDP transport. The command loopback, deterministic SITL mission, full RTP
   person-image mission, and Gazebo-camera exploratory mission all passed

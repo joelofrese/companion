@@ -1,0 +1,237 @@
+"""Use local Ollama models for the Mac brain."""
+
+import base64
+from io import BytesIO
+import json
+import math
+from numbers import Real
+from typing import Any, Dict, Optional
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
+
+from control.mind import ConsciousDecision, ConsciousInput, Telemetry, VisualObservation
+
+
+MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
+
+VISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "description": {"type": "string"},
+        "focused_answer": {"type": "string"},
+        "movement": {"type": "string", "enum": sorted(MOVEMENTS)},
+        "next_focus": {"type": "string"},
+        "confidence": {"type": "number"},
+    },
+    "required": [
+        "description",
+        "focused_answer",
+        "movement",
+        "next_focus",
+        "confidence",
+    ],
+}
+
+CONSCIOUS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "intent": {"type": "string"},
+        "focus": {"type": "string"},
+        "dialogue": {"type": "string"},
+        "summary": {"type": "string"},
+    },
+    "required": ["intent", "focus", "dialogue", "summary"],
+}
+
+
+def _text(data: Dict[str, Any], name: str) -> str:
+    value = data.get(name, "")
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _confidence(data: Dict[str, Any]) -> float:
+    value = data.get("confidence", 0.0)
+    if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
+        return 0.0
+    return min(1.0, max(0.0, float(value)))
+
+
+def _image_base64(image: Any) -> str:
+    """Encode one BGR frame for Ollama's image field."""
+
+    if isinstance(image, (bytes, bytearray)):
+        return base64.b64encode(image).decode("ascii")
+
+    from PIL import Image
+
+    if hasattr(image, "save"):
+        picture = image
+    else:
+        shape = getattr(image, "shape", ())
+        if len(shape) == 3 and shape[-1] == 3:
+            image = image[:, :, ::-1]
+        picture = Image.fromarray(image)
+    buffer = BytesIO()
+    picture.save(buffer, format="JPEG", quality=80)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+class OllamaClient:
+    """Small standard-library client for one local Ollama server."""
+
+    def __init__(self, base_url: str = "http://127.0.0.1:11434", timeout_s: float = 30.0):
+        if not isinstance(base_url, str) or not base_url.strip():
+            raise ValueError("Ollama URL must not be empty")
+        if (
+            isinstance(timeout_s, bool)
+            or not isinstance(timeout_s, Real)
+            or not math.isfinite(timeout_s)
+            or timeout_s <= 0.0
+        ):
+            raise ValueError("Ollama timeout must be positive")
+        self.base_url = base_url.rstrip("/") + "/"
+        self.timeout_s = float(timeout_s)
+
+    def _request(self, path: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        url = urljoin(self.base_url, path.lstrip("/"))
+        body = None if payload is None else json.dumps(payload).encode("utf-8")
+        request = Request(url, data=body, headers={"Content-Type": "application/json"})
+        try:
+            with urlopen(request, timeout=self.timeout_s) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Ollama request failed ({error.code}): {detail}") from error
+        except (URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"Ollama is unavailable at {self.base_url}") from error
+
+    def check(self):
+        """Fail early when the local server is not running."""
+
+        self._request("/api/tags")
+
+    def chat(
+        self,
+        model: str,
+        prompt: str,
+        schema: Dict[str, Any],
+        image: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("Ollama model must not be empty")
+        message: Dict[str, Any] = {"role": "user", "content": prompt}
+        if image is not None:
+            message["images"] = [image]
+        response = self._request(
+            "/api/chat",
+            {
+                "model": model,
+                "messages": [message],
+                "stream": False,
+                "format": schema,
+                "options": {"temperature": 0},
+                "keep_alive": "5m",
+            },
+        )
+        try:
+            content = response["message"]["content"]
+            return json.loads(content)
+        except (KeyError, TypeError, json.JSONDecodeError) as error:
+            raise RuntimeError("Ollama returned invalid structured output") from error
+
+
+class OllamaVisionModel:
+    """Use one local vision model for the subconscious."""
+
+    def __init__(self, client: OllamaClient, model: str):
+        self.client = client
+        self.model = model
+
+    def observe(
+        self,
+        image: Any,
+        timestamp_s: float,
+        focus: str,
+        intent: str,
+        previous_movement: str,
+        previous_observation: str,
+        telemetry: Telemetry,
+    ) -> VisualObservation:
+        prompt = f"""
+You are the Companion Drone's subconscious visual system. Describe the current
+camera frame and suggest one cautious next movement. Look broadly, but answer
+the requested focus when one is present. Never suggest backward movement. Use
+stop when the scene or movement is uncertain. Return only the requested JSON.
+
+Current high-level intent: {intent or "none"}
+Requested visual focus: {focus or "none"}
+Previous movement: {previous_movement or "stop"}
+Previous description: {previous_observation or "none"}
+Forward obstacle distance: {telemetry.obstacle_distance_m}
+
+The movement must be one of: forward, left, right, up, down, stop, hover.
+The description should be short plain English. Confidence must be between 0
+and 1. The next focus should be a short thing worth checking next, or empty.
+""".strip()
+        data = self.client.chat(
+            self.model,
+            prompt,
+            VISION_SCHEMA,
+            image=_image_base64(image),
+        )
+        movement = _text(data, "movement").lower()
+        if movement not in MOVEMENTS:
+            movement = "stop"
+        description = _text(data, "description") or "the scene is unclear"
+        return VisualObservation(
+            timestamp_s=timestamp_s,
+            description=description,
+            focused_answer=_text(data, "focused_answer"),
+            movement=movement,
+            next_focus=_text(data, "next_focus"),
+            confidence=_confidence(data),
+        )
+
+
+class OllamaLanguageModel:
+    """Use one local language model for the conscious mind."""
+
+    def __init__(self, client: OllamaClient, model: str):
+        self.client = client
+        self.model = model
+
+    def think(self, information: ConsciousInput) -> ConsciousDecision:
+        observations = "\n".join(
+            f"- {observation.description}; suggested movement={observation.movement}; "
+            f"focus next={observation.next_focus or 'none'}"
+            for observation in information.new_observations
+        ) or "(no new visual observations)"
+        prompt = f"""
+You are the Companion Drone's conscious mind. Use the visual observations,
+memory, telemetry, and optional dialogue to choose the next high-level intent.
+Keep the current intent when there is no clear reason to change it. You may
+choose a short natural intent, but do not issue motor or velocity commands.
+Return only the requested JSON.
+
+Current intent: {information.intent}
+Previous movement: {information.previous_movement}
+Previous visual summary: {information.summary or "none"}
+New visual observations:
+{observations}
+Optional user dialogue: {information.dialogue or "none"}
+Forward obstacle distance: {information.telemetry.obstacle_distance_m}
+
+The summary should stay short and describe what the drone currently knows.
+Dialogue should be empty unless a user deserves a response.
+""".strip()
+        data = self.client.chat(self.model, prompt, CONSCIOUS_SCHEMA)
+        intent = _text(data, "intent")
+        if not intent:
+            raise RuntimeError("Ollama returned an empty conscious intent")
+        return ConsciousDecision(
+            intent=intent,
+            focus=_text(data, "focus"),
+            dialogue=_text(data, "dialogue"),
+            summary=_text(data, "summary"),
+        )

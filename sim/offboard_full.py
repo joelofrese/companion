@@ -1,6 +1,7 @@
 """Verify the full camera-to-PX4 path in SITL."""
 
 import asyncio
+import argparse
 import socket
 import subprocess
 import sys
@@ -61,7 +62,7 @@ async def _stop_task(task, stop_event):
             pass
 
 
-async def run(image_path: str):
+async def run(image_path: str, expect_person: bool = False):
     video_config = H264StreamConfig(port=5014, width=640, height=480, framerate=15)
     video_receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(video_receiver)
@@ -93,7 +94,7 @@ async def run(image_path: str):
     command_dropout_reported = False
     malformed_packet_reported = False
     stale_packet_reported = False
-    malformed_socket = None
+    fault_socket = None
 
     def current_obstacle(timestamp_s):
         elapsed_s = max(0.0, timestamp_s - flight_started_at)
@@ -120,7 +121,7 @@ async def run(image_path: str):
         safe_commands = RecordingForwarder(forwarder)
 
         receiver.start()
-        malformed_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        fault_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         cm5_service = SafetyCommandService(
             receiver,
             safe_commands,
@@ -144,14 +145,14 @@ async def run(image_path: str):
                         print("Command packet loss injected during following.")
                         command_dropout_reported = True
                     if not malformed_packet_reported:
-                        malformed_socket.sendto(
+                        fault_socket.sendto(
                             b"not-a-command",
                             ("127.0.0.1", receiver.port),
                         )
                         print("Malformed command packet injected during dropout.")
                         malformed_packet_reported = True
                     if not stale_packet_reported:
-                        malformed_socket.sendto(
+                        fault_socket.sendto(
                             CommandPacket(
                                 0,
                                 VelocityCommand(north_m_s=0.5),
@@ -223,12 +224,12 @@ async def run(image_path: str):
         )
         mac_task = asyncio.create_task(mac_service.run(mac_stop))
         deadline = time.monotonic() + 5.0
-        while not safe_commands.commands and time.monotonic() < deadline:
+        while len(safe_commands.commands) < 3 and time.monotonic() < deadline:
             await asyncio.sleep(SETPOINT_PERIOD_S)
-        if not safe_commands.commands:
-            raise RuntimeError("CM5 did not forward a priming setpoint")
-        print("CM5 priming setpoint=verified.")
-        await asyncio.sleep(SETPOINT_PERIOD_S * 2)
+        if len(safe_commands.commands) < 3:
+            raise RuntimeError("CM5 did not forward consecutive priming setpoints")
+        print("CM5 priming setpoints=verified.")
+        await asyncio.sleep(SETPOINT_PERIOD_S * 4)
         await drone.offboard.start()
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
@@ -287,7 +288,7 @@ async def run(image_path: str):
             )
 
         print(
-            "Following commands by cycle: "
+            "Forward commands by cycle: "
             f"{forward_count(0.0, FOLLOW_END_S)}, "
             f"{forward_count(SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S)}, "
             f"{forward_count(THIRD_FOLLOW_START_S, THIRD_FOLLOW_END_S)}."
@@ -296,15 +297,36 @@ async def run(image_path: str):
             raise RuntimeError(
                 f"full stack did not observe obstacle backoff: {min_north_velocity:.2f}m/s"
             )
-        if max_north_velocity <= 0.02:
-            raise RuntimeError(
-                f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
+        if expect_person:
+            if max_north_velocity <= 0.02:
+                raise RuntimeError(
+                    f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
+                )
+            if max_east_velocity <= 0.02 and min_east_velocity >= -0.02:
+                raise RuntimeError(
+                    "full stack did not observe lateral visual tracking: "
+                    f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
+                )
+            print("Visual following and lateral tracking=verified.")
+        elif any(
+            timestamp_s >= flight_started_at
+            and (
+                command.north_m_s > 0.0
+                or command.east_m_s != 0.0
+                or command.down_m_s != 0.0
             )
-        if max_east_velocity <= 0.02 and min_east_velocity >= -0.02:
-            raise RuntimeError(
-                "full stack did not observe lateral visual tracking: "
-                f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
-            )
+            for timestamp_s, command in safe_commands.commands
+        ):
+            raise RuntimeError("full stack commanded motion without a detected person")
+        else:
+            print("No-person visual safe stop=verified.")
+
+        expected_motion = (
+            (lambda command: command.north_m_s > 0.0)
+            if expect_person
+            else (lambda command: command == VelocityCommand())
+        )
+        motion_name = "following" if expect_person else "safe stop without a person"
 
         def observed(start_s, end_s, predicate):
             return any(
@@ -318,8 +340,8 @@ async def run(image_path: str):
             (
                 SECOND_FOLLOW_START_S,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
-                "following after hover",
+                expected_motion,
+                f"{motion_name} after hover",
             ),
             (
                 INVALID_DISTANCE_START_S,
@@ -330,8 +352,8 @@ async def run(image_path: str):
             (
                 INVALID_DISTANCE_END_S + 0.1,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
-                "following recovery after invalid sensor",
+                expected_motion,
+                f"{motion_name} recovery after invalid sensor",
             ),
             (
                 STALE_DISTANCE_START_S + 0.2,
@@ -342,8 +364,8 @@ async def run(image_path: str):
             (
                 STALE_DISTANCE_END_S + 0.1,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
-                "following recovery after stale obstacle sensor",
+                expected_motion,
+                f"{motion_name} recovery after stale obstacle sensor",
             ),
             (
                 TARGET_LOST_START_S + 0.55,
@@ -354,8 +376,8 @@ async def run(image_path: str):
             (
                 TARGET_LOST_END_S + 0.1,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
-                "following recovery after target loss",
+                expected_motion,
+                f"{motion_name} recovery after target loss",
             ),
             (
                 COMMAND_DROPOUT_START_S + 0.2,
@@ -366,8 +388,8 @@ async def run(image_path: str):
             (
                 COMMAND_DROPOUT_END_S + 0.1,
                 THIRD_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
-                "following recovery after command dropout",
+                expected_motion,
+                f"{motion_name} recovery after command dropout",
             ),
             (
                 SECOND_FOLLOW_END_S,
@@ -378,8 +400,8 @@ async def run(image_path: str):
             (
                 THIRD_FOLLOW_START_S,
                 THIRD_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
-                "following after second hover",
+                expected_motion,
+                f"{motion_name} after second hover",
             ),
             (
                 THIRD_FOLLOW_END_S,
@@ -433,12 +455,18 @@ async def run(image_path: str):
             close_subprocess(camera_process)
         if sender is not None:
             sender.close()
-        if malformed_socket is not None:
-            malformed_socket.close()
+        if fault_socket is not None:
+            fault_socket.close()
         close_mavsdk(drone)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: python -m sim.offboard_full IMAGE_PATH")
-    asyncio.run(run(sys.argv[1]))
+    parser = argparse.ArgumentParser(description="Verify the RTP image flight path")
+    parser.add_argument("image_path")
+    parser.add_argument(
+        "--expect-person",
+        action="store_true",
+        help="require the image to produce following and lateral motion",
+    )
+    args = parser.parse_args()
+    asyncio.run(run(args.image_path, args.expect_person))

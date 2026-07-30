@@ -61,6 +61,7 @@ def _run_once(
     px4_dir: Path,
     companion_dir: Path,
     image_path: Optional[Path],
+    expect_person: bool,
     world: str,
     stdbuf: str,
     exploratory: bool,
@@ -108,6 +109,8 @@ def _run_once(
         scenario = [sys.executable, "-u", "-m"]
         if image_path:
             scenario += ["sim.offboard_full", str(image_path)]
+            if expect_person:
+                scenario.append("--expect-person")
         else:
             scenario += ["sim.world"]
             if exploratory:
@@ -127,6 +130,7 @@ def run(
     px4_dir: Path,
     companion_dir: Path,
     image_path: Optional[Path] = None,
+    expect_person: bool = False,
     world: str = "default",
     exploratory: bool = False,
     camera: bool = False,
@@ -151,6 +155,7 @@ def run(
                 px4_dir,
                 companion_dir,
                 image_path,
+                expect_person,
                 world,
                 stdbuf,
                 exploratory,
@@ -173,7 +178,12 @@ def main(argv=None):
     parser.add_argument(
         "--image",
         type=Path,
-        help="run the temporary RTP/person-detection full-stack verification with this image",
+        help="run the RTP image full-stack verification with this image",
+    )
+    parser.add_argument(
+        "--expect-person",
+        action="store_true",
+        help="require the image to produce following and lateral motion",
     )
     parser.add_argument(
         "--explore",
@@ -200,6 +210,8 @@ def main(argv=None):
         parser.error("--camera requires --explore")
     if args.duration is not None and args.image:
         parser.error("--duration cannot be combined with --image")
+    if args.expect_person and not args.image:
+        parser.error("--expect-person requires --image")
     if args.duration is not None and (args.duration <= 0.0 or not math.isfinite(args.duration)):
         parser.error("--duration must be positive")
     try:
@@ -207,6 +219,7 @@ def main(argv=None):
             args.px4_dir.expanduser().resolve(),
             Path(__file__).resolve().parent.parent,
             args.image.expanduser().resolve() if args.image else None,
+            args.expect_person,
             args.world,
             args.explore,
             args.camera,
