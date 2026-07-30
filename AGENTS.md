@@ -177,5 +177,9 @@ calibration, not replace the simulation-first development loop.
 - **2026-07-30** — Added a stale valid sequence packet beside the malformed
   packet. The RTP mission now verifies both wire decoding and sequence freshness
   at the CM5 boundary before confirming heartbeat expiry and recovery.
+- **2026-07-30** — Connected the temporary conscious adapters to the visual
+  memory path: each thought retains the newest visual description as its
+  summary. Deterministic and RTP SITL now explicitly verify that perception
+  reaches conscious memory before completing landing and disarm.
 
 as always, thank you, good luck, and i love you

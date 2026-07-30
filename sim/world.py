@@ -193,11 +193,14 @@ class WorldLanguageModel:
                 or THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S
             )
             self.intent = "following" if following else "hover"
+        summary = information.summary
+        if information.new_observations:
+            summary = information.new_observations[-1].description
         return ConsciousDecision(
             intent=self.intent,
             focus="person" if self.intent == "following" else "",
             dialogue=dialogue,
-            summary=information.summary or "The simulated world is running.",
+            summary=summary or "The simulated world is running.",
         )
 
 
@@ -392,10 +395,13 @@ async def run(
             raise RuntimeError("SITL did not observe a conscious Mac decision")
         if control.latest_observation is None:
             raise RuntimeError("SITL did not observe a Mac visual observation")
+        if not decision.summary:
+            raise RuntimeError("SITL did not retain a conscious visual summary")
         print(
             "Conscious Mac decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."
         )
+        print("Conscious visual memory=verified.")
         print("Mac visual observation=verified.")
 
         def forward_count(start_s, end_s):
