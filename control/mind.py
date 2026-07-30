@@ -6,6 +6,9 @@ import threading
 from typing import Any, Optional, Protocol
 
 
+MAX_PENDING_OBSERVATIONS = 32
+
+
 @dataclass(frozen=True)
 class Telemetry:
     """The vehicle information the brain can use."""
@@ -84,7 +87,9 @@ class MacMind:
         self.visual_model = visual_model
         self.language_model = language_model
         self.memory = MindMemory()
-        self._new_observations = deque[VisualObservation]()
+        self._new_observations = deque[VisualObservation](
+            maxlen=MAX_PENDING_OBSERVATIONS
+        )
         self._lock = threading.Lock()
 
     def set_intent(self, intent: str):
