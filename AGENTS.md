@@ -54,6 +54,10 @@ computer relays sensors and video, performs the final safety check, and
 forwards approved velocity setpoints to PX4. Keep hardware-specific code there
 so the Mac-side control behavior remains easy to simulate and test.
 
+The Mac brain has two roles: a subconscious VLM describes images and suggests
+movement, while a conscious LLM uses those descriptions, dialogue, and memory
+to choose high-level intent. They share only small structured state.
+
 Keep movement slow, deliberate, and easy to stop.
 
 ## Simulation and validation
