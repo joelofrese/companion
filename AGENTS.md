@@ -123,7 +123,9 @@ loopback, safety faults, recovery, landing, and disarm have been verified.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
-without replacing it.
+without replacing it. The voice path is a direct one-utterance pipeline, and
+the conscious model receives each visual observation’s focused answer and
+confidence.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
