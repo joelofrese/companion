@@ -21,9 +21,9 @@ from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
-from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.gazebo_camera import GazeboCamera
+from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
     PROFILE_DURATION_S,

@@ -130,7 +130,8 @@ without replacing it. The voice path is a direct one-utterance pipeline, and
 the conscious model receives each visual observation’s focused answer and
 confidence. Typed dialogue now uses the same non-blocking input path in
 simulation and the production Mac entry point. The CM5 also bounds yaw to
-±180° along with its velocity limits.
+±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
+the onboard hardware path remains the ROS 2 forwarder.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.

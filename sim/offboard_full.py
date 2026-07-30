@@ -18,9 +18,9 @@ from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
-from onboard.velocity_forwarder import MavsdkVelocityForwarder
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.fixed_brain import FixedLanguageModel
+from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
     COMMAND_DROPOUT_END_S,

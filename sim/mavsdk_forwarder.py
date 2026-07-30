@@ -1,4 +1,4 @@
-"""Send approved velocity commands to PX4 through MAVSDK."""
+"""Forward simulated CM5 commands to PX4 through MAVSDK."""
 
 from mavsdk.offboard import VelocityNedYaw
 
@@ -6,7 +6,7 @@ from control.velocity import VelocityCommand
 
 
 class MavsdkVelocityForwarder:
-    """Send approved commands to an active vehicle."""
+    """Send one simulated velocity setpoint to PX4."""
 
     def __init__(self, drone):
         self.drone = drone
