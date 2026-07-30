@@ -15,7 +15,6 @@ from mavsdk.offboard import OffboardError
 
 from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
 from control.mind_runtime import MindRuntime
-from control.state_machine import State
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
@@ -31,7 +30,6 @@ from sim.offboard_control import (
     SETPOINT_PERIOD_S,
     THIRD_FOLLOW_END_S,
     THIRD_FOLLOW_START_S,
-    demo_state,
 )
 
 
@@ -56,7 +54,6 @@ HOVER_START_S = 5.8
 
 @dataclass(frozen=True)
 class WorldStep:
-    intent: State
     obstacle_distance_m: Optional[float] = 2.0
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
@@ -74,26 +71,19 @@ class SyntheticWorld:
         self,
         elapsed_s: float,
     ) -> WorldStep:
-        intent = demo_state(elapsed_s)
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
-            return WorldStep(
-                intent,
-                obstacle_distance_m=0.3,
-            )
+            return WorldStep(obstacle_distance_m=0.3)
         if OBSTACLE_END_S <= elapsed_s < RECOVERY_END_S:
-            return WorldStep(State.FOLLOWING)
+            return WorldStep()
         if INVALID_SENSOR_START_S <= elapsed_s < INVALID_SENSOR_END_S:
-            return WorldStep(State.FOLLOWING, obstacle_distance_m=math.nan)
+            return WorldStep(obstacle_distance_m=math.nan)
         if DROPOUT_START_S <= elapsed_s < DROPOUT_END_S:
-            return WorldStep(State.FOLLOWING, transmit=False)
+            return WorldStep(transmit=False)
         if DROPOUT_END_S <= elapsed_s < LINK_RECOVERY_END_S:
-            return WorldStep(State.FOLLOWING)
+            return WorldStep()
         if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
-            return WorldStep(
-                State.FOLLOWING,
-                command_override=VelocityCommand(north_m_s=1.0),
-            )
-        return WorldStep(intent)
+            return WorldStep(command_override=VelocityCommand(north_m_s=1.0))
+        return WorldStep()
 
 
 class WorldVisualModel:
@@ -135,12 +125,22 @@ class WorldVisualModel:
 
 
 class WorldLanguageModel:
-    """Keep the scripted intent while exercising the conscious boundary."""
+    """Choose the scripted intent while exercising the conscious boundary."""
+
+    def __init__(self):
+        self.started_at_s = 0.0
 
     def think(self, information) -> ConsciousDecision:
+        elapsed_s = max(0.0, time.monotonic() - self.started_at_s)
+        following = (
+            elapsed_s < HOVER_START_S
+            or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
+            or THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S
+        )
+        intent = "following" if following else "hover"
         return ConsciousDecision(
-            intent=information.intent,
-            focus="person" if information.intent == "following" else "",
+            intent=intent,
+            focus="person" if intent == "following" else "",
             summary=information.summary or "The simulated world is running.",
         )
 
@@ -182,26 +182,29 @@ async def run():
         started_at = time.monotonic()
         world = SyntheticWorld()
         visual_model = WorldVisualModel(world, started_at)
-        control = MindRuntime(MacMind(visual_model, WorldLanguageModel()))
+        language_model = WorldLanguageModel()
+        language_model.started_at_s = started_at
+        control = MindRuntime(MacMind(visual_model, language_model))
 
-        def send_packet(elapsed_s: float, timestamp_s: float):
+        def send_packet(elapsed_s: float, timestamp_s: float, intent=None):
             step = world.step(elapsed_s)
             command = control.tick(
                 frame=step,
                 timestamp_s=timestamp_s,
-                intent=step.intent.name.lower(),
+                intent=intent,
                 obstacle_distance_m=step.obstacle_distance_m,
             )
             if step.transmit:
                 sender.send(step.command_override or command)
 
-        send_packet(0.0, time.monotonic())
+        send_packet(0.0, time.monotonic(), intent="following")
         await asyncio.sleep(SETPOINT_PERIOD_S * 2)
         await drone.offboard.start()
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
         started_at = time.monotonic()
         visual_model.started_at_s = started_at
+        language_model.started_at_s = started_at
         mind_task = asyncio.create_task(
             control.think_loop(
                 mind_stop,
