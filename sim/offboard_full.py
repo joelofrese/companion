@@ -1,6 +1,7 @@
 """Verify the full camera-to-PX4 path in SITL."""
 
 import asyncio
+import socket
 import subprocess
 import sys
 import time
@@ -89,6 +90,8 @@ async def run(image_path: str):
     video_fault_reported = False
     target_loss_reported = False
     command_dropout_reported = False
+    malformed_packet_reported = False
+    malformed_socket = None
 
     def current_obstacle(timestamp_s):
         elapsed_s = max(0.0, timestamp_s - flight_started_at)
@@ -115,6 +118,7 @@ async def run(image_path: str):
         safe_commands = RecordingForwarder(forwarder)
 
         receiver.start()
+        malformed_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         cm5_service = SafetyCommandService(
             receiver,
             safe_commands,
@@ -130,12 +134,19 @@ async def run(image_path: str):
                 sender.start()
 
             def send(self, command):
-                nonlocal command_dropout_reported
+                nonlocal command_dropout_reported, malformed_packet_reported
                 elapsed_s = time.monotonic() - flight_started_at
                 if COMMAND_DROPOUT_START_S <= elapsed_s < COMMAND_DROPOUT_END_S:
                     if not command_dropout_reported:
                         print("Command packet loss injected during following.")
                         command_dropout_reported = True
+                    if not malformed_packet_reported:
+                        malformed_socket.sendto(
+                            b"not-a-command",
+                            ("127.0.0.1", receiver.port),
+                        )
+                        print("Malformed command packet injected during dropout.")
+                        malformed_packet_reported = True
                     return
                 sender.send(command)
 
@@ -406,6 +417,8 @@ async def run(image_path: str):
             close_subprocess(camera_process)
         if sender is not None:
             sender.close()
+        if malformed_socket is not None:
+            malformed_socket.close()
         close_mavsdk(drone)
 
 

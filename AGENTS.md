@@ -171,5 +171,8 @@ calibration, not replace the simulation-first development loop.
   keeping two CM5 setpoint periods between priming and PX4 offboard start. A
   full RTP mission then passed without the intermittent `NO_SETPOINT_SET`
   race, including stale-sensor recovery, landing, and disarm.
+- **2026-07-30** — Replaced one RTP dropout packet with malformed UDP input.
+  The CM5 ignored it, expired the last valid heartbeat, recovered when valid
+  packets returned, and still completed the full mission through disarm.
 
 as always, thank you, good luck, and i love you
