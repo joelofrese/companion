@@ -141,5 +141,8 @@ calibration, not replace the simulation-first development loop.
   is now reserved for the CM5 obstacle-safety override. The deterministic SITL
   mission still passed every motion, fault, recovery, landing, and disarm
   objective.
+- **2026-07-30** — Repeated 45-second exploratory SITL in the `forest` and
+  `windy` Gazebo worlds; both stayed within the exploratory speed envelope and
+  completed landing and disarm.
 
 as always, thank you, good luck, and i love you

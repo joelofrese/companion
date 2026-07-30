@@ -139,7 +139,7 @@ class WorldVisualModel:
     ) -> VisualObservation:
         elapsed_s = max(0.0, timestamp_s - self.started_at_s)
         target_offset_east_m = self.world.target_offset_east(elapsed_s)
-        if intent in {"idle", "hover", "hovering"} or target_offset_east_m is None:
+        if intent in {"idle", "hover"} or target_offset_east_m is None:
             movement = "stop"
             description = "no movement target is available"
         elif target_offset_east_m > 0.0:

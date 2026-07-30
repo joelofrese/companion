@@ -28,7 +28,7 @@ class DistanceMessage:
 
 
 def demo_state(elapsed_s: float) -> str:
-    """Repeat following and hovering."""
+    """Repeat following and hover intents."""
 
     following = (
         0.0 <= elapsed_s < FOLLOW_END_S
