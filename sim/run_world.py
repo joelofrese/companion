@@ -164,7 +164,7 @@ def main(argv=None):
     parser.add_argument(
         "--image",
         type=Path,
-        help="run production RTP/YOLO full-stack verification with this person image",
+        help="run the temporary RTP/person-detection full-stack verification with this image",
     )
     parser.add_argument(
         "--explore",

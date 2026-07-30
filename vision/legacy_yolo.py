@@ -1,4 +1,4 @@
-"""Find people with YOLO and return one detection."""
+"""Temporary person detector for the hardware-shaped fallback path."""
 
 import math
 from numbers import Real

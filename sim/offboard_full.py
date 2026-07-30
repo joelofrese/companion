@@ -38,7 +38,7 @@ from sim.offboard_control import (
 )
 from sim.video_loopback import image_sender_command
 from vision.latest import LatestVisionPipeline
-from vision.person_detector import YoloPersonDetector
+from vision.legacy_yolo import YoloPersonDetector
 from vision.pipeline import PersonVisionPipeline
 from vision.video_stream import (
     AsyncLatestFrameReader,

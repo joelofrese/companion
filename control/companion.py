@@ -1,4 +1,4 @@
-"""Run the Mac control program."""
+"""Run the temporary YOLO-based Mac control fallback."""
 
 import argparse
 import asyncio
@@ -9,7 +9,7 @@ from control.reactive import ReactiveController, State
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
 from vision.latest import LatestVisionPipeline
-from vision.person_detector import YoloPersonDetector
+from vision.legacy_yolo import YoloPersonDetector
 from vision.pipeline import PersonVisionPipeline
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
@@ -25,7 +25,7 @@ def build_parser():
     )
     parser.add_argument("--whisper-model", default="tiny.en")
     parser.add_argument("--record-duration", type=float, default=3.0)
-    parser.add_argument("--model", default="yolov8n.pt")
+    parser.add_argument("--yolo-model", default="yolov8n.pt")
     parser.add_argument("--command-port", type=int, default=5001)
     parser.add_argument("--video-port", type=int, default=5000)
     parser.add_argument("--width", type=int, default=640)
@@ -61,7 +61,7 @@ async def run(args):
     receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(receiver)
     vision = LatestVisionPipeline(
-        PersonVisionPipeline(YoloPersonDetector(model_path=args.model))
+        PersonVisionPipeline(YoloPersonDetector(model_path=args.yolo_model))
     )
     control = CompanionRuntime(
         vision,
