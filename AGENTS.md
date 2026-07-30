@@ -167,5 +167,9 @@ calibration, not replace the simulation-first development loop.
   missions. Both now stop through the CM5 freshness timeout when distance data
   goes silent, verify recovery when it returns, and still complete landing and
   disarm.
+- **2026-07-30** — Matched RTP offboard startup to the synthetic path by
+  keeping two CM5 setpoint periods between priming and PX4 offboard start. A
+  full RTP mission then passed without the intermittent `NO_SETPOINT_SET`
+  race, including stale-sensor recovery, landing, and disarm.
 
 as always, thank you, good luck, and i love you
