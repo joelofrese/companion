@@ -280,6 +280,12 @@ async def run(
                 sender.send(step.command_override or command)
 
         send_packet(0.0, time.monotonic(), intent="following")
+        deadline = time.monotonic() + 5.0
+        while not safe_commands.commands and time.monotonic() < deadline:
+            await asyncio.sleep(SETPOINT_PERIOD_S)
+        if not safe_commands.commands:
+            raise RuntimeError("CM5 did not forward a priming setpoint")
+        print("CM5 priming setpoint=verified.")
         await asyncio.sleep(SETPOINT_PERIOD_S * 2)
         await drone.offboard.start()
         offboard_started = True

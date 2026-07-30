@@ -89,11 +89,12 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 ```
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The synthetic world exercises
-the command path, motion, target loss, obstacle handling, malformed input,
-dropout, recovery, sustained hover, shutdown, landing, and disarm. The image
-scenario exercises decoded RTP/video, perception, Mac commands, onboard safety,
-and PX4. Neither scenario proves physical sensors, radio behavior, or
-hardware-specific transport.
+the command path, motion, target loss, obstacle handling, invalid and stale
+sensor data, dropout, recovery, sustained hover, shutdown, landing, and
+disarm. The image scenario exercises decoded RTP/video, perception, Mac
+commands, malformed and stale wire packets, onboard safety, and PX4. Neither
+scenario proves physical sensors, radio behavior, or hardware-specific
+transport.
 
 Add `--camera` to an exploratory run to use Gazebo's rendered
 `x500_mono_cam` image topic as subconscious input. The simulated visual model
@@ -181,5 +182,12 @@ calibration, not replace the simulation-first development loop.
   memory path: each thought retains the newest visual description as its
   summary. Deterministic and RTP SITL now explicitly verify that perception
   reaches conscious memory before completing landing and disarm.
+- **2026-07-30** — Removed the obsolete `STEERING.md` ignore rule and corrected
+  the simulation description to match the current sensor and wire-fault
+  coverage.
+- **2026-07-30** — Made the synthetic runner wait for a real CM5-forwarded
+  priming setpoint before PX4 offboard start. A 45-second rendered-camera run
+  in Gazebo's `forest` world then processed 723 frames, retained conscious
+  visual memory, stayed bounded, and landed/disarmed cleanly.
 
 as always, thank you, good luck, and i love you
