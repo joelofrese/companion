@@ -209,7 +209,9 @@ class MacMind:
             dialogue=decision.dialogue,
             summary=summary,
         )
-        if self.memory_store is not None:
+        if self.memory_store is not None and (
+            information.new_observations or information.dialogue
+        ):
             entry = f"intent={intent}; {summary}"
             if information.dialogue:
                 entry = f"user={information.dialogue}; {entry}"
