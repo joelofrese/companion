@@ -134,6 +134,7 @@ class MacMind:
         self.language_model = language_model
         self.memory_store = memory
         self.memory = MindMemory()
+        self._intent_generation = 0
         self._new_observations = deque[VisualObservation](
             maxlen=MAX_PENDING_OBSERVATIONS
         )
@@ -149,7 +150,9 @@ class MacMind:
             if intent == self.memory.intent:
                 return
             self.memory.intent = intent
+            self._intent_generation += 1
             self.memory.focus = ""
+            self.memory.summary = ""
             self.memory.previous_movement = "stop"
             self.memory.previous_observation = ""
             self._new_observations.clear()
@@ -197,6 +200,7 @@ class MacMind:
         """Ask the LLM to update intent, focus, dialogue, and summary."""
 
         with self._lock:
+            intent_generation = self._intent_generation
             information = ConsciousInput(
                 new_observations=tuple(self._new_observations),
                 summary=self.memory.summary,
@@ -220,16 +224,18 @@ class MacMind:
             dialogue=decision.dialogue,
             summary=summary,
         )
-        if self.memory_store is not None and (
-            information.new_observations or information.dialogue
-        ):
-            entry = f"intent={intent}; focus={decision.focus or 'none'}; {summary}"
-            if isinstance(decision.dialogue, str) and decision.dialogue.strip():
-                entry += f"; response={decision.dialogue}"
-            if information.dialogue:
-                entry = f"user={information.dialogue}; {entry}"
-            self.memory_store.remember(entry)
         with self._lock:
+            if self._intent_generation != intent_generation:
+                return ConsciousDecision(intent=self.memory.intent)
+            if self.memory_store is not None and (
+                information.new_observations or information.dialogue
+            ):
+                entry = f"intent={intent}; focus={decision.focus or 'none'}; {summary}"
+                if isinstance(decision.dialogue, str) and decision.dialogue.strip():
+                    entry += f"; response={decision.dialogue}"
+                if information.dialogue:
+                    entry = f"user={information.dialogue}; {entry}"
+                self.memory_store.remember(entry)
             self.memory.intent = intent
             self.memory.focus = decision.focus
             self.memory.summary = decision.summary

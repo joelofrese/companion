@@ -38,7 +38,7 @@ merge and delete it.
 - The Mac conscious LLM uses those observations, dialogue, telemetry, and
   memory to choose high-level intent.
 - Mac control turns the suggestion into slow velocity commands.
-- A changed intent clears older visual focus and observations.
+- A changed intent clears older visual context and pending decisions.
 - Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.
@@ -171,7 +171,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Dialogue and bounded editable memory work across runs. Memory preserves
   requests, decisions, focus, and responses; natural intents and open-ended
   requests use one shared intent path.
-- Changing intent clears older visual context before new perception is used.
+- Changing intent clears older visual context before new perception or
+  conscious decisions are used.
 - Simulation arguments are validated once before PX4 starts. Missing or stale
   frames and sensors, malformed commands, command dropout, low confidence,
   and model shutdown fail safely.
