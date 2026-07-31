@@ -35,8 +35,6 @@ async def prepare(drone):
     async for health in drone.telemetry.health():
         if (
             health.is_armable
-            and health.is_global_position_ok
-            and health.is_home_position_ok
             and health.is_local_position_ok
             and health.is_magnetometer_calibration_ok
         ):

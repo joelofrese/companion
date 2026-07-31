@@ -66,6 +66,8 @@ control path, perception, varied worlds, faults, recovery, safety, long runs,
 landing, and disarm. Verify actual output or telemetry, including connection,
 readiness, arming, offboard setpoints, motion, safety intervention, landing,
 and disarm.
+Simulation readiness checks local position and magnetometer health, not global
+position or home health, so the flight path does not require GPS.
 
 Do not add unit tests. They add rigidity without helping the project’s
 simulation-first goal. Prefer small end-to-end checks and real simulator
