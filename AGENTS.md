@@ -162,6 +162,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   CM5 safety faults, recovery, hover, landing, and disarm.
 - A 120-second exploratory Gazebo mission passed with 2,347 VLM observations,
   120 conscious thoughts, bounded telemetry, landing, and disarm.
+- The walls-world depth mission passed 374 valid sensor samples, observed a
+  0.52 m minimum range, and verified CM5 obstacle backoff and recovery.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
