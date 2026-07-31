@@ -218,6 +218,8 @@ class MacMind:
             information.new_observations or information.dialogue
         ):
             entry = f"intent={intent}; {summary}"
+            if isinstance(decision.dialogue, str) and decision.dialogue.strip():
+                entry += f"; response={decision.dialogue}"
             if information.dialogue:
                 entry = f"user={information.dialogue}; {entry}"
             self.memory_store.remember(entry)

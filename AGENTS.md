@@ -167,7 +167,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   worlds, with completed VLM and conscious-thought counts reported. An
   open-ended camera question reaches the conscious model and returns a focus.
 - Exploratory dialogue and editable experience memory work across runs. Memory
-  is limited to 64 entries of 240 characters each.
+  records requests, decisions, and responses in at most 64 entries of 240
+  characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
 - Empty scripted dialogue is rejected before PX4 starts; open-ended dialogue
   is passed to the conscious model.
