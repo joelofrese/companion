@@ -325,6 +325,9 @@ async def run(
         depth_samples = 0
         valid_depth_samples = 0
         minimum_depth_distance = math.inf
+        north_velocity_m_s = None
+        east_velocity_m_s = None
+        down_velocity_m_s = None
 
         def read_step(elapsed_s: float):
             nonlocal depth_samples, valid_depth_samples, minimum_depth_distance
@@ -391,7 +394,10 @@ async def run(
             control.think_loop(
                 mind_stop,
                 telemetry_provider=lambda: Telemetry(
-                    obstacle_distance_m=sender.obstacle_distance()
+                    obstacle_distance_m=sender.obstacle_distance(),
+                    north_velocity_m_s=north_velocity_m_s,
+                    east_velocity_m_s=east_velocity_m_s,
+                    down_velocity_m_s=down_velocity_m_s,
                 ),
                 dialogue_provider=dialogue_input.next if dialogue_input else None,
             )
@@ -410,7 +416,11 @@ async def run(
         async def observe_velocity():
             nonlocal max_north_velocity, min_north_velocity
             nonlocal max_east_velocity, min_east_velocity
+            nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
             async for velocity in drone.telemetry.velocity_ned():
+                north_velocity_m_s = velocity.north_m_s
+                east_velocity_m_s = velocity.east_m_s
+                down_velocity_m_s = velocity.down_m_s
                 max_north_velocity = max(max_north_velocity, velocity.north_m_s)
                 min_north_velocity = min(min_north_velocity, velocity.north_m_s)
                 max_east_velocity = max(max_east_velocity, velocity.east_m_s)

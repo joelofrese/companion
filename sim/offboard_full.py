@@ -87,6 +87,9 @@ async def run(image_path: str, expect_person: bool = False):
     min_north_velocity = 0.0
     max_east_velocity = 0.0
     min_east_velocity = 0.0
+    north_velocity_m_s = None
+    east_velocity_m_s = None
+    down_velocity_m_s = None
     frames_received = 0
     video_fault_reported = False
     target_loss_reported = False
@@ -184,7 +187,10 @@ async def run(image_path: str, expect_person: bool = False):
             control.think_loop(
                 mind_stop,
                 telemetry_provider=lambda: Telemetry(
-                    obstacle_distance_m=sender.obstacle_distance()
+                    obstacle_distance_m=sender.obstacle_distance(),
+                    north_velocity_m_s=north_velocity_m_s,
+                    east_velocity_m_s=east_velocity_m_s,
+                    down_velocity_m_s=down_velocity_m_s,
                 ),
             )
         )
@@ -239,7 +245,11 @@ async def run(image_path: str, expect_person: bool = False):
         async def observe_velocity():
             nonlocal max_north_velocity, min_north_velocity
             nonlocal max_east_velocity, min_east_velocity
+            nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
             async for velocity in drone.telemetry.velocity_ned():
+                north_velocity_m_s = velocity.north_m_s
+                east_velocity_m_s = velocity.east_m_s
+                down_velocity_m_s = velocity.down_m_s
                 max_north_velocity = max(max_north_velocity, velocity.north_m_s)
                 min_north_velocity = min(min_north_velocity, velocity.north_m_s)
                 max_east_velocity = max(max_east_velocity, velocity.east_m_s)

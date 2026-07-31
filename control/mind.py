@@ -57,6 +57,9 @@ class Telemetry:
 
     obstacle_distance_m: Optional[float] = None
     last_command: Optional[VelocityCommand] = None
+    north_velocity_m_s: Optional[float] = None
+    east_velocity_m_s: Optional[float] = None
+    down_velocity_m_s: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -243,6 +246,10 @@ class MacMind:
                 entry = (
                     f"intent={intent}; focus={decision.focus or 'none'}; "
                     f"command={information.telemetry.last_command or 'none yet'}; "
+                    "velocity="
+                    f"north={information.telemetry.north_velocity_m_s},"
+                    f"east={information.telemetry.east_velocity_m_s},"
+                    f"down={information.telemetry.down_velocity_m_s}; "
                     f"{summary}"
                 )
                 if isinstance(decision.dialogue, str) and decision.dialogue.strip():

@@ -251,6 +251,10 @@ New visual observations:
 {observations}
 Optional user dialogue: {information.dialogue or "none"}
 Last requested command: {information.telemetry.last_command or "none yet"}
+Measured NED velocity:
+north={information.telemetry.north_velocity_m_s}
+east={information.telemetry.east_velocity_m_s}
+down={information.telemetry.down_velocity_m_s}
 Forward obstacle distance: {information.telemetry.obstacle_distance_m}
 
 The summary should stay short and describe what the drone currently knows.
