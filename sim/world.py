@@ -271,6 +271,7 @@ async def run(
     gazebo_camera = None
     gazebo_depth = None
     control = None
+    applied_dialogue_intent = None
     offboard_started = False
     armed = False
     landed = False
@@ -390,6 +391,16 @@ async def run(
         if ollama_client is None:
             visual_model.started_at_s = started_at
             language_model.started_at_s = started_at
+        dialogue_provider = None
+        if dialogue_input is not None:
+            def read_dialogue():
+                nonlocal applied_dialogue_intent
+                message = dialogue_input.next()
+                if message:
+                    applied_dialogue_intent = parse_intent(message)
+                return message
+
+            dialogue_provider = read_dialogue
         mind_task = asyncio.create_task(
             control.think_loop(
                 mind_stop,
@@ -399,7 +410,7 @@ async def run(
                     east_velocity_m_s=east_velocity_m_s,
                     down_velocity_m_s=down_velocity_m_s,
                 ),
-                dialogue_provider=dialogue_input.next if dialogue_input else None,
+                dialogue_provider=dialogue_provider,
             )
         )
         if dialogue_input:
@@ -515,12 +526,12 @@ async def run(
         if control.decision_count == 0:
             raise RuntimeError("SITL did not complete a conscious thought")
         if requested_intent is not None:
-            if decision.intent != requested_intent:
+            if applied_dialogue_intent != requested_intent:
                 raise RuntimeError(
-                    "SITL did not apply the scripted dialogue request: "
-                    f"expected {requested_intent}, got {decision.intent}"
+                    "SITL did not receive the scripted dialogue request: "
+                    f"expected {requested_intent}, got {applied_dialogue_intent}"
                 )
-            print(f"Scripted dialogue=verified: intent={decision.intent}.")
+            print(f"Scripted dialogue=verified: intent={requested_intent}.")
         elif dialogue_request is not None:
             print("Scripted open-ended dialogue=delivered to the conscious mind.")
         print(
