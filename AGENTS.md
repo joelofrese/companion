@@ -171,6 +171,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   camera frames, two VLM observations, two conscious thoughts, and disarmed.
 - The model-driven walls-world run completed 347 frames and three VLM/thought
   cycles, returned a focused obstacle description, and disarmed safely.
+- The combined Ollama/depth walls run produced a focused obstacle answer,
+  223 valid depth samples, CM5 backoff, landing, and disarm.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
