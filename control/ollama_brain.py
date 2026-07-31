@@ -51,7 +51,7 @@ def _text(data: Dict[str, Any], name: str) -> str:
     if not isinstance(value, str):
         return ""
     value = value.strip()
-    return "" if value.lower() in {"", "{}", "[]", "null", "none"} else value
+    return "" if value.lower() in {"", "{}", "[]", "null", "none", "empty", "n/a"} else value
 
 
 def _confidence(data: Dict[str, Any]) -> float:

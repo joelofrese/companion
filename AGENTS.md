@@ -167,6 +167,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   120 conscious thoughts, bounded telemetry, landing, and disarm.
 - The walls-world depth mission passed 374 valid sensor samples, observed a
   0.52 m minimum range, and verified CM5 obstacle backoff and recovery.
+- A model-driven rendered-camera run accepted a natural goal, completed 207
+  camera frames, two VLM observations, two conscious thoughts, and disarmed.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
