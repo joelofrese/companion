@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 from control.mind import ConsciousDecision, ConsciousInput, Telemetry, VisualObservation
+from voice.intent import parse_intent
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
@@ -235,7 +236,8 @@ The summary should stay short and describe what the drone currently knows.
 Dialogue should be empty unless a user deserves a response.
 """.strip()
         data = self.client.chat(self.model, prompt, CONSCIOUS_SCHEMA)
-        intent = _text(data, "intent")
+        dialogue_intent = parse_intent(information.dialogue) if information.dialogue else None
+        intent = dialogue_intent or _text(data, "intent")
         if not intent:
             raise RuntimeError("Ollama returned an empty conscious intent")
         return ConsciousDecision(
