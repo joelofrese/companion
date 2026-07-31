@@ -697,6 +697,7 @@ async def run(
 
 if __name__ == "__main__":
     import argparse
+    import sys
 
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
@@ -716,18 +717,22 @@ if __name__ == "__main__":
         help="initial intent for an exploratory run",
     )
     args = parser.parse_args()
-    asyncio.run(
-        run(
-            exploratory=args.explore,
-            camera=args.camera,
-            depth=args.depth,
-            world_name=args.world,
-            duration_s=args.duration,
-            ollama=args.ollama,
-            vlm_model=args.vlm_model,
-            llm_model=args.llm_model,
-            ollama_timeout=args.ollama_timeout,
-            initial_intent=args.intent,
-            memory_path=args.memory,
+    try:
+        asyncio.run(
+            run(
+                exploratory=args.explore,
+                camera=args.camera,
+                depth=args.depth,
+                world_name=args.world,
+                duration_s=args.duration,
+                ollama=args.ollama,
+                vlm_model=args.vlm_model,
+                llm_model=args.llm_model,
+                ollama_timeout=args.ollama_timeout,
+                initial_intent=args.intent,
+                memory_path=args.memory,
+            )
         )
-    )
+    except (RuntimeError, ValueError) as error:
+        print(f"simulation: {error}", file=sys.stderr)
+        raise SystemExit(1)

@@ -164,11 +164,13 @@ Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
 without replacing it. The voice path is a direct one-utterance pipeline, and
-the conscious model receives each visual observation’s focused answer and
-confidence. Typed dialogue now uses the same non-blocking input path in
-simulation and the production Mac entry point. Mac motion now requires at
-least 0.5 visual confidence, and pending observations are bounded while the
-conscious summary and editable experience memory carry longer context.
+unavailable local model services now produce one concise simulation error after
+PX4/Gazebo cleanup. The conscious model receives each visual observation’s
+focused answer and confidence. Typed dialogue now uses the same non-blocking
+input path in simulation and the production Mac entry point. Mac motion now
+requires at least 0.5 visual confidence, and pending observations are bounded
+while the conscious summary and editable experience memory carry longer
+context.
 Exploratory runs can persist that experience with `--memory` so later runs can
 receive it. Empty thoughts are not saved; visual observations and dialogue are.
 Use the default or a longer duration for local model runs; a short exploratory
