@@ -24,7 +24,6 @@ from onboard.ros2_bridge import LatestDistanceSensor
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.gazebo_camera import GazeboCamera
 from sim.gazebo_depth import GazeboDepthRangefinder
-from sim.gazebo_range import GazeboRangefinder
 from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
@@ -193,7 +192,6 @@ class WorldLanguageModel:
 async def run(
     exploratory: bool = False,
     camera: bool = False,
-    lidar: bool = False,
     world_name: str = "default",
     duration_s: float = PROFILE_DURATION_S,
     ollama: bool = False,
@@ -211,10 +209,8 @@ async def run(
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
     if initial_intent not in {"hover", "following"}:
         raise ValueError("initial exploratory intent must be hover or following")
-    if sum((camera, lidar, depth)) > 1:
-        raise ValueError("camera, lidar, and depth modes cannot run together")
-    if lidar and not exploratory:
-        raise ValueError("Gazebo lidar mode requires exploratory simulation")
+    if camera and depth:
+        raise ValueError("camera and depth modes cannot run together")
     if depth and not exploratory:
         raise ValueError("Gazebo depth mode requires exploratory simulation")
     if ollama and not (exploratory and (camera or depth)):
@@ -238,7 +234,6 @@ async def run(
     offboard_task = None
     dialogue_input = DialogueInput() if exploratory else None
     gazebo_camera = None
-    gazebo_rangefinder = None
     gazebo_depth = None
     control = None
     offboard_started = False
@@ -272,12 +267,6 @@ async def run(
                 f"link/camera_link/sensor/{camera_sensor}/image"
             )
             gazebo_camera.start()
-        if lidar:
-            gazebo_rangefinder = GazeboRangefinder(
-                f"/world/{world_name}/model/x500_lidar_front_0/"
-                "link/lidar_sensor_link/sensor/lidar/scan"
-            )
-            gazebo_rangefinder.start()
         if depth:
             gazebo_depth = GazeboDepthRangefinder("/depth_camera")
             gazebo_depth.start()
@@ -291,31 +280,13 @@ async def run(
         control = MindRuntime(MacMind(visual_model, language_model))
 
         camera_frames = 0
-        lidar_samples = 0
-        valid_lidar_samples = 0
-        minimum_lidar_distance = math.inf
         depth_samples = 0
         valid_depth_samples = 0
         minimum_depth_distance = math.inf
 
         def read_step(elapsed_s: float):
-            nonlocal lidar_samples, valid_lidar_samples, minimum_lidar_distance
             nonlocal depth_samples, valid_depth_samples, minimum_depth_distance
             step = world.step(elapsed_s)
-            if gazebo_rangefinder is not None:
-                sample = gazebo_rangefinder.latest()
-                if sample is not None:
-                    distance_sensor.update(sample)
-                    lidar_samples += 1
-                    distance = distance_sensor.read()
-                    if math.isfinite(distance):
-                        valid_lidar_samples += 1
-                        minimum_lidar_distance = min(minimum_lidar_distance, distance)
-                return replace(
-                    step,
-                    obstacle_distance_m=distance_sensor.read(),
-                    distance_fresh=sample is not None,
-                )
             if gazebo_depth is not None:
                 sample = gazebo_depth.latest()
                 if sample is not None:
@@ -470,7 +441,7 @@ async def run(
         commands = safe_commands.commands
         if not commands or commands[-1][1] != VelocityCommand():
             raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
-        if lidar or depth:
+        if depth:
             minimum_forwarded_north = min(
                 command.north_m_s for _, command in commands
             )
@@ -652,14 +623,6 @@ async def run(
             if camera_frames == 0:
                 raise RuntimeError("Gazebo did not provide a camera frame")
             print(f"Gazebo camera frames=verified ({camera_frames}).")
-        if lidar:
-            if not valid_lidar_samples:
-                raise RuntimeError("Gazebo did not provide a valid lidar reading")
-            print(
-                "Gazebo lidar samples=verified: "
-                f"{valid_lidar_samples} valid of {lidar_samples}."
-            )
-            print(f"Minimum Gazebo lidar distance: {minimum_lidar_distance:.2f}m")
         if depth:
             if not valid_depth_samples:
                 raise RuntimeError("Gazebo did not provide a valid depth reading")
@@ -678,8 +641,6 @@ async def run(
         receiver.close()
         if gazebo_camera is not None:
             gazebo_camera.close()
-        if gazebo_rangefinder is not None:
-            gazebo_rangefinder.close()
         if gazebo_depth is not None:
             gazebo_depth.close()
         if sender is not None:
@@ -714,7 +675,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
     parser.add_argument("--camera", action="store_true")
-    parser.add_argument("--lidar", action="store_true")
     parser.add_argument("--depth", action="store_true")
     parser.add_argument("--ollama", action="store_true")
     parser.add_argument("--vlm-model", default="gemma3:4b")
@@ -733,7 +693,6 @@ if __name__ == "__main__":
         run(
             exploratory=args.explore,
             camera=args.camera,
-            lidar=args.lidar,
             depth=args.depth,
             world_name=args.world,
             duration_s=args.duration,

@@ -49,6 +49,10 @@ video and sensors, performs the final safety check, and forwards approved
 velocity setpoints to PX4. Keep hardware-specific code on the CM5 side so Mac
 behavior stays easy to simulate.
 
+The target hardware is the DroneBlocks DEXI 3: PX4, optical flow, a TOF
+distance sensor, a Raspberry Pi camera, and a Raspberry Pi CM5. It has no
+lidar. Keep simulation sensors clearly separate from this hardware boundary.
+
 Keep the VLM and conscious LLM as separate sessions with small structured data
 between them. Keep movement slow, deliberate, and easy to stop.
 
@@ -81,8 +85,6 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --explore --camera
-.venv/bin/python -m sim.run_world --explore --lidar --world walls
-.venv/bin/python -m sim.run_world --explore --lidar --world walls --intent following --pose 4,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --camera --ollama
 .venv/bin/python -m sim.run_world --explore --depth --ollama --world walls --intent following --pose 3.8,0,0,0,0,0
@@ -108,16 +110,11 @@ request such as `follow me`, `hover`, or `stop` during an exploratory
 synthetic run to change the conscious intent. Use `--world walls`, `forest`,
 `windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
 
-Add `--lidar` to an exploratory run to use PX4’s Gazebo `x500_lidar_front`
-model and feed its real forward ray readings into the CM5 safety path. The
-stock camera and lidar models are separate, so use them in separate runs. Use
-`--intent following` and `--pose x,y,z,roll,pitch,yaw` to start moving near a
-world obstacle and observe the real sensor trigger local safety.
-
 Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
-feed the Mac brain while its depth image supplies the CM5 forward safety
-distance, so one stock vehicle exercises both perception and real obstacle
-data.
+This is a simulation-only approximation of the DEXI 3’s forward TOF distance
+sensor, not a claim that DEXI 3 has a depth camera. Use `--intent following`
+and `--pose x,y,z,roll,pitch,yaw` to start near a world obstacle and observe
+the simulated sensor trigger local safety.
 
 The deterministic RTP scenario uses YOLO only as a repeatable person-image
 fixture. It is not the production brain. Production `control/` uses local
@@ -142,11 +139,12 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 ## Current state
 
 The deterministic mission, person and non-person RTP images, rendered Gazebo
-camera, lidar, and depth input, local Ollama camera and depth input, live
+camera and depth input, local Ollama camera and depth input, live
 exploratory dialogue, command loopback, safety faults, recovery, landing, and
 disarm have been verified. Near-wall exploratory runs measure real sensor
-distances and trigger a bounded CM5 backoff command. The three Gazebo sensor
-readers share one small topic reader while keeping their decoders explicit.
+distances and trigger a bounded CM5 backoff command. The two Gazebo sensor
+readers share one small topic reader while keeping their camera and depth
+decoders explicit.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
