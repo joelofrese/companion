@@ -175,6 +175,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   223 valid depth samples, CM5 backoff, landing, and disarm.
 - The combined forest-world run completed 206 camera frames and 186 valid depth
   samples, returned a focused range answer, and disarmed without backoff.
+- The windy-world exploratory run completed 395 VLM observations and 21
+  conscious thoughts while staying within its 1.0 m/s motion envelope.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
