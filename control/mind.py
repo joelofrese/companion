@@ -173,6 +173,7 @@ class MacMind:
         """Ask the VLM to describe one image."""
 
         with self._lock:
+            intent_generation = self._intent_generation
             focus = self.memory.focus
             intent = self.memory.intent
             previous_movement = self.memory.previous_movement
@@ -187,9 +188,10 @@ class MacMind:
             telemetry=telemetry,
         )
         with self._lock:
-            self.memory.previous_movement = observation.movement
-            self.memory.previous_observation = observation.description
-            self._new_observations.append(observation)
+            if self._intent_generation == intent_generation:
+                self.memory.previous_movement = observation.movement
+                self.memory.previous_observation = observation.description
+                self._new_observations.append(observation)
         return observation
 
     def think(

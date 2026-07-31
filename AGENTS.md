@@ -38,7 +38,7 @@ merge and delete it.
 - The Mac conscious LLM uses those observations, dialogue, telemetry, and
   memory to choose high-level intent.
 - Mac control turns the suggestion into slow velocity commands.
-- A changed intent clears older visual context and pending decisions.
+- A changed intent invalidates older visual context and pending brain results.
 - Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.
