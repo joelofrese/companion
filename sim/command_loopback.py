@@ -68,7 +68,7 @@ async def run():
                 control,
                 sender,
                 frame_reader,
-                obstacle_provider=lambda timestamp_s: sender.obstacle_distance(),
+                obstacle_provider=sender.obstacle_distance,
                 tick_period_s=0.01,
             ).run(mac_stop_event)
         )

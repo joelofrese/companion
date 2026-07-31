@@ -88,7 +88,7 @@ async def run(args):
         control,
         sender,
         frame_reader.read,
-        obstacle_provider=lambda timestamp_s: sender.obstacle_distance(),
+        obstacle_provider=sender.obstacle_distance,
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()

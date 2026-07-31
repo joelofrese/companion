@@ -34,7 +34,7 @@ class UdpControlService:
         sender: UdpCommandSender,
         frame_reader: FrameReader,
         intent_provider: Optional[Callable[[float], Optional[str]]] = None,
-        obstacle_provider: Optional[Callable[[float], Optional[float]]] = None,
+        obstacle_provider: Optional[Callable[[], Optional[float]]] = None,
         tick_period_s: float = 0.05,
         frame_timeout_s: float = 2.0,
     ):
@@ -56,7 +56,7 @@ class UdpControlService:
         self.sender = sender
         self.frame_reader = frame_reader
         self.intent_provider = intent_provider or (lambda timestamp_s: None)
-        self.obstacle_provider = obstacle_provider or (lambda timestamp_s: None)
+        self.obstacle_provider = obstacle_provider or (lambda: None)
         self.tick_period_s = tick_period_s
         self.frame_timeout_s = frame_timeout_s
 
@@ -81,7 +81,7 @@ class UdpControlService:
                     frame=frame,
                     timestamp_s=timestamp_s,
                     intent=self.intent_provider(timestamp_s),
-                    obstacle_distance_m=self.obstacle_provider(timestamp_s),
+                    obstacle_distance_m=self.obstacle_provider(),
                 )
                 self.sender.send(command)
                 await asyncio.sleep(self.tick_period_s)

@@ -220,7 +220,7 @@ async def run(image_path: str, expect_person: bool = False):
             mac_sender,
             read_frame,
             intent_provider=current_intent,
-            obstacle_provider=lambda timestamp_s: sender.obstacle_distance(),
+            obstacle_provider=sender.obstacle_distance,
             tick_period_s=SETPOINT_PERIOD_S,
         )
         mac_task = asyncio.create_task(mac_service.run(mac_stop))

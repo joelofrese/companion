@@ -192,6 +192,9 @@ the onboard hardware path remains the ROS 2 forwarder.
 The obsolete synthetic camera fallback was removed after the live-frame stop
 boundary made it unreachable. The deterministic Gazebo mission passed again,
 including faults, recovery, landing, and disarm.
+The Mac obstacle-telemetry callback no longer carries an unused timestamp;
+production, UDP loopback, deterministic SITL, and RTP/person SITL all passed
+through the simpler direct sender method.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
