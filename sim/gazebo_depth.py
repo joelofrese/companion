@@ -35,7 +35,9 @@ def _decode_depth(message):
         height // 4 : 3 * height // 4,
         width // 4 : 3 * width // 4,
     ]
-    valid = center[np.isfinite(center)]
-    valid = valid[(valid >= MIN_DEPTH_M) & (valid <= MAX_DEPTH_M)]
+    finite = center[np.isfinite(center)]
+    valid = finite[(finite >= MIN_DEPTH_M) & (finite <= MAX_DEPTH_M)]
+    if not valid.size and center.size and np.all(np.isposinf(center)):
+        return DistanceMessage(MAX_DEPTH_M, MIN_DEPTH_M, MAX_DEPTH_M)
     distance = float(np.min(valid)) if valid.size else math.nan
     return DistanceMessage(distance, MIN_DEPTH_M, MAX_DEPTH_M)

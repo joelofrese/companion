@@ -275,6 +275,19 @@ async def run(
     landed = False
     distance_sensor = LatestDistanceSensor()
     try:
+        world = SyntheticWorld(exploratory)
+        if camera or depth:
+            camera_sensor = "IMX214" if depth else "camera"
+            camera_model = "x500_depth" if depth else "x500_mono_cam"
+            gazebo_camera = GazeboCamera(
+                f"/world/{world_name}/model/{camera_model}_0/"
+                f"link/camera_link/sensor/{camera_sensor}/image"
+            )
+            gazebo_camera.start()
+        if depth:
+            gazebo_depth = GazeboDepthRangefinder("/depth_camera")
+            gazebo_depth.start()
+
         await prepare(drone)
         armed = True
 
@@ -292,18 +305,6 @@ async def run(
         service_task = asyncio.create_task(service.run(service_stop))
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         started_at = time.monotonic()
-        world = SyntheticWorld(exploratory)
-        if camera or depth:
-            camera_sensor = "IMX214" if depth else "camera"
-            camera_model = "x500_depth" if depth else "x500_mono_cam"
-            gazebo_camera = GazeboCamera(
-                f"/world/{world_name}/model/{camera_model}_0/"
-                f"link/camera_link/sensor/{camera_sensor}/image"
-            )
-            gazebo_camera.start()
-        if depth:
-            gazebo_depth = GazeboDepthRangefinder("/depth_camera")
-            gazebo_depth.start()
         if ollama_client is None:
             visual_model = WorldVisualModel(
                 world,
