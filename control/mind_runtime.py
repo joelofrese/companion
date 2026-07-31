@@ -32,6 +32,8 @@ class MindRuntime:
         self._decision: Optional[ConsciousDecision] = None
         self._error: Optional[Exception] = None
         self._closed = False
+        self._observation_count = 0
+        self._decision_count = 0
 
     @property
     def latest_decision(self) -> Optional[ConsciousDecision]:
@@ -44,6 +46,18 @@ class MindRuntime:
         """Return the newest observation processed by the visual model."""
 
         return self._observation
+
+    @property
+    def observation_count(self) -> int:
+        """Return the number of VLM observations completed."""
+
+        return self._observation_count
+
+    @property
+    def decision_count(self) -> int:
+        """Return the number of conscious thoughts completed."""
+
+        return self._decision_count
 
     def tick(
         self,
@@ -85,6 +99,7 @@ class MindRuntime:
         future = self._future
         self._future = None
         self._observation = future.result()
+        self._observation_count += 1
         self._observation_intent = self._future_intent
         self._future_intent = None
 
@@ -137,6 +152,7 @@ class MindRuntime:
             if decision is None:
                 return
             self._decision = decision
+            self._decision_count += 1
             if decision.dialogue:
                 print(f"Companion: {decision.dialogue}", flush=True)
             try:

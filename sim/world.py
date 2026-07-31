@@ -498,6 +498,10 @@ async def run(
             raise RuntimeError("SITL did not observe a Mac visual observation")
         if not decision.summary:
             raise RuntimeError("SITL did not retain a conscious visual summary")
+        if control.observation_count == 0:
+            raise RuntimeError("SITL did not complete a Mac VLM observation")
+        if control.decision_count == 0:
+            raise RuntimeError("SITL did not complete a conscious thought")
         if requested_intent is not None:
             if decision.intent != requested_intent:
                 raise RuntimeError(
@@ -511,6 +515,8 @@ async def run(
         )
         print("Conscious visual memory=verified.")
         print("Mac visual observation=verified.")
+        print(f"Mac VLM observations=verified ({control.observation_count}).")
+        print(f"Conscious thoughts=verified ({control.decision_count}).")
         if ollama:
             print(
                 "Local Ollama brain=verified: "

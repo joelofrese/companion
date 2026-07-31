@@ -163,7 +163,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
-  Local Ollama brain runs have also passed this path.
+  Local Ollama `qwen3-vl:2b` and `gemma3:4b` runs pass in walls and forest
+  worlds, with completed VLM and conscious-thought counts reported.
 - Exploratory dialogue and editable experience memory work across runs. Memory
   is limited to 64 entries of 240 characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
