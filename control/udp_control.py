@@ -5,6 +5,7 @@ import math
 from numbers import Real
 from typing import Any, Awaitable, Callable, Optional, Protocol
 
+from control.mind import Telemetry
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 
@@ -20,7 +21,7 @@ class ControlLoop(Protocol):
         frame: Any,
         timestamp_s: float,
         intent: Optional[str] = None,
-        obstacle_distance_m: Optional[float] = None,
+        telemetry: Telemetry = Telemetry(),
     ) -> VelocityCommand:
         ...
 
@@ -34,7 +35,7 @@ class UdpControlService:
         sender: UdpCommandSender,
         frame_reader: FrameReader,
         intent_provider: Optional[Callable[[float], Optional[str]]] = None,
-        obstacle_provider: Optional[Callable[[], Optional[float]]] = None,
+        telemetry_provider: Optional[Callable[[], Telemetry]] = None,
         tick_period_s: float = 0.05,
         frame_timeout_s: float = 2.0,
     ):
@@ -56,7 +57,9 @@ class UdpControlService:
         self.sender = sender
         self.frame_reader = frame_reader
         self.intent_provider = intent_provider or (lambda timestamp_s: None)
-        self.obstacle_provider = obstacle_provider or (lambda: None)
+        self.telemetry_provider = telemetry_provider or (
+            lambda: Telemetry(obstacle_distance_m=math.nan)
+        )
         self.tick_period_s = tick_period_s
         self.frame_timeout_s = frame_timeout_s
 
@@ -81,7 +84,7 @@ class UdpControlService:
                     frame=frame,
                     timestamp_s=timestamp_s,
                     intent=self.intent_provider(timestamp_s),
-                    obstacle_distance_m=self.obstacle_provider(),
+                    telemetry=self.telemetry_provider(),
                 )
                 self.sender.send(command)
                 await asyncio.sleep(self.tick_period_s)

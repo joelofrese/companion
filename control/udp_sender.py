@@ -54,11 +54,6 @@ class UdpCommandSender:
         self._socket.sendto(payload, self.destination)
         self._sequence += 1
 
-    def obstacle_distance(self) -> float:
-        """Return a fresh CM5 distance, or NaN when it is unavailable."""
-
-        return self.telemetry().obstacle_distance_m
-
     def telemetry(self) -> Telemetry:
         """Return fresh CM5 sensor and PX4 velocity telemetry."""
 

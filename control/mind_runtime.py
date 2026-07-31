@@ -67,7 +67,7 @@ class MindRuntime:
         frame,
         timestamp_s: float,
         intent: Optional[str] = None,
-        obstacle_distance_m: Optional[float] = None,
+        telemetry: Telemetry = Telemetry(),
     ) -> VelocityCommand:
         """Run one subconscious step and return one safe command."""
 
@@ -82,10 +82,7 @@ class MindRuntime:
                 self.mind.see,
                 frame,
                 timestamp_s,
-                Telemetry(
-                    obstacle_distance_m=obstacle_distance_m,
-                    last_command=self._last_command,
-                ),
+                replace(telemetry, last_command=self._last_command),
             )
         movement = "stop"
         if frame is not None and self._observation is not None:
@@ -98,7 +95,7 @@ class MindRuntime:
                 movement = self._observation.movement
         if parse_intent(self.mind.intent) == "hover":
             movement = "stop"
-        desired = movement_command(movement, obstacle_distance_m)
+        desired = movement_command(movement, telemetry.obstacle_distance_m)
         command = self.watchdog.emit(timestamp_s, desired)
         self._last_command = command
         return command

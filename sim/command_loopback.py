@@ -6,6 +6,7 @@ import time
 
 from control.udp_sender import UdpCommandSender
 from control.udp_control import UdpControlService
+from control.mind import Telemetry
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
@@ -17,8 +18,8 @@ class FixedCommandControl:
     def __init__(self):
         self.obstacle_distances = []
 
-    def tick(self, frame, timestamp_s, intent=None, obstacle_distance_m=None):
-        self.obstacle_distances.append(obstacle_distance_m)
+    def tick(self, frame, timestamp_s, intent=None, telemetry=Telemetry()):
+        self.obstacle_distances.append(telemetry.obstacle_distance_m)
         return VelocityCommand(north_m_s=0.25)
 
 
@@ -79,7 +80,7 @@ async def run():
                 control,
                 sender,
                 frame_reader,
-                obstacle_provider=sender.obstacle_distance,
+                telemetry_provider=sender.telemetry,
                 tick_period_s=0.01,
             ).run(mac_stop_event)
         )

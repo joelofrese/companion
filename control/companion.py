@@ -90,7 +90,7 @@ async def run(args):
         control,
         sender,
         frame_reader.read,
-        obstacle_provider=sender.obstacle_distance,
+        telemetry_provider=sender.telemetry,
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()

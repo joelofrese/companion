@@ -336,6 +336,20 @@ async def run(
         valid_depth_samples = 0
         minimum_depth_distance = math.inf
 
+        def brain_telemetry():
+            nonlocal velocity_telemetry_seen
+            telemetry = sender.telemetry()
+            if any(
+                value is not None
+                for value in (
+                    telemetry.north_velocity_m_s,
+                    telemetry.east_velocity_m_s,
+                    telemetry.down_velocity_m_s,
+                )
+            ):
+                velocity_telemetry_seen = True
+            return telemetry
+
         def read_step(elapsed_s: float):
             nonlocal depth_samples, valid_depth_samples, minimum_depth_distance
             step = world.step(elapsed_s)
@@ -368,11 +382,12 @@ async def run(
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
+            telemetry = brain_telemetry()
             command = control.tick(
                 frame=frame,
                 timestamp_s=timestamp_s,
                 intent=intent,
-                obstacle_distance_m=sender.obstacle_distance(),
+                telemetry=telemetry,
             )
             if step.transmit:
                 sender.send(step.command_override or command)
@@ -407,20 +422,6 @@ async def run(
                 return message
 
             dialogue_provider = read_dialogue
-
-        def brain_telemetry():
-            nonlocal velocity_telemetry_seen
-            telemetry = sender.telemetry()
-            if any(
-                value is not None
-                for value in (
-                    telemetry.north_velocity_m_s,
-                    telemetry.east_velocity_m_s,
-                    telemetry.down_velocity_m_s,
-                )
-            ):
-                velocity_telemetry_seen = True
-            return telemetry
 
         mind_task = asyncio.create_task(
             control.think_loop(
