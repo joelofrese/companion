@@ -192,7 +192,7 @@ def run(
     vlm_model: str = "qwen3-vl:2b",
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
-    initial_intent: str = "hover",
+    initial_intent: str = "explore the surroundings",
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
@@ -303,7 +303,7 @@ def main(argv=None):
     )
     parser.add_argument(
         "--intent",
-        default="hover",
+        default="explore the surroundings",
         help="initial high-level intent for an exploratory run",
     )
     parser.add_argument(

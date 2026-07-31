@@ -66,6 +66,7 @@ STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
 MAX_EXPLORATORY_SPEED_M_S = 1.0
+DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
 
 
 @dataclass(frozen=True)
@@ -217,7 +218,7 @@ async def run(
     vlm_model: str = "qwen3-vl:2b",
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
-    initial_intent: str = "hover",
+    initial_intent: str = DEFAULT_EXPLORATORY_INTENT,
     depth: bool = False,
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
@@ -756,7 +757,7 @@ if __name__ == "__main__":
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     parser.add_argument(
         "--intent",
-        default="hover",
+        default=DEFAULT_EXPLORATORY_INTENT,
         help="initial high-level intent for an exploratory run",
     )
     args = parser.parse_args()
