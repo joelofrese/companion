@@ -14,11 +14,17 @@ def _positive_int(value: object) -> bool:
 def close_subprocess(process):
     """Stop a media process."""
 
-    process.terminate()
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        return
     try:
         process.wait(timeout=2.0)
     except subprocess.TimeoutExpired:
-        process.kill()
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
         process.wait()
 
 

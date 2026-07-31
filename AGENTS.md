@@ -175,6 +175,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   dialogue remains with the conscious model.
 - Missing frames, stale or invalid sensor data, malformed commands, command
   dropout, low visual confidence, and model shutdown fail safely.
+- Media cleanup tolerates a child process that has already exited, preserving
+  the original stream failure.
 - The CM5 returns fresh TOF data, stops when it is missing, enforces command
   bounds, and remains the final safety authority. ROS 2 forwarding and
   physical sensors remain hardware-gated.
