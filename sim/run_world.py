@@ -189,7 +189,7 @@ def run(
     depth: bool = False,
     duration_s: Optional[float] = None,
     ollama: bool = False,
-    vlm_model: str = "qwen3-vl:2b",
+    vlm_model: str = "moondream",
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
     initial_intent: str = "explore the surroundings",
@@ -315,7 +315,7 @@ def main(argv=None):
         action="store_true",
         help="use local Ollama VLM and LLM for an exploratory camera or depth run",
     )
-    parser.add_argument("--vlm-model", default="qwen3-vl:2b")
+    parser.add_argument("--vlm-model", default="moondream")
     parser.add_argument("--llm-model", default="gemma3:4b")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
