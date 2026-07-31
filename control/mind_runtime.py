@@ -66,7 +66,7 @@ class MindRuntime:
                 Telemetry(obstacle_distance_m=obstacle_distance_m),
             )
         movement = "stop"
-        if self._observation is not None:
+        if frame is not None and self._observation is not None:
             age_s = timestamp_s - self._observation.timestamp_s
             if (
                 self._observation_intent == self.mind.intent

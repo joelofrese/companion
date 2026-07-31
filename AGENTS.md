@@ -155,6 +155,8 @@ The deterministic heartbeat pause resumes with one Mac tick so the Mac
 watchdog emits zero; the later command dropout separately exercises CM5 expiry.
 The non-Ollama Gazebo camera fallback stops with zero confidence when no frame
 is available instead of generating movement from synthetic scene state.
+Mac motion also stops immediately when the current camera frame is missing;
+it never reuses an older visual movement for that tick.
 The forest camera scenario and a 120-second exploratory flight also passed with
 bounded telemetry, landing, and disarm.
 PX4’s stock GPS-denied optical-flow model was investigated but is not a
