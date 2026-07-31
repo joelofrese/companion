@@ -156,11 +156,9 @@ readers use one small shared topic-reader lifecycle while keeping their camera
 and depth decoders explicit.
 The deterministic heartbeat pause resumes with one Mac tick so the Mac
 watchdog emits zero; the later command dropout separately exercises CM5 expiry.
-The non-Ollama Gazebo camera fallback stops with zero confidence when no frame
-is available instead of generating movement from synthetic scene state.
-Mac motion also stops immediately when the current camera frame is missing;
-it never reuses an older visual movement without a live camera frame. A valid
-visual movement expires after 1.5 seconds even while the camera remains live.
+Missing Gazebo camera frames never fall back to synthetic scene movement. Mac
+motion stops immediately without a live camera frame, and a valid visual
+movement expires after 1.5 seconds even while the camera remains live.
 The forest camera scenario and a 120-second exploratory flight also passed with
 bounded telemetry, landing, and disarm.
 PX4’s stock GPS-denied optical-flow model was investigated but is not a
@@ -191,6 +189,9 @@ Conscious shutdown is stop-aware,
 so a slow model cannot delay zero-command cleanup. The CM5 also bounds yaw to
 ±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
 the onboard hardware path remains the ROS 2 forwarder.
+The obsolete synthetic camera fallback was removed after the live-frame stop
+boundary made it unreachable. The deterministic Gazebo mission passed again,
+including faults, recovery, landing, and disarm.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
