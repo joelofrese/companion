@@ -4,7 +4,6 @@ import asyncio
 import argparse
 import socket
 import subprocess
-import sys
 import time
 
 from mavsdk import System
