@@ -210,7 +210,7 @@ async def run(
     world_name: str = "default",
     duration_s: float = PROFILE_DURATION_S,
     ollama: bool = False,
-    vlm_model: str = "gemma3:4b",
+    vlm_model: str = "qwen3-vl:2b",
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
     initial_intent: str = "hover",
@@ -704,7 +704,7 @@ if __name__ == "__main__":
     parser.add_argument("--camera", action="store_true")
     parser.add_argument("--depth", action="store_true")
     parser.add_argument("--ollama", action="store_true")
-    parser.add_argument("--vlm-model", default="gemma3:4b")
+    parser.add_argument("--vlm-model", default="qwen3-vl:2b")
     parser.add_argument("--llm-model", default="gemma3:4b")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")

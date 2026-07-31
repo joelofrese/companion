@@ -129,13 +129,16 @@ Ollama models; simulation-only fixtures live under `sim/`.
 After installing Ollama and pulling a local vision-capable model:
 
 ```sh
+ollama pull qwen3-vl:2b
 ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip>
 .venv/bin/python -m control.companion <cm5-ip> --dialogue
 ```
 
-The production entry point uses separate VLM and LLM sessions. Set
-`--vlm-model` and `--llm-model` when different local models are preferred.
+The production entry point uses separate VLM and LLM sessions. It defaults to
+the faster `qwen3-vl:2b` for visual perception and `gemma3:4b` for conscious
+language. Set `--vlm-model` and `--llm-model` when different local models are
+preferred.
 The initial `--intent` may be any short plain-language goal. Add `--dialogue`
 to type natural requests for the conscious LLM while flight control continues;
 replies are printed only when the model provides one. It keeps a small,
@@ -180,6 +183,9 @@ flight may land before its first VLM observation finishes.
 The CM5 returns fresh TOF distance telemetry over the command socket so the
 Mac brain and CM5 safety layer use the same body reading without adding a
 second transport. Missing or stale telemetry becomes zero motion on the Mac.
+The qwen3-vl:2b VLM runs with local reasoning disabled so it returns compact
+structured observations quickly; the conscious LLM remains the reasoning
+layer. The mixed brain passed rendered-camera and near-wall depth SITL runs.
 Conscious shutdown is stop-aware,
 so a slow model cannot delay zero-command cleanup. The CM5 also bounds yaw to
 ±180° along with its velocity limits. MAVSDK forwarding is simulation-only;

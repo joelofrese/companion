@@ -120,27 +120,29 @@ class OllamaClient:
         prompt: str,
         schema: Dict[str, Any],
         image: Optional[str] = None,
+        think: Optional[bool] = None,
     ) -> Dict[str, Any]:
         if not isinstance(model, str) or not model.strip():
             raise ValueError("Ollama model must not be empty")
         message: Dict[str, Any] = {"role": "user", "content": prompt}
         if image is not None:
             message["images"] = [image]
-        response = self._request(
-            "/api/chat",
-            {
-                "model": model,
-                "messages": [message],
-                "stream": False,
-                "format": schema,
-                "options": {"temperature": 0},
-                "keep_alive": "5m",
-            },
-        )
+        payload = {
+            "model": model,
+            "messages": [message],
+            "stream": False,
+            "format": schema,
+            "options": {"temperature": 0},
+            "keep_alive": "5m",
+        }
+        if think is not None:
+            payload["think"] = think
+        response = self._request("/api/chat", payload)
         try:
-            content = response["message"]["content"]
+            message = response["message"]
+            content = message.get("content") or message.get("thinking")
             return json.loads(content)
-        except (KeyError, TypeError, json.JSONDecodeError) as error:
+        except (AttributeError, KeyError, TypeError, json.JSONDecodeError) as error:
             raise RuntimeError("Ollama returned invalid structured output") from error
 
 
@@ -182,6 +184,7 @@ and 1. The next focus should be a short thing worth checking next, or empty.
             prompt,
             VISION_SCHEMA,
             image=_image_base64(image),
+            think=False,
         )
         movement = _text(data, "movement").lower()
         if movement not in MOVEMENTS:
