@@ -174,7 +174,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   stayed at zero and it remained in constant-position mode. Its internal range
   sensor is not DEXI 3 hardware.
 - Simulation preparation reports a clear connection or readiness error after
-  30 seconds instead of hanging. Simulation-only fixtures stay under `sim/`.
+  30 seconds instead of hanging. Takeoff, landing, and disarm waits are also
+  bounded. Simulation-only fixtures stay under `sim/`.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.

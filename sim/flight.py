@@ -9,6 +9,7 @@ from mavsdk.telemetry import LandedState
 
 TAKEOFF_ALTITUDE = 2.0
 PREPARE_TIMEOUT_S = 30.0
+FLIGHT_ACTION_TIMEOUT_S = 30.0
 
 
 class RecordingForwarder:
@@ -44,6 +45,24 @@ async def _wait_until_ready(drone):
             return
 
 
+async def _wait_until_in_air(drone):
+    async for state in drone.telemetry.landed_state():
+        if state == LandedState.IN_AIR:
+            return
+
+
+async def _wait_until_on_ground(drone):
+    async for state in drone.telemetry.landed_state():
+        if state == LandedState.ON_GROUND:
+            return
+
+
+async def _wait_until_disarmed(drone):
+    async for armed in drone.telemetry.armed():
+        if not armed:
+            return
+
+
 async def prepare(drone):
     """Connect, wait for arming health, arm, and reach the air."""
 
@@ -71,12 +90,22 @@ async def prepare(drone):
         print(f"Taking off to {TAKEOFF_ALTITUDE}m...")
         await drone.action.set_takeoff_altitude(TAKEOFF_ALTITUDE)
         await drone.action.takeoff()
-        async for state in drone.telemetry.landed_state():
-            if state == LandedState.IN_AIR:
-                return
+        try:
+            await asyncio.wait_for(
+                _wait_until_in_air(drone),
+                FLIGHT_ACTION_TIMEOUT_S,
+            )
+        except asyncio.TimeoutError as error:
+            raise RuntimeError(
+                f"vehicle did not take off within {FLIGHT_ACTION_TIMEOUT_S:.0f}s"
+            ) from error
+        return
     except Exception:
         try:
-            await drone.action.land()
+            await asyncio.wait_for(
+                drone.action.land(),
+                FLIGHT_ACTION_TIMEOUT_S,
+            )
         except Exception:
             pass
         raise
@@ -86,15 +115,35 @@ async def land(drone):
     """Land and wait for PX4 to report the vehicle on the ground."""
 
     print("Landing...")
-    await drone.action.land()
-    async for state in drone.telemetry.landed_state():
-        if state == LandedState.ON_GROUND:
-            break
+    try:
+        await asyncio.wait_for(
+            drone.action.land(),
+            FLIGHT_ACTION_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            f"landing command did not complete within {FLIGHT_ACTION_TIMEOUT_S:.0f}s"
+        ) from error
+    try:
+        await asyncio.wait_for(
+            _wait_until_on_ground(drone),
+            FLIGHT_ACTION_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            f"vehicle did not land within {FLIGHT_ACTION_TIMEOUT_S:.0f}s"
+        ) from error
     print("Landed.")
-    async for armed in drone.telemetry.armed():
-        if not armed:
-            print("Disarmed.")
-            return
+    try:
+        await asyncio.wait_for(
+            _wait_until_disarmed(drone),
+            FLIGHT_ACTION_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            f"vehicle did not disarm within {FLIGHT_ACTION_TIMEOUT_S:.0f}s"
+        ) from error
+    print("Disarmed.")
 
 
 async def wait_for_offboard(drone):
