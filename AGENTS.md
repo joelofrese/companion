@@ -197,6 +197,11 @@ production, UDP loopback, deterministic SITL, and RTP/person SITL all passed
 through the simpler direct sender method.
 The shared H.264 configuration rejects UDP ports above 65535 before starting
 GStreamer; its boundary check and the full RTP/person SITL path passed.
+Simulation preparation now times out after 30 seconds with a clear connection
+or readiness error instead of hanging when an estimator or sensor path fails.
+The deterministic and RTP/person SITL paths plus UDP loopback passed again; the
+GPS-denied optical-flow model still fails to become armable and remains
+unverified.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.

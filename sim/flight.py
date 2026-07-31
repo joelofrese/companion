@@ -1,5 +1,6 @@
 """Shared PX4 flight steps for the simulations."""
 
+import asyncio
 import time
 
 from mavsdk.telemetry import FlightMode
@@ -7,6 +8,7 @@ from mavsdk.telemetry import LandedState
 
 
 TAKEOFF_ALTITUDE = 2.0
+PREPARE_TIMEOUT_S = 30.0
 
 
 class RecordingForwarder:
@@ -21,25 +23,43 @@ class RecordingForwarder:
         self.commands.append((time.monotonic(), command))
 
 
-async def prepare(drone):
-    """Connect, wait for arming health, arm, and reach the air."""
-
-    print("Waiting for drone connection...")
-    await drone.connect()
+async def _wait_for_connection(drone):
     async for state in drone.core.connection_state():
         if state.is_connected:
-            print("Connected.")
-            break
+            return
 
-    print("Waiting for vehicle to be ready to arm...")
+
+async def _wait_until_ready(drone):
     async for health in drone.telemetry.health():
         if (
             health.is_armable
             and health.is_local_position_ok
             and health.is_magnetometer_calibration_ok
         ):
-            print("Ready.")
-            break
+            return
+
+
+async def prepare(drone):
+    """Connect, wait for arming health, arm, and reach the air."""
+
+    print("Waiting for drone connection...")
+    await drone.connect()
+    try:
+        await asyncio.wait_for(_wait_for_connection(drone), PREPARE_TIMEOUT_S)
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            f"drone did not connect within {PREPARE_TIMEOUT_S:.0f}s"
+        ) from error
+    print("Connected.")
+
+    print("Waiting for vehicle to be ready to arm...")
+    try:
+        await asyncio.wait_for(_wait_until_ready(drone), PREPARE_TIMEOUT_S)
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            f"vehicle did not become ready to arm within {PREPARE_TIMEOUT_S:.0f}s"
+        ) from error
+    print("Ready.")
 
     print("Arming...")
     try:
