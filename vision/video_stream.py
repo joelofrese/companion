@@ -32,6 +32,8 @@ class H264StreamConfig:
     def __post_init__(self):
         if not all(_positive_int(value) for value in (self.port, self.width, self.height, self.framerate)):
             raise ValueError("stream dimensions, port, and framerate must be positive")
+        if self.port > 65535:
+            raise ValueError("stream port must be between 1 and 65535")
 
     def sender_command(self, destination_host: str) -> Sequence[str]:
         """Return the CM5 camera command."""
