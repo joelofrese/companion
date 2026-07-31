@@ -168,8 +168,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   is limited to 64 entries of 240 characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
 - Invalid scripted dialogue is rejected before PX4 starts.
-- Clear dialogue commands override model intent; open-ended dialogue remains
-  with the conscious model.
+- Clear dialogue commands immediately override stale movement; open-ended
+  dialogue remains with the conscious model.
 - Missing frames, stale or invalid sensor data, malformed commands, command
   dropout, low visual confidence, and model shutdown fail safely.
 - The CM5 returns fresh TOF data, enforces command bounds, and remains the

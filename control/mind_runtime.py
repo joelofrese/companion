@@ -8,6 +8,7 @@ from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservatio
 from control.mind_motion import movement_command
 from control.watchdog import SetpointWatchdog
 from control.velocity import VelocityCommand
+from voice.intent import parse_intent
 
 
 MIN_MOVEMENT_CONFIDENCE = 0.5
@@ -121,6 +122,9 @@ class MindRuntime:
             raise ValueError("thinking period must be positive")
         while not stop_event.is_set():
             dialogue = dialogue_provider() if dialogue_provider is not None else None
+            explicit_intent = parse_intent(dialogue) if dialogue else None
+            if explicit_intent is not None:
+                self.mind.set_intent(explicit_intent)
             try:
                 decision = await self._think_or_stop(
                     stop_event,
