@@ -429,6 +429,8 @@ async def run(
                         print("Mac control pause; watchdog holds zero.")
                         reported.add("Mac control pause")
                     await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
+                    now = time.monotonic()
+                    send_packet(now, read_step(now - started_at))
                     continue
                 send_packet(now, step)
                 await asyncio.sleep(SETPOINT_PERIOD_S)

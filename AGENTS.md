@@ -151,6 +151,8 @@ disarm have been verified. Near-wall exploratory runs measure real sensor
 distances and trigger a bounded CM5 backoff command. Both Gazebo sensor
 readers use one small shared topic-reader lifecycle while keeping their camera
 and depth decoders explicit.
+The deterministic heartbeat pause resumes with one Mac tick so the Mac
+watchdog emits zero; the later command dropout separately exercises CM5 expiry.
 PX4’s stock GPS-denied optical-flow model was investigated but is not a
 verified path here: its flow quality stayed at zero and PX4 remained in
 constant-position mode. Its internal range sensor is not DEXI 3 hardware.
@@ -165,6 +167,8 @@ least 0.5 visual confidence, and pending observations are bounded while the
 conscious summary and editable experience memory carry longer context.
 Exploratory runs can persist that experience with `--memory` so later runs can
 receive it. Empty thoughts are not saved; visual observations and dialogue are.
+Use the default or a longer duration for local model runs; a short exploratory
+flight may land before its first VLM observation finishes.
 The CM5 returns fresh TOF distance telemetry over the command socket so the
 Mac brain and CM5 safety layer use the same body reading without adding a
 second transport. Missing or stale telemetry becomes zero motion on the Mac.
