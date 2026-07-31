@@ -13,6 +13,7 @@ from voice.intent import parse_intent
 
 MIN_MOVEMENT_CONFIDENCE = 0.5
 MAX_MOVEMENT_AGE_S = 1.5
+CONSCIOUS_PERIOD_S = 0.5
 
 
 class MindRuntime:
@@ -131,7 +132,7 @@ class MindRuntime:
         stop_event: asyncio.Event,
         telemetry_provider: Callable[[], Telemetry],
         dialogue_provider: Optional[Callable[[], Optional[str]]] = None,
-        period_s: float = 1.0,
+        period_s: float = CONSCIOUS_PERIOD_S,
     ):
         """Run conscious thoughts independently of image processing."""
 

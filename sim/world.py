@@ -392,7 +392,6 @@ async def run(
                     obstacle_distance_m=sender.obstacle_distance()
                 ),
                 dialogue_provider=dialogue_input.next if dialogue_input else None,
-                period_s=1.0,
             )
         )
         if dialogue_input:
