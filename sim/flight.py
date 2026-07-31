@@ -29,6 +29,11 @@ async def _wait_for_connection(drone):
             return
 
 
+async def _connect_and_wait(drone):
+    await drone.connect()
+    await _wait_for_connection(drone)
+
+
 async def _wait_until_ready(drone):
     async for health in drone.telemetry.health():
         if (
@@ -43,9 +48,8 @@ async def prepare(drone):
     """Connect, wait for arming health, arm, and reach the air."""
 
     print("Waiting for drone connection...")
-    await drone.connect()
     try:
-        await asyncio.wait_for(_wait_for_connection(drone), PREPARE_TIMEOUT_S)
+        await asyncio.wait_for(_connect_and_wait(drone), PREPARE_TIMEOUT_S)
     except asyncio.TimeoutError as error:
         raise RuntimeError(
             f"drone did not connect within {PREPARE_TIMEOUT_S:.0f}s"
