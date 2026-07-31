@@ -8,12 +8,19 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Optional
 
 from mavsdk import System
 from mavsdk.offboard import OffboardError
 
-from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
+from control.mind import (
+    CompanionMemory,
+    ConsciousDecision,
+    MacMind,
+    Telemetry,
+    VisualObservation,
+)
 from control.dialogue import DialogueInput
 from control.mind_runtime import MindRuntime
 from control.udp_sender import UdpCommandSender
@@ -200,6 +207,7 @@ async def run(
     ollama_timeout: float = 60.0,
     initial_intent: str = "hover",
     depth: bool = False,
+    memory_path: Optional[Path] = None,
 ):
     """Run one complete Gazebo world simulation."""
 
@@ -215,6 +223,8 @@ async def run(
         raise ValueError("Gazebo depth mode requires exploratory simulation")
     if ollama and not (exploratory and (camera or depth)):
         raise ValueError("Ollama simulation requires exploratory camera or depth mode")
+    if memory_path is not None and not exploratory:
+        raise ValueError("experience memory requires exploratory simulation")
 
     ollama_client = None
     if ollama:
@@ -222,6 +232,7 @@ async def run(
 
         ollama_client = OllamaClient(timeout_s=ollama_timeout)
         await asyncio.to_thread(ollama_client.check)
+    memory_store = CompanionMemory(memory_path) if memory_path is not None else None
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
@@ -277,7 +288,9 @@ async def run(
         else:
             visual_model = OllamaVisionModel(ollama_client, vlm_model)
             language_model = OllamaLanguageModel(ollama_client, llm_model)
-        control = MindRuntime(MacMind(visual_model, language_model))
+        control = MindRuntime(
+            MacMind(visual_model, language_model, memory=memory_store)
+        )
 
         camera_frames = 0
         depth_samples = 0
@@ -468,6 +481,10 @@ async def run(
                 "Local Ollama brain=verified: "
                 f"VLM={vlm_model}, LLM={llm_model}."
             )
+        if memory_store is not None:
+            if not memory_store.context():
+                raise RuntimeError("SITL did not retain conscious experience memory")
+            print("Conscious experience memory=verified.")
 
         def forward_count(start_s, end_s):
             return sum(
@@ -680,6 +697,7 @@ if __name__ == "__main__":
     parser.add_argument("--vlm-model", default="gemma3:4b")
     parser.add_argument("--llm-model", default="gemma3:4b")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
+    parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
     parser.add_argument("--world", default="default")
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     parser.add_argument(
@@ -701,5 +719,6 @@ if __name__ == "__main__":
             llm_model=args.llm_model,
             ollama_timeout=args.ollama_timeout,
             initial_intent=args.intent,
+            memory_path=args.memory,
         )
     )

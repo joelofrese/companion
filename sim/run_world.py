@@ -93,6 +93,7 @@ def _run_once(
     ollama_timeout: float,
     initial_intent: str,
     model_pose: Optional[str],
+    memory_path: Optional[Path],
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -164,6 +165,8 @@ def _run_once(
                     "--ollama-timeout",
                     str(ollama_timeout),
                 ]
+            if memory_path is not None:
+                scenario += ["--memory", str(memory_path)]
             scenario += ["--world", world]
             if duration_s is not None:
                 scenario += ["--duration", str(duration_s)]
@@ -189,6 +192,7 @@ def run(
     ollama_timeout: float = 60.0,
     initial_intent: str = "hover",
     model_pose: Optional[str] = None,
+    memory_path: Optional[Path] = None,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -203,6 +207,10 @@ def run(
         raise RuntimeError("camera and depth modes cannot run together")
     if depth and not exploratory:
         raise RuntimeError("Gazebo depth mode requires exploratory simulation")
+    if memory_path is not None and not exploratory:
+        raise RuntimeError("experience memory requires exploratory simulation")
+    if memory_path is not None and image_path is not None:
+        raise RuntimeError("experience memory cannot run with an RTP image scenario")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     model_pose = _validate_pose(model_pose)
@@ -229,6 +237,7 @@ def run(
                 ollama_timeout=ollama_timeout,
                 initial_intent=initial_intent,
                 model_pose=model_pose,
+                memory_path=memory_path,
             )
         except _BootError:
             if attempt == BOOT_RETRIES:
@@ -287,6 +296,11 @@ def main(argv=None):
     parser.add_argument("--llm-model", default="gemma3:4b")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
+        "--memory",
+        type=Path,
+        help="persist conscious experience across exploratory runs",
+    )
+    parser.add_argument(
         "--duration",
         type=float,
         help="world simulation duration in seconds (default: 32)",
@@ -305,6 +319,10 @@ def main(argv=None):
         parser.error("--camera requires --explore")
     if args.depth and not args.explore:
         parser.error("--depth requires --explore")
+    if args.memory and not args.explore:
+        parser.error("--memory requires --explore")
+    if args.memory and args.image:
+        parser.error("--memory cannot be combined with --image")
     if args.ollama and not (args.camera or args.depth):
         parser.error("--ollama requires --camera or --depth")
     if args.duration is not None and args.image:
@@ -330,6 +348,7 @@ def main(argv=None):
             ollama_timeout=args.ollama_timeout,
             initial_intent=args.intent,
             model_pose=args.pose,
+            memory_path=args.memory.expanduser().resolve() if args.memory else None,
         )
     except KeyboardInterrupt:
         return 130

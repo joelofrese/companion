@@ -113,6 +113,7 @@ bounded motion, landing, and disarm rather than exact decisions. Type a
 request such as `follow me`, `hover`, or `stop` during an exploratory
 synthetic run to change the conscious intent. Use `--world walls`, `forest`,
 `windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
+Add `--memory PATH` to persist conscious experience across exploratory runs.
 
 Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
 feed the Mac brain and its depth readings feed CM5 safety. This is a
@@ -162,6 +163,8 @@ confidence. Typed dialogue now uses the same non-blocking input path in
 simulation and the production Mac entry point. Mac motion now requires at
 least 0.5 visual confidence, and pending observations are bounded while the
 conscious summary and editable experience memory carry longer context.
+Exploratory runs can persist that experience with `--memory` so later runs can
+receive it.
 The CM5 returns fresh TOF distance telemetry over the command socket so the
 Mac brain and CM5 safety layer use the same body reading without adding a
 second transport. Missing or stale telemetry becomes zero motion on the Mac.
