@@ -25,6 +25,12 @@ value. Refactor broadly when it makes the whole system cleaner. Continuously
 review the codebase, simplify it, and then develop aligned companion
 capabilities. Repeat that loop without waiting for confirmation.
 
+## Git
+
+Work directly on `main` in this single-contributor repository. Push verified
+checkpoints there; use a temporary branch only for risky isolated work, then
+merge and delete it.
+
 ## Control flow
 
 - The Mac brain uses a subconscious VLM to describe images and suggest cautious
