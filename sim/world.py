@@ -245,8 +245,6 @@ async def run(
     requested_intent = (
         parse_intent(dialogue_request) if dialogue_request is not None else None
     )
-    if dialogue_request is not None and requested_intent is None:
-        raise ValueError("dialogue request must contain a recognized intent")
 
     ollama_client = None
     if ollama:
@@ -509,6 +507,8 @@ async def run(
                     f"expected {requested_intent}, got {decision.intent}"
                 )
             print(f"Scripted dialogue=verified: intent={decision.intent}.")
+        elif dialogue_request is not None:
+            print("Scripted open-ended dialogue=delivered to the conscious mind.")
         print(
             "Conscious Mac decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."

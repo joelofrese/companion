@@ -12,9 +12,6 @@ import threading
 import time
 from typing import Optional
 
-from voice.intent import parse_intent
-
-
 BOOT_MARKER = "pxh>"
 BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
@@ -221,8 +218,6 @@ def run(
         raise RuntimeError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and not dialogue_request.strip():
         raise RuntimeError("dialogue request must not be empty")
-    if dialogue_request is not None and parse_intent(dialogue_request) is None:
-        raise RuntimeError("dialogue request must contain a recognized intent")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     model_pose = _validate_pose(model_pose)

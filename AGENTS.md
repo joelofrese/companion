@@ -164,11 +164,13 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
   Local Ollama `qwen3-vl:2b` and `gemma3:4b` runs pass in walls and forest
-  worlds, with completed VLM and conscious-thought counts reported.
+  worlds, with completed VLM and conscious-thought counts reported. An
+  open-ended camera question reaches the conscious model and returns a focus.
 - Exploratory dialogue and editable experience memory work across runs. Memory
   is limited to 64 entries of 240 characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
-- Invalid scripted dialogue is rejected before PX4 starts.
+- Empty scripted dialogue is rejected before PX4 starts; open-ended dialogue
+  is passed to the conscious model.
 - Clear dialogue commands immediately override stale movement; open-ended
   dialogue remains with the conscious model.
 - Missing frames, stale or invalid sensor data, malformed commands, command
