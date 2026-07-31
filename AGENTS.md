@@ -113,10 +113,11 @@ synthetic run to change the conscious intent. Use `--world walls`, `forest`,
 `windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
 
 Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
-This is a simulation-only approximation of the DEXI 3’s forward TOF distance
-sensor, not a claim that DEXI 3 has a depth camera. Use `--intent following`
-and `--pose x,y,z,roll,pitch,yaw` to start near a world obstacle and observe
-the simulated sensor trigger local safety.
+feed the Mac brain and its depth readings feed CM5 safety. This is a
+simulation-only approximation of the DEXI 3’s forward TOF distance sensor,
+not a claim that DEXI 3 has a depth camera. Use `--intent following` and
+`--pose x,y,z,roll,pitch,yaw` to start near a world obstacle and observe the
+simulated sensor trigger local safety.
 
 The deterministic RTP scenario uses YOLO only as a repeatable person-image
 fixture. It is not the production brain. Production `control/` uses local
@@ -144,9 +145,9 @@ The deterministic mission, person and non-person RTP images, rendered Gazebo
 camera and depth input, local Ollama camera and depth input, live
 exploratory dialogue, command loopback, safety faults, recovery, landing, and
 disarm have been verified. Near-wall exploratory runs measure real sensor
-distances and trigger a bounded CM5 backoff command. The two Gazebo sensor
-readers share one small topic reader while keeping their camera and depth
-decoders explicit.
+distances and trigger a bounded CM5 backoff command. Both Gazebo sensor
+readers use one small shared topic-reader lifecycle while keeping their camera
+and depth decoders explicit.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
