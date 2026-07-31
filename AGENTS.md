@@ -83,9 +83,9 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera
 .venv/bin/python -m sim.run_world --explore --lidar --world walls
 .venv/bin/python -m sim.run_world --explore --lidar --world walls --intent following --pose 4,0,0,0,0,0
-.venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 4,0,0,0,0,0
+.venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --camera --ollama
-.venv/bin/python -m sim.run_world --explore --depth --ollama --world walls --intent following --pose 4,0,0,0,0,0
+.venv/bin/python -m sim.run_world --explore --depth --ollama --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg

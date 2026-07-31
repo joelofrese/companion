@@ -221,23 +221,23 @@ def run(
     for attempt in range(BOOT_RETRIES + 1):
         try:
             return _run_once(
-                px4_dir,
-                companion_dir,
-                image_path,
-                expect_person,
-                world,
-                stdbuf,
-                exploratory,
-                camera,
-                lidar,
-                depth,
-                duration_s,
-                ollama,
-                vlm_model,
-                llm_model,
-                ollama_timeout,
-                initial_intent,
-                model_pose,
+                px4_dir=px4_dir,
+                companion_dir=companion_dir,
+                image_path=image_path,
+                expect_person=expect_person,
+                world=world,
+                stdbuf=stdbuf,
+                exploratory=exploratory,
+                camera=camera,
+                lidar=lidar,
+                depth=depth,
+                duration_s=duration_s,
+                ollama=ollama,
+                vlm_model=vlm_model,
+                llm_model=llm_model,
+                ollama_timeout=ollama_timeout,
+                initial_intent=initial_intent,
+                model_pose=model_pose,
             )
         except _BootError:
             if attempt == BOOT_RETRIES:
@@ -295,7 +295,7 @@ def main(argv=None):
     parser.add_argument(
         "--ollama",
         action="store_true",
-        help="use local Ollama VLM and LLM for an exploratory camera run",
+        help="use local Ollama VLM and LLM for an exploratory camera or depth run",
     )
     parser.add_argument("--vlm-model", default="gemma3:4b")
     parser.add_argument("--llm-model", default="gemma3:4b")
@@ -333,22 +333,22 @@ def main(argv=None):
         parser.error("--duration must be positive")
     try:
         return run(
-            args.px4_dir.expanduser().resolve(),
-            Path(__file__).resolve().parent.parent,
-            args.image.expanduser().resolve() if args.image else None,
-            args.expect_person,
-            args.world,
-            args.explore,
-            args.camera,
-            args.lidar,
-            args.depth,
-            args.duration,
-            args.ollama,
-            args.vlm_model,
-            args.llm_model,
-            args.ollama_timeout,
-            args.intent,
-            args.pose,
+            px4_dir=args.px4_dir.expanduser().resolve(),
+            companion_dir=Path(__file__).resolve().parent.parent,
+            image_path=args.image.expanduser().resolve() if args.image else None,
+            expect_person=args.expect_person,
+            world=args.world,
+            exploratory=args.explore,
+            camera=args.camera,
+            lidar=args.lidar,
+            depth=args.depth,
+            duration_s=args.duration,
+            ollama=args.ollama,
+            vlm_model=args.vlm_model,
+            llm_model=args.llm_model,
+            ollama_timeout=args.ollama_timeout,
+            initial_intent=args.intent,
+            model_pose=args.pose,
         )
     except KeyboardInterrupt:
         return 130
