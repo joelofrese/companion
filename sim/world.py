@@ -68,10 +68,6 @@ HOVER_START_S = 5.8
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 
 
-def _is_following(intent: str) -> bool:
-    return intent == "following" or parse_intent(intent) == "following"
-
-
 @dataclass(frozen=True)
 class WorldStep:
     obstacle_distance_m: Optional[float] = 2.0
@@ -162,7 +158,7 @@ class WorldVisualModel:
         else:
             movement = "forward"
             description = "the person is ahead"
-        if not _is_following(intent):
+        if parse_intent(intent) != "following":
             movement = "stop"
         return VisualObservation(
             timestamp_s=timestamp_s,
@@ -206,7 +202,7 @@ class WorldLanguageModel:
             summary = information.new_observations[-1].description
         return ConsciousDecision(
             intent=self.intent,
-            focus="person" if _is_following(self.intent) else "",
+            focus="person" if parse_intent(self.intent) == "following" else "",
             dialogue=dialogue,
             summary=summary or "The simulated world is running.",
         )

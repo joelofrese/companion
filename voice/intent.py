@@ -27,7 +27,7 @@ def parse_intent(transcript: str) -> Optional[str]:
         return "hover"
 
     intents = {
-        "following": ("follow", "come with me", "come along"),
+        "following": ("follow", "following", "come with me", "come along"),
         "hover": ("idle", "sleep"),
     }
     matches = [

@@ -179,6 +179,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - `--request` can exercise one dialogue interaction without manual stdin input.
 - Exploratory `--intent` accepts natural high-level text instead of a fixed
   state list; synthetic following recognizes clear follow phrases safely.
+- Shared intent parsing accepts both canonical `following` and natural follow
+  phrases, keeping voice, dialogue, and simulation behavior aligned.
 - Simulation argument validation lives in one runner boundary, so CLI and
   direct callers reject the same invalid combinations before PX4 starts.
 - Empty scripted dialogue is rejected before PX4 starts; open-ended dialogue
