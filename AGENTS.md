@@ -170,6 +170,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   records requests, decisions, and responses in at most 64 entries of 240
   characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
+- Simulation argument validation lives in one runner boundary, so CLI and
+  direct callers reject the same invalid combinations before PX4 starts.
 - Empty scripted dialogue is rejected before PX4 starts; open-ended dialogue
   is passed to the conscious model.
 - Clear dialogue commands immediately override stale movement; open-ended

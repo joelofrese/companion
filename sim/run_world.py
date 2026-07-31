@@ -204,10 +204,18 @@ def run(
         raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
     if image_path is not None and not image_path.is_file():
         raise RuntimeError(f"scenario image does not exist: {image_path}")
+    if exploratory and image_path is not None:
+        raise RuntimeError("exploratory simulation cannot use an RTP image")
+    if camera and image_path is not None:
+        raise RuntimeError("camera mode cannot use an RTP image")
+    if depth and image_path is not None:
+        raise RuntimeError("depth mode cannot use an RTP image")
     if initial_intent not in {"hover", "following"}:
         raise RuntimeError("initial exploratory intent must be hover or following")
     if camera and depth:
         raise RuntimeError("camera and depth modes cannot run together")
+    if camera and not exploratory:
+        raise RuntimeError("Gazebo camera mode requires exploratory simulation")
     if depth and not exploratory:
         raise RuntimeError("Gazebo depth mode requires exploratory simulation")
     if memory_path is not None and not exploratory:
@@ -216,8 +224,16 @@ def run(
         raise RuntimeError("experience memory cannot run with an RTP image scenario")
     if dialogue_request is not None and not exploratory:
         raise RuntimeError("dialogue request requires exploratory simulation")
+    if dialogue_request is not None and image_path is not None:
+        raise RuntimeError("dialogue request cannot use an RTP image scenario")
     if dialogue_request is not None and not dialogue_request.strip():
         raise RuntimeError("dialogue request must not be empty")
+    if ollama and not (exploratory and (camera or depth)):
+        raise RuntimeError("Ollama simulation requires exploratory camera or depth mode")
+    if duration_s is not None and image_path is not None:
+        raise RuntimeError("simulation duration cannot use an RTP image scenario")
+    if expect_person and image_path is None:
+        raise RuntimeError("expect-person requires an RTP image scenario")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     model_pose = _validate_pose(model_pose)
@@ -319,34 +335,6 @@ def main(argv=None):
     )
     parser.add_argument("--world", default="default", help="Gazebo world name from PX4")
     args = parser.parse_args(argv)
-    if args.explore and args.image:
-        parser.error("--explore cannot be combined with --image")
-    if args.camera and args.image:
-        parser.error("--camera cannot be combined with --image")
-    if args.depth and args.image:
-        parser.error("--depth cannot be combined with --image")
-    if args.camera and args.depth:
-        parser.error("--camera and --depth cannot be combined")
-    if args.camera and not args.explore:
-        parser.error("--camera requires --explore")
-    if args.depth and not args.explore:
-        parser.error("--depth requires --explore")
-    if args.memory and not args.explore:
-        parser.error("--memory requires --explore")
-    if args.memory and args.image:
-        parser.error("--memory cannot be combined with --image")
-    if args.request and not args.explore:
-        parser.error("--request requires --explore")
-    if args.request and args.image:
-        parser.error("--request cannot be combined with --image")
-    if args.ollama and not (args.camera or args.depth):
-        parser.error("--ollama requires --camera or --depth")
-    if args.duration is not None and args.image:
-        parser.error("--duration cannot be combined with --image")
-    if args.expect_person and not args.image:
-        parser.error("--expect-person requires --image")
-    if args.duration is not None and (args.duration <= 0.0 or not math.isfinite(args.duration)):
-        parser.error("--duration must be positive")
     try:
         return run(
             px4_dir=args.px4_dir.expanduser().resolve(),
