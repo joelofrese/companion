@@ -192,11 +192,17 @@ Requested visual focus: {focus or "none"}
 Previous movement: {previous_movement or "stop"}
 Previous description: {previous_observation or "none"}
 Last requested command: {telemetry.last_command or "none yet"}
+Measured NED velocity:
+north={telemetry.north_velocity_m_s}
+east={telemetry.east_velocity_m_s}
+down={telemetry.down_velocity_m_s}
 Forward obstacle distance: {telemetry.obstacle_distance_m}
 
 The movement must be one of: forward, left, right, up, down, stop, hover.
-The description should be short plain English. Confidence must be between 0
-and 1. The next focus should be a short thing worth checking next, or empty.
+Use measured velocity to distinguish the requested movement from what the
+vehicle actually did. The description should be short plain English.
+Confidence must be between 0 and 1. The next focus should be a short thing
+worth checking next, or empty.
 """.strip()
         data = self.client.chat(
             self.model,
@@ -257,6 +263,9 @@ east={information.telemetry.east_velocity_m_s}
 down={information.telemetry.down_velocity_m_s}
 Forward obstacle distance: {information.telemetry.obstacle_distance_m}
 
+Treat measured velocity as what actually happened. Compare it with the last
+requested command and adapt the next intent when the vehicle did not respond
+as expected.
 The summary should stay short and describe what the drone currently knows.
 Dialogue should be empty unless a user deserves a response.
 """.strip()
