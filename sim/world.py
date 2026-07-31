@@ -208,6 +208,7 @@ async def run(
     initial_intent: str = "hover",
     depth: bool = False,
     memory_path: Optional[Path] = None,
+    dialogue_request: Optional[str] = None,
 ):
     """Run one complete Gazebo world simulation."""
 
@@ -225,6 +226,15 @@ async def run(
         raise ValueError("Ollama simulation requires exploratory camera or depth mode")
     if memory_path is not None and not exploratory:
         raise ValueError("experience memory requires exploratory simulation")
+    if dialogue_request is not None and not exploratory:
+        raise ValueError("dialogue request requires exploratory simulation")
+    if dialogue_request is not None and not dialogue_request.strip():
+        raise ValueError("dialogue request must not be empty")
+    requested_intent = (
+        parse_intent(dialogue_request) if dialogue_request is not None else None
+    )
+    if dialogue_request is not None and requested_intent is None:
+        raise ValueError("dialogue request must contain a recognized intent")
 
     ollama_client = None
     if ollama:
@@ -243,7 +253,7 @@ async def run(
     mind_stop = asyncio.Event()
     telemetry_task = None
     offboard_task = None
-    dialogue_input = DialogueInput() if exploratory else None
+    dialogue_input = DialogueInput(dialogue_request) if exploratory else None
     gazebo_camera = None
     gazebo_depth = None
     control = None
@@ -472,6 +482,13 @@ async def run(
             raise RuntimeError("SITL did not observe a Mac visual observation")
         if not decision.summary:
             raise RuntimeError("SITL did not retain a conscious visual summary")
+        if requested_intent is not None:
+            if decision.intent != requested_intent:
+                raise RuntimeError(
+                    "SITL did not apply the scripted dialogue request: "
+                    f"expected {requested_intent}, got {decision.intent}"
+                )
+            print(f"Scripted dialogue=verified: intent={decision.intent}.")
         print(
             "Conscious Mac decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."
@@ -700,6 +717,10 @@ if __name__ == "__main__":
     parser.add_argument("--llm-model", default="gemma3:4b")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
+    parser.add_argument(
+        "--request",
+        help="send one dialogue request automatically at the start of an exploratory run",
+    )
     parser.add_argument("--world", default="default")
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     parser.add_argument(
@@ -723,6 +744,7 @@ if __name__ == "__main__":
                 ollama_timeout=args.ollama_timeout,
                 initial_intent=args.intent,
                 memory_path=args.memory,
+                dialogue_request=args.request,
             )
         )
     except (RuntimeError, ValueError) as error:

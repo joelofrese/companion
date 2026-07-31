@@ -94,6 +94,7 @@ def _run_once(
     initial_intent: str,
     model_pose: Optional[str],
     memory_path: Optional[Path],
+    dialogue_request: Optional[str],
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -167,6 +168,8 @@ def _run_once(
                 ]
             if memory_path is not None:
                 scenario += ["--memory", str(memory_path)]
+            if dialogue_request is not None:
+                scenario += ["--request", dialogue_request]
             scenario += ["--world", world]
             if duration_s is not None:
                 scenario += ["--duration", str(duration_s)]
@@ -193,6 +196,7 @@ def run(
     initial_intent: str = "hover",
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
+    dialogue_request: Optional[str] = None,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -211,6 +215,10 @@ def run(
         raise RuntimeError("experience memory requires exploratory simulation")
     if memory_path is not None and image_path is not None:
         raise RuntimeError("experience memory cannot run with an RTP image scenario")
+    if dialogue_request is not None and not exploratory:
+        raise RuntimeError("dialogue request requires exploratory simulation")
+    if dialogue_request is not None and not dialogue_request.strip():
+        raise RuntimeError("dialogue request must not be empty")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     model_pose = _validate_pose(model_pose)
@@ -238,6 +246,7 @@ def run(
                 initial_intent=initial_intent,
                 model_pose=model_pose,
                 memory_path=memory_path,
+                dialogue_request=dialogue_request,
             )
         except _BootError:
             if attempt == BOOT_RETRIES:
@@ -301,6 +310,10 @@ def main(argv=None):
         help="persist conscious experience across exploratory runs",
     )
     parser.add_argument(
+        "--request",
+        help="send one dialogue request automatically during an exploratory run",
+    )
+    parser.add_argument(
         "--duration",
         type=float,
         help="world simulation duration in seconds (default: 32)",
@@ -323,6 +336,10 @@ def main(argv=None):
         parser.error("--memory requires --explore")
     if args.memory and args.image:
         parser.error("--memory cannot be combined with --image")
+    if args.request and not args.explore:
+        parser.error("--request requires --explore")
+    if args.request and args.image:
+        parser.error("--request cannot be combined with --image")
     if args.ollama and not (args.camera or args.depth):
         parser.error("--ollama requires --camera or --depth")
     if args.duration is not None and args.image:
@@ -349,6 +366,7 @@ def main(argv=None):
             initial_intent=args.intent,
             model_pose=args.pose,
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
+            dialogue_request=args.request,
         )
     except KeyboardInterrupt:
         return 130

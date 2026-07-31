@@ -94,6 +94,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.command_loopback
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
+.venv/bin/python -m sim.run_world --explore --request "follow me" --duration 12
 .venv/bin/python -m sim.run_world --explore --camera
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --camera --ollama
@@ -119,6 +120,8 @@ bounded motion, landing, and disarm rather than exact decisions. Type a
 request such as `follow me`, `hover`, or `stop` during an exploratory
 synthetic run to change the conscious intent. Use `--world walls`, `forest`,
 `windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
+Use `--request` to inject one dialogue request without typing, which makes
+the conscious interaction path repeatable in unattended simulation.
 Add `--memory PATH` to persist conscious experience across exploratory runs.
 
 Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
@@ -160,6 +163,7 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   checks. Local Ollama brain runs have also passed this path.
 - Exploratory dialogue and editable experience memory work across runs. Memory
   is limited to 64 entries of 240 characters each.
+- `--request` can exercise one dialogue interaction without manual stdin input.
 - Missing frames, stale or invalid sensor data, malformed commands, command
   dropout, low visual confidence, and slow model shutdown fail safely.
 - The CM5 returns fresh TOF data, enforces command bounds, and remains the
