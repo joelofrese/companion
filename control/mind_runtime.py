@@ -102,7 +102,6 @@ class MindRuntime:
             return_when=asyncio.FIRST_COMPLETED,
         )
         if stopped in done:
-            thought.cancel()
             await asyncio.gather(thought, return_exceptions=True)
             return None
         stopped.cancel()
@@ -142,11 +141,11 @@ class MindRuntime:
                 pass
 
     def close(self):
-        """Stop background VLM work."""
+        """Finish background VLM work before closing."""
 
         if self._closed:
             return
         self._closed = True
         if self._future is not None:
             self._future.cancel()
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        self._executor.shutdown(wait=True, cancel_futures=True)

@@ -166,7 +166,7 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - `--request` can exercise one dialogue interaction without manual stdin input.
 - Invalid scripted dialogue is rejected before PX4 starts.
 - Missing frames, stale or invalid sensor data, malformed commands, command
-  dropout, low visual confidence, and slow model shutdown fail safely.
+  dropout, low visual confidence, and model shutdown fail safely.
 - The CM5 returns fresh TOF data, enforces command bounds, and remains the
   final safety authority. ROS 2 forwarding and physical sensors remain
   hardware-gated.
