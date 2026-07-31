@@ -83,6 +83,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera
 .venv/bin/python -m sim.run_world --explore --lidar --world walls
 .venv/bin/python -m sim.run_world --explore --lidar --world walls --intent following --pose 4,0,0,0,0,0
+.venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 4,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --camera --ollama
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
@@ -112,6 +113,11 @@ stock camera and lidar models are separate, so use them in separate runs. Use
 `--intent following` and `--pose x,y,z,roll,pitch,yaw` to start moving near a
 world obstacle and observe the real sensor trigger local safety.
 
+Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
+feed the Mac brain while its depth image supplies the CM5 forward safety
+distance, so one stock vehicle exercises both perception and real obstacle
+data.
+
 The deterministic RTP scenario uses YOLO only as a repeatable person-image
 fixture. It is not the production brain. Production `control/` uses local
 Ollama models; simulation-only fixtures live under `sim/`.
@@ -135,10 +141,10 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 ## Current state
 
 The deterministic mission, person and non-person RTP images, rendered Gazebo
-camera input, Gazebo lidar input, local Ollama camera input, live exploratory
-dialogue, command loopback, safety faults, recovery, landing, and disarm have
-been verified. A near-wall exploratory run also measured a real `0.33 m`
-lidar reading and a `-0.20 m/s` CM5 backoff command.
+camera input, Gazebo lidar and depth input, local Ollama camera input, live
+exploratory dialogue, command loopback, safety faults, recovery, landing, and
+disarm have been verified. Near-wall exploratory runs measure real sensor
+distances and trigger a bounded CM5 backoff command.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence

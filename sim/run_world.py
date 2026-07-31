@@ -86,6 +86,7 @@ def _run_once(
     exploratory: bool,
     camera: bool,
     lidar: bool,
+    depth: bool,
     duration_s: Optional[float],
     ollama: bool,
     vlm_model: str,
@@ -99,7 +100,9 @@ def _run_once(
     if model_pose is not None:
         environment["PX4_GZ_MODEL_POSE"] = model_pose
     model = "gz_x500"
-    if camera:
+    if depth:
+        model = "gz_x500_depth"
+    elif camera:
         model = "gz_x500_mono_cam"
     elif lidar:
         model = "gz_x500_lidar_front"
@@ -152,6 +155,8 @@ def _run_once(
                 scenario.append("--camera")
             if lidar:
                 scenario.append("--lidar")
+            if depth:
+                scenario.append("--depth")
             if exploratory:
                 scenario += ["--intent", initial_intent]
             if ollama:
@@ -182,6 +187,7 @@ def run(
     exploratory: bool = False,
     camera: bool = False,
     lidar: bool = False,
+    depth: bool = False,
     duration_s: Optional[float] = None,
     ollama: bool = False,
     vlm_model: str = "gemma3:4b",
@@ -199,10 +205,12 @@ def run(
         raise RuntimeError(f"scenario image does not exist: {image_path}")
     if initial_intent not in {"hover", "following"}:
         raise RuntimeError("initial exploratory intent must be hover or following")
-    if camera and lidar:
-        raise RuntimeError("camera and lidar simulation modes cannot run together")
+    if sum((camera, lidar, depth)) > 1:
+        raise RuntimeError("camera, lidar, and depth modes cannot run together")
     if lidar and not exploratory:
         raise RuntimeError("Gazebo lidar mode requires exploratory simulation")
+    if depth and not exploratory:
+        raise RuntimeError("Gazebo depth mode requires exploratory simulation")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     model_pose = _validate_pose(model_pose)
@@ -222,6 +230,7 @@ def run(
                 exploratory,
                 camera,
                 lidar,
+                depth,
                 duration_s,
                 ollama,
                 vlm_model,
@@ -269,6 +278,11 @@ def main(argv=None):
         help="use Gazebo's x500_lidar_front and feed its range readings to CM5 safety",
     )
     parser.add_argument(
+        "--depth",
+        action="store_true",
+        help="use Gazebo's x500_depth camera and feed its depth readings to CM5 safety",
+    )
+    parser.add_argument(
         "--intent",
         choices=("hover", "following"),
         default="hover",
@@ -299,14 +313,18 @@ def main(argv=None):
         parser.error("--camera cannot be combined with --image")
     if args.lidar and args.image:
         parser.error("--lidar cannot be combined with --image")
-    if args.camera and args.lidar:
-        parser.error("--camera and --lidar cannot be combined")
+    if args.depth and args.image:
+        parser.error("--depth cannot be combined with --image")
+    if sum((args.camera, args.lidar, args.depth)) > 1:
+        parser.error("--camera, --lidar, and --depth cannot be combined")
     if args.camera and not args.explore:
         parser.error("--camera requires --explore")
     if args.lidar and not args.explore:
         parser.error("--lidar requires --explore")
-    if args.ollama and not args.camera:
-        parser.error("--ollama requires --camera")
+    if args.depth and not args.explore:
+        parser.error("--depth requires --explore")
+    if args.ollama and not (args.camera or args.depth):
+        parser.error("--ollama requires --camera or --depth")
     if args.duration is not None and args.image:
         parser.error("--duration cannot be combined with --image")
     if args.expect_person and not args.image:
@@ -323,6 +341,7 @@ def main(argv=None):
             args.explore,
             args.camera,
             args.lidar,
+            args.depth,
             args.duration,
             args.ollama,
             args.vlm_model,

@@ -23,6 +23,7 @@ from onboard.command_service import SafetyCommandService
 from onboard.ros2_bridge import LatestDistanceSensor
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
 from sim.gazebo_camera import GazeboCamera
+from sim.gazebo_depth import GazeboDepthRangefinder
 from sim.gazebo_range import GazeboRangefinder
 from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
@@ -200,6 +201,7 @@ async def run(
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
     initial_intent: str = "hover",
+    depth: bool = False,
 ):
     """Run one complete Gazebo world simulation."""
 
@@ -209,12 +211,14 @@ async def run(
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
     if initial_intent not in {"hover", "following"}:
         raise ValueError("initial exploratory intent must be hover or following")
-    if camera and lidar:
-        raise ValueError("camera and lidar simulation modes cannot run together")
+    if sum((camera, lidar, depth)) > 1:
+        raise ValueError("camera, lidar, and depth modes cannot run together")
     if lidar and not exploratory:
         raise ValueError("Gazebo lidar mode requires exploratory simulation")
-    if ollama and not (exploratory and camera):
-        raise ValueError("Ollama simulation requires exploratory camera mode")
+    if depth and not exploratory:
+        raise ValueError("Gazebo depth mode requires exploratory simulation")
+    if ollama and not (exploratory and (camera or depth)):
+        raise ValueError("Ollama simulation requires exploratory camera or depth mode")
 
     ollama_client = None
     if ollama:
@@ -235,6 +239,7 @@ async def run(
     dialogue_input = DialogueInput() if exploratory else None
     gazebo_camera = None
     gazebo_rangefinder = None
+    gazebo_depth = None
     control = None
     offboard_started = False
     armed = False
@@ -259,9 +264,12 @@ async def run(
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         started_at = time.monotonic()
         world = SyntheticWorld(exploratory)
-        if camera:
+        if camera or depth:
+            camera_sensor = "IMX214" if depth else "camera"
+            camera_model = "x500_depth" if depth else "x500_mono_cam"
             gazebo_camera = GazeboCamera(
-                f"/world/{world_name}/model/x500_mono_cam_0/link/camera_link/sensor/camera/image"
+                f"/world/{world_name}/model/{camera_model}_0/"
+                f"link/camera_link/sensor/{camera_sensor}/image"
             )
             gazebo_camera.start()
         if lidar:
@@ -270,6 +278,9 @@ async def run(
                 "link/lidar_sensor_link/sensor/lidar/scan"
             )
             gazebo_rangefinder.start()
+        if depth:
+            gazebo_depth = GazeboDepthRangefinder("/depth_camera")
+            gazebo_depth.start()
         if ollama_client is None:
             visual_model = WorldVisualModel(world, started_at)
             language_model = WorldLanguageModel(exploratory)
@@ -283,9 +294,13 @@ async def run(
         lidar_samples = 0
         valid_lidar_samples = 0
         minimum_lidar_distance = math.inf
+        depth_samples = 0
+        valid_depth_samples = 0
+        minimum_depth_distance = math.inf
 
         def read_step(elapsed_s: float):
             nonlocal lidar_samples, valid_lidar_samples, minimum_lidar_distance
+            nonlocal depth_samples, valid_depth_samples, minimum_depth_distance
             step = world.step(elapsed_s)
             if gazebo_rangefinder is not None:
                 sample = gazebo_rangefinder.latest()
@@ -296,6 +311,20 @@ async def run(
                     if math.isfinite(distance):
                         valid_lidar_samples += 1
                         minimum_lidar_distance = min(minimum_lidar_distance, distance)
+                return replace(
+                    step,
+                    obstacle_distance_m=distance_sensor.read(),
+                    distance_fresh=sample is not None,
+                )
+            if gazebo_depth is not None:
+                sample = gazebo_depth.latest()
+                if sample is not None:
+                    distance_sensor.update(sample)
+                    depth_samples += 1
+                    distance = distance_sensor.read()
+                    if math.isfinite(distance):
+                        valid_depth_samples += 1
+                        minimum_depth_distance = min(minimum_depth_distance, distance)
                 return replace(
                     step,
                     obstacle_distance_m=distance_sensor.read(),
@@ -441,7 +470,7 @@ async def run(
         commands = safe_commands.commands
         if not commands or commands[-1][1] != VelocityCommand():
             raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
-        if lidar:
+        if lidar or depth:
             minimum_forwarded_north = min(
                 command.north_m_s for _, command in commands
             )
@@ -619,7 +648,7 @@ async def run(
                 f"north={min_north_velocity:.2f}..{max_north_velocity:.2f}, "
                 f"east={min_east_velocity:.2f}..{max_east_velocity:.2f}"
             )
-        if camera:
+        if camera or depth:
             if camera_frames == 0:
                 raise RuntimeError("Gazebo did not provide a camera frame")
             print(f"Gazebo camera frames=verified ({camera_frames}).")
@@ -631,6 +660,14 @@ async def run(
                 f"{valid_lidar_samples} valid of {lidar_samples}."
             )
             print(f"Minimum Gazebo lidar distance: {minimum_lidar_distance:.2f}m")
+        if depth:
+            if not valid_depth_samples:
+                raise RuntimeError("Gazebo did not provide a valid depth reading")
+            print(
+                "Gazebo depth samples=verified: "
+                f"{valid_depth_samples} valid of {depth_samples}."
+            )
+            print(f"Minimum Gazebo depth distance: {minimum_depth_distance:.2f}m")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
@@ -643,6 +680,8 @@ async def run(
             gazebo_camera.close()
         if gazebo_rangefinder is not None:
             gazebo_rangefinder.close()
+        if gazebo_depth is not None:
+            gazebo_depth.close()
         if sender is not None:
             sender.close()
         if service_task is not None and not service_task.done():
@@ -676,6 +715,7 @@ if __name__ == "__main__":
     parser.add_argument("--explore", action="store_true")
     parser.add_argument("--camera", action="store_true")
     parser.add_argument("--lidar", action="store_true")
+    parser.add_argument("--depth", action="store_true")
     parser.add_argument("--ollama", action="store_true")
     parser.add_argument("--vlm-model", default="gemma3:4b")
     parser.add_argument("--llm-model", default="gemma3:4b")
@@ -694,6 +734,7 @@ if __name__ == "__main__":
             exploratory=args.explore,
             camera=args.camera,
             lidar=args.lidar,
+            depth=args.depth,
             world_name=args.world,
             duration_s=args.duration,
             ollama=args.ollama,
