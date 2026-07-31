@@ -254,7 +254,12 @@ Forward obstacle distance: {information.telemetry.obstacle_distance_m}
 The summary should stay short and describe what the drone currently knows.
 Dialogue should be empty unless a user deserves a response.
 """.strip()
-        data = self.client.chat(self.model, prompt, CONSCIOUS_SCHEMA)
+        data = self.client.chat(
+            self.model,
+            prompt,
+            CONSCIOUS_SCHEMA,
+            think=False,
+        )
         dialogue_intent = parse_intent(information.dialogue) if information.dialogue else None
         intent = dialogue_intent or _text(data, "intent")
         if not intent:
