@@ -150,12 +150,17 @@ class MacMind:
             if intent == self.memory.intent:
                 return
             self.memory.intent = intent
-            self._intent_generation += 1
-            self.memory.focus = ""
-            self.memory.summary = ""
-            self.memory.previous_movement = "stop"
-            self.memory.previous_observation = ""
-            self._new_observations.clear()
+            self._invalidate_visual_context()
+
+    def _invalidate_visual_context(self):
+        """Discard visual context that belongs to the previous intent."""
+
+        self._intent_generation += 1
+        self.memory.focus = ""
+        self.memory.summary = ""
+        self.memory.previous_movement = "stop"
+        self.memory.previous_observation = ""
+        self._new_observations.clear()
 
     @property
     def intent(self) -> str:
@@ -238,7 +243,9 @@ class MacMind:
                 if information.dialogue:
                     entry = f"user={information.dialogue}; {entry}"
                 self.memory_store.remember(entry)
-            self.memory.intent = intent
+            if intent != self.memory.intent:
+                self.memory.intent = intent
+                self._invalidate_visual_context()
             self.memory.focus = decision.focus
             self.memory.summary = decision.summary
         return decision
