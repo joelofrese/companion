@@ -150,6 +150,16 @@ class MindRuntime:
             explicit_intent = parse_intent(dialogue) if dialogue else None
             if explicit_intent is not None:
                 self.mind.set_intent(explicit_intent)
+            if (
+                self._decision_count == 0
+                and self._observation_intent != self.mind.intent
+                and not dialogue
+            ):
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=period_s)
+                except asyncio.TimeoutError:
+                    pass
+                continue
             try:
                 telemetry = replace(
                     telemetry_provider(),
