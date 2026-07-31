@@ -161,56 +161,25 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 
 ## Current state
 
-- Deterministic Gazebo missions pass the full control path, visual fixtures,
-  CM5 safety faults, recovery, hover, landing, and disarm.
-- A 120-second exploratory Gazebo mission passed with 2,347 VLM observations,
-  120 conscious thoughts, bounded telemetry, landing, and disarm.
-- The walls-world depth mission passed 374 valid sensor samples, observed a
-  0.52 m minimum range, and verified CM5 obstacle backoff and recovery.
-- A model-driven rendered-camera run accepted a natural goal, completed 207
-  camera frames, two VLM observations, two conscious thoughts, and disarmed.
-- The model-driven walls-world run completed 347 frames and three VLM/thought
-  cycles, returned a focused obstacle description, and disarmed safely.
-- The combined Ollama/depth walls run produced a focused obstacle answer,
-  223 valid depth samples, CM5 backoff, landing, and disarm.
-- The combined forest-world run completed 206 camera frames and 186 valid depth
-  samples, returned a focused range answer, and disarmed without backoff.
-- The windy-world exploratory run completed 395 VLM observations and 21
-  conscious thoughts while staying within its 1.0 m/s motion envelope.
-- RTP image runs pass both person-following and non-person safe-stop behavior;
-  rendered-camera transport and depth runs pass bounded exploratory flight and
-  sensor checks. Camera transport stays stopped until a VLM is configured.
-  Local Ollama `qwen3-vl:2b` and `gemma3:4b` runs pass in walls and forest
-  worlds, with completed VLM and conscious-thought counts reported. An
-  open-ended camera question reaches the conscious model and returns a focus.
-- Exploratory dialogue and editable experience memory work across runs. Memory
-  records requests, decisions, and responses in at most 64 entries of 240
-  characters each.
-- `--request` can exercise one dialogue interaction without manual stdin input.
-- Exploratory `--intent` accepts natural high-level text instead of a fixed
-  state list; synthetic following recognizes clear follow phrases safely.
-- Shared intent parsing accepts both canonical `following` and natural follow
-  phrases, keeping voice, dialogue, and simulation behavior aligned.
-- Simulation argument validation lives in one runner boundary, so CLI and
-  direct callers reject the same invalid combinations before PX4 starts.
-- Empty scripted dialogue is rejected before PX4 starts; open-ended dialogue
-  is passed to the conscious model.
-- Clear dialogue commands immediately override stale movement; open-ended
-  dialogue remains with the conscious model.
-- Explicit hover or stop intent overrides any visual movement suggestion.
-- Missing frames, stale or invalid sensor data, malformed commands, command
-  dropout, low visual confidence, and model shutdown fail safely.
-- Media cleanup tolerates a child process that has already exited, preserving
-  the original stream failure.
-- The CM5 returns fresh TOF data, stops when it is missing, enforces command
-  bounds, and remains the final safety authority. ROS 2 forwarding and
-  physical sensors remain hardware-gated.
-- PX4’s stock GPS-denied optical-flow model is not verified: its flow quality
-  stayed at zero and it remained in constant-position mode. Its internal range
-  sensor is not DEXI 3 hardware.
-- Simulation preparation reports a clear connection or readiness error after
-  30 seconds instead of hanging. Takeoff, landing, and disarm waits are also
-  bounded. Simulation-only fixtures stay under `sim/`.
+- Deterministic Gazebo missions pass the full control path, perception
+  fixtures, CM5 safety faults, recovery, hover, landing, and disarm.
+- Exploratory brain-driven runs pass in default, walls, forest, and windy
+  worlds. Local Ollama VLM/LLM, rendered camera, simulated depth/TOF, focused
+  visual answers, bounded motion, long runs, landing, and disarm are verified.
+- RTP image runs pass person-following and non-person safe-stop behavior.
+  Camera transport stays stopped until a visual model is configured.
+- Dialogue and bounded editable memory work across runs. Natural initial
+  intents, clear follow/hover commands, conscious focus, and open-ended
+  requests are supported through one shared intent path.
+- Simulation arguments are validated once before PX4 starts. Missing or stale
+  frames and sensors, malformed commands, command dropout, low confidence,
+  and model shutdown fail safely.
+- The CM5 returns fresh TOF data, enforces command bounds, and remains the
+  final safety authority. ROS 2 forwarding and physical sensors are still
+  hardware-gated.
+- PX4’s stock GPS-denied optical-flow model is not verified; its flow quality
+  stayed at zero in SITL. Simulation preparation, flight actions, landing,
+  and disarm waits are bounded.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
