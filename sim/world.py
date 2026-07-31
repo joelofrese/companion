@@ -135,6 +135,14 @@ class WorldVisualModel:
         previous_observation: str,
         telemetry: Telemetry,
     ) -> VisualObservation:
+        if image is None:
+            return VisualObservation(
+                timestamp_s=timestamp_s,
+                description="camera frame is unavailable",
+                movement="stop",
+                next_focus=focus,
+                confidence=0.0,
+            )
         elapsed_s = max(0.0, timestamp_s - self.started_at_s)
         target_offset_east_m = self.world.target_offset_east(elapsed_s)
         if target_offset_east_m is None:

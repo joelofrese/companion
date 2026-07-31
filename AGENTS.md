@@ -153,6 +153,8 @@ readers use one small shared topic-reader lifecycle while keeping their camera
 and depth decoders explicit.
 The deterministic heartbeat pause resumes with one Mac tick so the Mac
 watchdog emits zero; the later command dropout separately exercises CM5 expiry.
+The non-Ollama Gazebo camera fallback stops with zero confidence when no frame
+is available instead of generating movement from synthetic scene state.
 PX4’s stock GPS-denied optical-flow model was investigated but is not a
 verified path here: its flow quality stayed at zero and PX4 remained in
 constant-position mode. Its internal range sensor is not DEXI 3 hardware.
