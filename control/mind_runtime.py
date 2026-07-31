@@ -2,6 +2,7 @@
 
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import replace
 from typing import Callable, Optional
 
 from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
@@ -35,6 +36,7 @@ class MindRuntime:
         self._closed = False
         self._observation_count = 0
         self._decision_count = 0
+        self._last_command: Optional[VelocityCommand] = None
 
     @property
     def latest_decision(self) -> Optional[ConsciousDecision]:
@@ -80,7 +82,10 @@ class MindRuntime:
                 self.mind.see,
                 frame,
                 timestamp_s,
-                Telemetry(obstacle_distance_m=obstacle_distance_m),
+                Telemetry(
+                    obstacle_distance_m=obstacle_distance_m,
+                    last_command=self._last_command,
+                ),
             )
         movement = "stop"
         if frame is not None and self._observation is not None:
@@ -94,7 +99,9 @@ class MindRuntime:
         if parse_intent(self.mind.intent) == "hover":
             movement = "stop"
         desired = movement_command(movement, obstacle_distance_m)
-        return self.watchdog.emit(timestamp_s, desired)
+        command = self.watchdog.emit(timestamp_s, desired)
+        self._last_command = command
+        return command
 
     def _collect(self):
         if self._future is None or not self._future.done():
@@ -144,9 +151,13 @@ class MindRuntime:
             if explicit_intent is not None:
                 self.mind.set_intent(explicit_intent)
             try:
+                telemetry = replace(
+                    telemetry_provider(),
+                    last_command=self._last_command,
+                )
                 decision = await self._think_or_stop(
                     stop_event,
-                    telemetry_provider(),
+                    telemetry,
                     dialogue,
                 )
             except Exception as error:

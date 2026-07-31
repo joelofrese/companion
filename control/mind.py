@@ -6,6 +6,8 @@ from pathlib import Path
 import threading
 from typing import Any, Optional, Protocol
 
+from control.velocity import VelocityCommand
+
 
 MAX_PENDING_OBSERVATIONS = 32
 MAX_MEMORY_LINES = 64
@@ -54,6 +56,7 @@ class Telemetry:
     """The vehicle information the brain can use."""
 
     obstacle_distance_m: Optional[float] = None
+    last_command: Optional[VelocityCommand] = None
 
 
 @dataclass(frozen=True)
@@ -237,7 +240,11 @@ class MacMind:
             if self.memory_store is not None and (
                 information.new_observations or information.dialogue
             ):
-                entry = f"intent={intent}; focus={decision.focus or 'none'}; {summary}"
+                entry = (
+                    f"intent={intent}; focus={decision.focus or 'none'}; "
+                    f"command={information.telemetry.last_command or 'none yet'}; "
+                    f"{summary}"
+                )
                 if isinstance(decision.dialogue, str) and decision.dialogue.strip():
                     entry += f"; response={decision.dialogue}"
                 if information.dialogue:

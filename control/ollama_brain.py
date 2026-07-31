@@ -191,6 +191,7 @@ Current high-level intent: {intent or "none"}
 Requested visual focus: {focus or "none"}
 Previous movement: {previous_movement or "stop"}
 Previous description: {previous_observation or "none"}
+Last requested command: {telemetry.last_command or "none yet"}
 Forward obstacle distance: {telemetry.obstacle_distance_m}
 
 The movement must be one of: forward, left, right, up, down, stop, hover.
@@ -249,6 +250,7 @@ Long-term experience memory:
 New visual observations:
 {observations}
 Optional user dialogue: {information.dialogue or "none"}
+Last requested command: {information.telemetry.last_command or "none yet"}
 Forward obstacle distance: {information.telemetry.obstacle_distance_m}
 
 The summary should stay short and describe what the drone currently knows.
