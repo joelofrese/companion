@@ -146,7 +146,13 @@ class MacMind:
             raise ValueError("intent must be a non-empty string")
         intent = intent.strip()
         with self._lock:
+            if intent == self.memory.intent:
+                return
             self.memory.intent = intent
+            self.memory.focus = ""
+            self.memory.previous_movement = "stop"
+            self.memory.previous_observation = ""
+            self._new_observations.clear()
 
     @property
     def intent(self) -> str:
