@@ -116,6 +116,22 @@ class OllamaClient:
 
         self._request("/api/tags")
 
+    def preload(self, model: str):
+        """Load one model without generating a response."""
+
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("Ollama model must not be empty")
+        self._request(
+            "/api/generate",
+            {
+                "model": model,
+                "prompt": "",
+                "stream": False,
+                "keep_alive": "5m",
+                "options": {"num_predict": 1},
+            },
+        )
+
     def chat(
         self,
         model: str,

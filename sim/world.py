@@ -253,6 +253,8 @@ async def run(
 
         ollama_client = OllamaClient(timeout_s=ollama_timeout)
         await asyncio.to_thread(ollama_client.check)
+        await asyncio.to_thread(ollama_client.preload, vlm_model)
+        await asyncio.to_thread(ollama_client.preload, llm_model)
     memory_store = CompanionMemory(memory_path) if memory_path is not None else None
 
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)

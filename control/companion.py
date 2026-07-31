@@ -68,6 +68,8 @@ async def run(args):
 
     client = OllamaClient(args.ollama_url, timeout_s=args.ollama_timeout)
     await asyncio.to_thread(client.check)
+    await asyncio.to_thread(client.preload, args.vlm_model)
+    await asyncio.to_thread(client.preload, args.llm_model)
     video_config = H264StreamConfig(
         port=args.video_port,
         width=args.width,
