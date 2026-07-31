@@ -1,9 +1,10 @@
-"""Encode velocity commands for the Mac-to-CM5 link."""
+"""Encode the small Mac-to-CM5 UDP contract."""
 
 import json
 import math
 from dataclasses import dataclass
 from numbers import Real
+from typing import Optional
 
 from control.velocity import VelocityCommand
 
@@ -85,3 +86,69 @@ class CommandPacket:
         ):
             raise ValueError("invalid command velocity")
         return cls(sequence, VelocityCommand(*values))
+
+
+@dataclass(frozen=True)
+class TelemetryPacket:
+    """Return the newest CM5 distance reading to the Mac."""
+
+    sequence: int
+    obstacle_distance_m: Optional[float]
+
+    def encode(self) -> bytes:
+        if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 0:
+            raise ValueError("sequence must be non-negative")
+        if self.obstacle_distance_m is not None and (
+            isinstance(self.obstacle_distance_m, bool)
+            or not isinstance(self.obstacle_distance_m, Real)
+            or not math.isfinite(self.obstacle_distance_m)
+            or self.obstacle_distance_m < 0.0
+        ):
+            raise ValueError("obstacle distance must be finite or none")
+        payload = {
+            "type": "telemetry",
+            "version": PROTOCOL_VERSION,
+            "sequence": self.sequence,
+            "telemetry": {"obstacle_distance_m": self.obstacle_distance_m},
+        }
+        encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        if len(encoded) > MAX_PACKET_BYTES:
+            raise ValueError("telemetry packet is too large")
+        return encoded
+
+    @classmethod
+    def decode(cls, payload: bytes) -> "TelemetryPacket":
+        if len(payload) > MAX_PACKET_BYTES:
+            raise ValueError("telemetry packet is too large")
+        try:
+            data = json.loads(payload.decode("utf-8"))
+            version = data["version"]
+            packet_type = data["type"]
+            sequence = data["sequence"]
+            distance = data["telemetry"]["obstacle_distance_m"]
+        except (
+            AttributeError,
+            KeyError,
+            IndexError,
+            TypeError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as error:
+            raise ValueError("invalid telemetry packet") from error
+
+        if (
+            version != PROTOCOL_VERSION
+            or packet_type != "telemetry"
+            or isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 0
+        ):
+            raise ValueError("invalid telemetry packet header")
+        if distance is not None and (
+            isinstance(distance, bool)
+            or not isinstance(distance, Real)
+            or not math.isfinite(distance)
+            or distance < 0.0
+        ):
+            raise ValueError("invalid obstacle distance")
+        return cls(sequence, distance)

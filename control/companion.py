@@ -88,6 +88,7 @@ async def run(args):
         control,
         sender,
         frame_reader.read,
+        obstacle_provider=lambda timestamp_s: sender.obstacle_distance(),
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()
@@ -95,7 +96,9 @@ async def run(args):
     mind_task = asyncio.create_task(
         control.think_loop(
             mind_stop,
-            telemetry_provider=lambda: Telemetry(),
+            telemetry_provider=lambda: Telemetry(
+                obstacle_distance_m=sender.obstacle_distance()
+            ),
             dialogue_provider=dialogue_input.next if dialogue_input else None,
         )
     )

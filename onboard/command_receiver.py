@@ -1,10 +1,12 @@
 """Receive Mac commands and apply CM5 safety checks."""
 
+import math
 import socket
 import time
+from numbers import Real
 from typing import Optional
 
-from control.command_packet import MAX_PACKET_BYTES
+from control.command_packet import MAX_PACKET_BYTES, TelemetryPacket
 from control.velocity import VelocityCommand
 from onboard.safety import OnboardSafetyEnvelope
 
@@ -29,6 +31,8 @@ class UdpSafetyReceiver:
         self.port = port
         self.safety = safety or OnboardSafetyEnvelope()
         self._socket = None
+        self._client_address = None
+        self._telemetry_sequence = 0
 
     def start(self):
         """Bind the UDP socket."""
@@ -44,6 +48,8 @@ class UdpSafetyReceiver:
             raise
         self._socket = receiver_socket
         self.port = receiver_socket.getsockname()[1]
+        self._client_address = None
+        self._telemetry_sequence = 0
 
     def poll(self, obstacle_distance_m: Optional[float] = None) -> VelocityCommand:
         """Read available packets and return the safe command."""
@@ -52,14 +58,38 @@ class UdpSafetyReceiver:
             raise RuntimeError("receiver must be started before polling")
         while True:
             try:
-                payload, _ = self._socket.recvfrom(MAX_PACKET_BYTES + 1)
+                payload, address = self._socket.recvfrom(MAX_PACKET_BYTES + 1)
             except BlockingIOError:
                 break
             try:
-                self.safety.receive_packet(time.monotonic(), payload)
+                accepted = self.safety.receive_packet(time.monotonic(), payload)
             except ValueError:
                 continue
+            if accepted:
+                self._client_address = address
         return self.safety.tick(time.monotonic(), obstacle_distance_m=obstacle_distance_m)
+
+    def send_telemetry(self, obstacle_distance_m: Optional[float] = None):
+        """Return the latest sensor value to the Mac command sender."""
+
+        if self._socket is None or self._client_address is None:
+            return
+        if (
+            obstacle_distance_m is not None
+            and (
+                isinstance(obstacle_distance_m, bool)
+                or not isinstance(obstacle_distance_m, Real)
+                or not math.isfinite(obstacle_distance_m)
+                or obstacle_distance_m < 0.0
+            )
+        ):
+            obstacle_distance_m = None
+        payload = TelemetryPacket(
+            self._telemetry_sequence,
+            obstacle_distance_m,
+        ).encode()
+        self._socket.sendto(payload, self._client_address)
+        self._telemetry_sequence += 1
 
     def close(self):
         """Close the UDP socket."""
@@ -68,3 +98,4 @@ class UdpSafetyReceiver:
             return
         self._socket.close()
         self._socket = None
+        self._client_address = None

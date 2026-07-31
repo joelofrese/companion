@@ -96,8 +96,9 @@ async def run(image_path: str, expect_person: bool = False):
     stale_packet_reported = False
     fault_socket = None
 
-    def current_obstacle(timestamp_s):
-        elapsed_s = max(0.0, timestamp_s - flight_started_at)
+    def cm5_obstacle_distance():
+        started_at = flight_started_at or time.monotonic()
+        elapsed_s = max(0.0, time.monotonic() - started_at)
         if not STALE_DISTANCE_START_S <= elapsed_s < STALE_DISTANCE_END_S:
             distance_sensor.update(DistanceMessage(demo_obstacle_distance_m(elapsed_s)))
         return distance_sensor.read()
@@ -126,7 +127,7 @@ async def run(image_path: str, expect_person: bool = False):
             receiver,
             safe_commands,
             tick_period_s=SETPOINT_PERIOD_S,
-            obstacle_distance=distance_sensor.read,
+            obstacle_distance=cm5_obstacle_distance,
         )
         cm5_service.start()
         cm5_task = asyncio.create_task(cm5_service.run(cm5_stop))
@@ -184,7 +185,7 @@ async def run(image_path: str, expect_person: bool = False):
             control.think_loop(
                 mind_stop,
                 telemetry_provider=lambda: Telemetry(
-                    obstacle_distance_m=distance_sensor.read()
+                    obstacle_distance_m=sender.obstacle_distance()
                 ),
             )
         )
@@ -219,7 +220,7 @@ async def run(image_path: str, expect_person: bool = False):
             mac_sender,
             read_frame,
             intent_provider=current_intent,
-            obstacle_provider=current_obstacle,
+            obstacle_provider=lambda timestamp_s: sender.obstacle_distance(),
             tick_period_s=SETPOINT_PERIOD_S,
         )
         mac_task = asyncio.create_task(mac_service.run(mac_stop))

@@ -320,7 +320,7 @@ async def run(
                 frame=frame,
                 timestamp_s=timestamp_s,
                 intent=intent,
-                obstacle_distance_m=step.obstacle_distance_m,
+                obstacle_distance_m=sender.obstacle_distance(),
             )
             if step.transmit:
                 sender.send(step.command_override or command)
@@ -349,7 +349,7 @@ async def run(
             control.think_loop(
                 mind_stop,
                 telemetry_provider=lambda: Telemetry(
-                    obstacle_distance_m=distance_sensor.read()
+                    obstacle_distance_m=sender.obstacle_distance()
                 ),
                 dialogue_provider=dialogue_input.next if dialogue_input else None,
                 period_s=1.0,

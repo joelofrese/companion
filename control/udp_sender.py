@@ -1,9 +1,14 @@
-"""Send numbered velocity commands to the CM5."""
+"""Send commands and receive CM5 distance telemetry."""
 
+import math
 import socket
+import time
 
-from control.command_packet import CommandPacket
+from control.command_packet import MAX_PACKET_BYTES, CommandPacket, TelemetryPacket
 from control.velocity import VelocityCommand
+
+
+TELEMETRY_TIMEOUT_S = 0.2
 
 
 class UdpCommandSender:
@@ -26,12 +31,16 @@ class UdpCommandSender:
         self.destination = (destination_host, destination_port)
         self._socket = None
         self._sequence = 0
+        self._telemetry_sequence = None
+        self._obstacle_distance_m = None
+        self._telemetry_received_at_s = None
 
     def start(self):
         """Open the sender socket once; repeated starts are harmless."""
 
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self._socket.setblocking(False)
 
     def send(self, command: VelocityCommand):
         """Send one packet and advance its sequence only after a successful send."""
@@ -40,6 +49,36 @@ class UdpCommandSender:
         payload = CommandPacket(self._sequence, command).encode()
         self._socket.sendto(payload, self.destination)
         self._sequence += 1
+
+    def obstacle_distance(self) -> float:
+        """Return a fresh CM5 distance, or NaN when it is unavailable."""
+
+        if self._socket is None:
+            return math.nan
+        while True:
+            try:
+                payload, _ = self._socket.recvfrom(MAX_PACKET_BYTES + 1)
+            except BlockingIOError:
+                break
+            try:
+                packet = TelemetryPacket.decode(payload)
+            except ValueError:
+                continue
+            if (
+                self._telemetry_sequence is not None
+                and packet.sequence <= self._telemetry_sequence
+            ):
+                continue
+            self._telemetry_sequence = packet.sequence
+            self._obstacle_distance_m = packet.obstacle_distance_m
+            self._telemetry_received_at_s = time.monotonic()
+        if (
+            self._telemetry_received_at_s is None
+            or time.monotonic() - self._telemetry_received_at_s > TELEMETRY_TIMEOUT_S
+            or self._obstacle_distance_m is None
+        ):
+            return math.nan
+        return self._obstacle_distance_m
 
     def close(self):
         """Release the UDP socket."""

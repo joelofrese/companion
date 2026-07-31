@@ -1,6 +1,7 @@
 """Verify the Mac-to-CM5 command link over local UDP."""
 
 import asyncio
+import math
 import time
 
 from control.udp_sender import UdpCommandSender
@@ -13,7 +14,11 @@ from onboard.command_service import SafetyCommandService
 class FixedCommandControl:
     """Provide one normal Mac command for the transport loopback."""
 
+    def __init__(self):
+        self.obstacle_distances = []
+
     def tick(self, frame, timestamp_s, intent=None, obstacle_distance_m=None):
+        self.obstacle_distances.append(obstacle_distance_m)
         return VelocityCommand(north_m_s=0.25)
 
 
@@ -37,11 +42,8 @@ async def run():
     frame_count = 0
     cm5_started_at = None
 
-    def mac_obstacle_distance():
-        return 0.5 if frame_count >= 2 else 2.0
-
     def cm5_obstacle_distance():
-        return 2.0 if time.monotonic() - cm5_started_at < 0.08 else 0.5
+        return 2.0 if time.monotonic() - cm5_started_at < 0.12 else 0.5
 
     async def frame_reader():
         nonlocal frame_count
@@ -55,6 +57,7 @@ async def run():
     cm5_task = None
     mac_task = None
     sender = None
+    control = FixedCommandControl()
     try:
         cm5_service.start()
         cm5_started_at = time.monotonic()
@@ -62,10 +65,10 @@ async def run():
         sender = UdpCommandSender("127.0.0.1", receiver.port)
         mac_task = asyncio.create_task(
             UdpControlService(
-                FixedCommandControl(),
+                control,
                 sender,
                 frame_reader,
-                obstacle_provider=lambda timestamp_s: mac_obstacle_distance(),
+                obstacle_provider=lambda timestamp_s: sender.obstacle_distance(),
                 tick_period_s=0.01,
             ).run(mac_stop_event)
         )
@@ -78,12 +81,33 @@ async def run():
             raise RuntimeError(f"Mac control service did not produce a fresh follow command: {commands}")
         if VelocityCommand(north_m_s=-0.2) not in commands:
             raise RuntimeError(f"Mac control service did not produce obstacle backoff: {commands}")
+        if not any(
+            distance is not None
+            and not (isinstance(distance, float) and math.isnan(distance))
+            and distance > 1.0
+            for distance in control.obstacle_distances
+        ):
+            raise RuntimeError(
+                f"Mac did not receive a clear CM5 distance: {control.obstacle_distances}"
+            )
+        if not any(
+            distance is not None
+            and not (isinstance(distance, float) and math.isnan(distance))
+            and distance < 0.6
+            for distance in control.obstacle_distances
+        ):
+            raise RuntimeError(
+                f"Mac did not receive the CM5 obstacle distance: {control.obstacle_distances}"
+            )
         cm5_stop_event.set()
         await cm5_task
         shutdown_command = await _next_command(forwarder)
         if shutdown_command != VelocityCommand():
             raise RuntimeError("command service did not send zero on shutdown")
-        print("Mac control service=verified; obstacle command=verified; shutdown=zero")
+        print(
+            "Mac control service=verified; CM5 telemetry=verified; "
+            "obstacle command=verified; shutdown=zero"
+        )
     finally:
         if sender is not None:
             sender.close()

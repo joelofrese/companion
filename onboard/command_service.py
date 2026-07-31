@@ -41,7 +41,9 @@ class SafetyCommandService:
 
         try:
             while not stop_event.is_set():
-                command = self.receiver.poll(obstacle_distance_m=self.obstacle_distance())
+                obstacle_distance_m = self.obstacle_distance()
+                command = self.receiver.poll(obstacle_distance_m=obstacle_distance_m)
+                self.receiver.send_telemetry(obstacle_distance_m)
                 await self.forwarder.send(command)
                 await asyncio.sleep(self.tick_period_s)
         finally:

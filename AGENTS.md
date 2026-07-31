@@ -36,6 +36,8 @@ capabilities. Repeat that loop without waiting for confirmation.
 - Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.
+- CM5 returns fresh TOF telemetry over the same UDP link; missing or stale
+  readings stop Mac motion while CM5 remains the final safety authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
 The brain never sends motor or attitude commands. The flight interface is
@@ -45,9 +47,9 @@ becomes zero motion, and a fresh obstacle reading may override normal intent.
 ## Where code runs
 
 Heavy perception, cognition, and interaction run on the Mac. The CM5 relays
-video and sensors, performs the final safety check, and forwards approved
-velocity setpoints to PX4. Keep hardware-specific code on the CM5 side so Mac
-behavior stays easy to simulate.
+video and sensor telemetry, performs the final safety check, and forwards
+approved velocity setpoints to PX4. Keep hardware-specific code on the CM5
+side so Mac behavior stays easy to simulate.
 
 The target hardware is the DroneBlocks DEXI 3: PX4, optical flow, a TOF
 distance sensor, a Raspberry Pi camera, and a Raspberry Pi CM5. It has no
@@ -154,6 +156,9 @@ confidence. Typed dialogue now uses the same non-blocking input path in
 simulation and the production Mac entry point. Mac motion now requires at
 least 0.5 visual confidence, and pending observations are bounded while the
 conscious summary and editable experience memory carry longer context.
+The CM5 returns fresh TOF distance telemetry over the command socket so the
+Mac brain and CM5 safety layer use the same body reading without adding a
+second transport. Missing or stale telemetry becomes zero motion on the Mac.
 Conscious shutdown is stop-aware,
 so a slow model cannot delay zero-command cleanup. The CM5 also bounds yaw to
 ±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
