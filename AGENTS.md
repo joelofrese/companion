@@ -85,6 +85,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --lidar --world walls --intent following --pose 4,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 4,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --camera --ollama
+.venv/bin/python -m sim.run_world --explore --depth --ollama --world walls --intent following --pose 4,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
@@ -141,10 +142,11 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 ## Current state
 
 The deterministic mission, person and non-person RTP images, rendered Gazebo
-camera input, Gazebo lidar and depth input, local Ollama camera input, live
+camera, lidar, and depth input, local Ollama camera and depth input, live
 exploratory dialogue, command loopback, safety faults, recovery, landing, and
 disarm have been verified. Near-wall exploratory runs measure real sensor
-distances and trigger a bounded CM5 backoff command.
+distances and trigger a bounded CM5 backoff command. The three Gazebo sensor
+readers share one small topic reader while keeping their decoders explicit.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
