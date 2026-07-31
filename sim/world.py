@@ -121,9 +121,15 @@ class SyntheticWorld:
 class WorldVisualModel:
     """Provide fixed scene descriptions to the Mac VLM boundary."""
 
-    def __init__(self, world: SyntheticWorld, started_at_s: float):
+    def __init__(
+        self,
+        world: SyntheticWorld,
+        started_at_s: float,
+        synthetic_scene: bool = True,
+    ):
         self.world = world
         self.started_at_s = started_at_s
+        self.synthetic_scene = synthetic_scene
 
     def observe(
         self,
@@ -135,6 +141,12 @@ class WorldVisualModel:
         previous_observation: str,
         telemetry: Telemetry,
     ) -> VisualObservation:
+        if not self.synthetic_scene:
+            return VisualObservation(
+                timestamp_s=timestamp_s,
+                description="camera frame received; no visual model configured",
+                next_focus=focus,
+            )
         elapsed_s = max(0.0, timestamp_s - self.started_at_s)
         target_offset_east_m = self.world.target_offset_east(elapsed_s)
         if target_offset_east_m is None:
@@ -292,7 +304,11 @@ async def run(
             gazebo_depth = GazeboDepthRangefinder("/depth_camera")
             gazebo_depth.start()
         if ollama_client is None:
-            visual_model = WorldVisualModel(world, started_at)
+            visual_model = WorldVisualModel(
+                world,
+                started_at,
+                synthetic_scene=not (camera or depth),
+            )
             language_model = WorldLanguageModel(exploratory)
             language_model.started_at_s = started_at
         else:
@@ -658,6 +674,12 @@ async def run(
             if camera_frames == 0:
                 raise RuntimeError("Gazebo did not provide a camera frame")
             print(f"Gazebo camera frames=verified ({camera_frames}).")
+        if camera and not ollama:
+            if any(command != VelocityCommand() for _, command in commands):
+                raise RuntimeError(
+                    "camera transport run commanded motion without a visual model"
+                )
+            print("Gazebo camera transport safe stop=verified.")
         if depth:
             if not valid_depth_samples:
                 raise RuntimeError("Gazebo did not provide a valid depth reading")

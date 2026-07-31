@@ -114,12 +114,14 @@ image stays stopped. These scenarios do not prove physical sensors, radio, or
 hardware-specific transport.
 
 Add `--camera` to an exploratory run to use Gazebo’s rendered camera topic as
-the VLM input. Add `--ollama` to send those frames through local Ollama VLM
-and LLM sessions. This is slower and exploratory, so it checks safety,
-bounded motion, landing, and disarm rather than exact decisions. Type a
-request such as `follow me`, `hover`, or `stop` during an exploratory
-synthetic run to change the conscious intent. Use `--world walls`, `forest`,
-`windy`, or another PX4 Gazebo world, and `--duration` for a longer run.
+the VLM input. Without `--ollama`, the camera transport is verified but the
+brain stays stopped because no visual model is configured. Add `--ollama` to
+send those frames through local Ollama VLM and LLM sessions. This is slower
+and exploratory, so it checks safety, bounded motion, landing, and disarm
+rather than exact decisions. Type a request such as `follow me`, `hover`, or
+`stop` during an exploratory synthetic run to change the conscious intent.
+Use `--world walls`, `forest`, `windy`, or another PX4 Gazebo world, and
+`--duration` for a longer run.
 Use `--request` to inject one dialogue request without typing, which makes
 the conscious interaction path repeatable in unattended simulation.
 Add `--memory PATH` to persist conscious experience across exploratory runs.
@@ -159,8 +161,9 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Deterministic Gazebo missions pass the full control path, visual fixtures,
   CM5 safety faults, recovery, hover, landing, and disarm.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
-  rendered-camera and depth runs pass bounded exploratory flight and sensor
-  checks. Local Ollama brain runs have also passed this path.
+  rendered-camera transport and depth runs pass bounded exploratory flight and
+  sensor checks. Camera transport stays stopped until a VLM is configured.
+  Local Ollama brain runs have also passed this path.
 - Exploratory dialogue and editable experience memory work across runs. Memory
   is limited to 64 entries of 240 characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
