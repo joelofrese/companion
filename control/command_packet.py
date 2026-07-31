@@ -29,12 +29,7 @@ class CommandPacket:
         )
         if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 0:
             raise ValueError("sequence must be non-negative")
-        if any(
-            isinstance(value, bool)
-            or not isinstance(value, Real)
-            or not math.isfinite(value)
-            for value in values
-        ):
+        if any(not _finite(value) for value in values):
             raise ValueError("command velocity must be finite")
         payload = {
             "version": PROTOCOL_VERSION,
@@ -78,12 +73,7 @@ class CommandPacket:
             or sequence < 0
         ):
             raise ValueError("invalid command packet header")
-        if any(
-            isinstance(value, bool)
-            or not isinstance(value, Real)
-            or not math.isfinite(value)
-            for value in values
-        ):
+        if any(not _finite(value) for value in values):
             raise ValueError("invalid command velocity")
         return cls(sequence, VelocityCommand(*values))
 

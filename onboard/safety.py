@@ -14,7 +14,7 @@ from control.velocity import VelocityCommand
 MAX_HORIZONTAL_SPEED_M_S = 0.5
 MAX_VERTICAL_SPEED_M_S = 0.3
 MAX_YAW_DEG = 180.0
-DISTANCE_TIMEOUT_S = 0.15
+SENSOR_TIMEOUT_S = 0.15
 
 
 def _finite_real(value):
@@ -28,7 +28,7 @@ def _finite_real(value):
 class LatestDistanceSensor:
     """Keep the newest distance reading; missing data is unsafe."""
 
-    def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
+    def __init__(self, clock=time.monotonic, timeout_s: float = SENSOR_TIMEOUT_S):
         if (
             isinstance(timeout_s, bool)
             or not isinstance(timeout_s, Real)
@@ -77,7 +77,7 @@ class LatestDistanceSensor:
 class LatestVelocity:
     """Keep the newest PX4 NED velocity; missing data is unavailable."""
 
-    def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
+    def __init__(self, clock=time.monotonic, timeout_s: float = SENSOR_TIMEOUT_S):
         if (
             isinstance(timeout_s, bool)
             or not isinstance(timeout_s, Real)
