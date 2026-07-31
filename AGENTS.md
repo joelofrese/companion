@@ -173,6 +173,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   cycles, returned a focused obstacle description, and disarmed safely.
 - The combined Ollama/depth walls run produced a focused obstacle answer,
   223 valid depth samples, CM5 backoff, landing, and disarm.
+- The combined forest-world run completed 206 camera frames and 186 valid depth
+  samples, returned a focused range answer, and disarmed without backoff.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
