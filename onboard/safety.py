@@ -136,18 +136,12 @@ class OnboardSafetyEnvelope:
             return VelocityCommand()
         if timestamp_s - self._received_at_s > self.command_timeout_s:
             return VelocityCommand()
-        if obstacle_distance_m is not None:
-            if isinstance(obstacle_distance_m, bool) or not isinstance(obstacle_distance_m, Real):
-                return VelocityCommand()
-            try:
-                if not math.isfinite(obstacle_distance_m):
-                    return VelocityCommand()
-            except TypeError:
-                return VelocityCommand()
-            if obstacle_distance_m < 0.0:
-                return VelocityCommand()
-            if obstacle_distance_m < OBSTACLE_STOP_M:
-                return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
+        if obstacle_distance_m is not None and (
+            not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0
+        ):
+            return VelocityCommand()
+        if obstacle_distance_m is not None and obstacle_distance_m < OBSTACLE_STOP_M:
+            return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
         if not self._command_is_safe(self._command):
             return VelocityCommand()
         return self._command
@@ -160,12 +154,7 @@ class OnboardSafetyEnvelope:
             command.down_m_s,
             command.yaw_deg,
         )
-        if any(
-            isinstance(value, bool)
-            or not isinstance(value, Real)
-            or not math.isfinite(value)
-            for value in values
-        ):
+        if not all(_finite_real(value) for value in values):
             return False
         return (
             abs(command.north_m_s) <= MAX_HORIZONTAL_SPEED_M_S
