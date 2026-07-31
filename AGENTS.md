@@ -169,6 +169,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   0.52 m minimum range, and verified CM5 obstacle backoff and recovery.
 - A model-driven rendered-camera run accepted a natural goal, completed 207
   camera frames, two VLM observations, two conscious thoughts, and disarmed.
+- The model-driven walls-world run completed 347 frames and three VLM/thought
+  cycles, returned a focused obstacle description, and disarmed safely.
 - RTP image runs pass both person-following and non-person safe-stop behavior;
   rendered-camera transport and depth runs pass bounded exploratory flight and
   sensor checks. Camera transport stays stopped until a VLM is configured.
