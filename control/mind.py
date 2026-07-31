@@ -2,11 +2,46 @@
 
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 import threading
 from typing import Any, Optional, Protocol
 
 
 MAX_PENDING_OBSERVATIONS = 32
+MAX_MEMORY_LINES = 64
+MEMORY_CONTEXT_LINES = 8
+
+
+class CompanionMemory:
+    """Keep a small, editable record of past conscious decisions."""
+
+    def __init__(self, path):
+        if not isinstance(path, (str, Path)) or not str(path).strip():
+            raise ValueError("memory path must not be empty")
+        self.path = Path(path).expanduser()
+        self._lines = self._read()
+
+    def _read(self):
+        try:
+            lines = self.path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return []
+        return [line.strip() for line in lines if line.strip()][-MAX_MEMORY_LINES:]
+
+    def context(self) -> str:
+        """Return the newest memories for the conscious prompt."""
+
+        return "\n".join(self._lines[-MEMORY_CONTEXT_LINES:])
+
+    def remember(self, entry: str):
+        """Save one new memory and keep the file bounded."""
+
+        entry = " ".join(entry.split())
+        if not entry or (self._lines and self._lines[-1] == entry):
+            return
+        self._lines = (self._lines + [entry])[-MAX_MEMORY_LINES:]
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text("\n".join(self._lines) + "\n", encoding="utf-8")
 
 
 @dataclass(frozen=True)
@@ -34,6 +69,7 @@ class ConsciousInput:
 
     new_observations: tuple[VisualObservation, ...]
     summary: str
+    memory: str
     intent: str
     previous_movement: str
     dialogue: Optional[str]
@@ -83,9 +119,15 @@ class LanguageModel(Protocol):
 class MacMind:
     """Connect a VLM subconscious to a conscious language model."""
 
-    def __init__(self, visual_model: VisualModel, language_model: LanguageModel):
+    def __init__(
+        self,
+        visual_model: VisualModel,
+        language_model: LanguageModel,
+        memory: Optional[CompanionMemory] = None,
+    ):
         self.visual_model = visual_model
         self.language_model = language_model
+        self.memory_store = memory
         self.memory = MindMemory()
         self._new_observations = deque[VisualObservation](
             maxlen=MAX_PENDING_OBSERVATIONS
@@ -147,6 +189,7 @@ class MacMind:
             information = ConsciousInput(
                 new_observations=tuple(self._new_observations),
                 summary=self.memory.summary,
+                memory=self.memory_store.context() if self.memory_store else "",
                 intent=self.memory.intent,
                 previous_movement=self.memory.previous_movement,
                 dialogue=dialogue,
@@ -166,6 +209,11 @@ class MacMind:
             dialogue=decision.dialogue,
             summary=summary,
         )
+        if self.memory_store is not None:
+            entry = f"intent={intent}; {summary}"
+            if information.dialogue:
+                entry = f"user={information.dialogue}; {entry}"
+            self.memory_store.remember(entry)
         with self._lock:
             self.memory.intent = intent
             self.memory.focus = decision.focus

@@ -128,7 +128,9 @@ The production entry point uses separate VLM and LLM sessions. Set
 `--vlm-model` and `--llm-model` when different local models are preferred.
 The initial `--intent` may be any short plain-language goal. Add `--dialogue`
 to type natural requests for the conscious LLM while flight control continues;
-replies are printed only when the model provides one.
+replies are printed only when the model provides one. It keeps a small,
+editable experience memory at `~/.companion/memory.txt`; change it with
+`--memory` when needed.
 
 ## Current state
 
@@ -145,7 +147,8 @@ the conscious model receives each visual observation’s focused answer and
 confidence. Typed dialogue now uses the same non-blocking input path in
 simulation and the production Mac entry point. Mac motion now requires at
 least 0.5 visual confidence, and pending observations are bounded while the
-conscious summary carries longer context. Conscious shutdown is stop-aware,
+conscious summary and editable experience memory carry longer context.
+Conscious shutdown is stop-aware,
 so a slow model cannot delay zero-command cleanup. The CM5 also bounds yaw to
 ±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
 the onboard hardware path remains the ROS 2 forwarder.

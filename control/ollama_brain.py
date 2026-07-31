@@ -218,6 +218,8 @@ Return only the requested JSON.
 Current intent: {information.intent}
 Previous movement: {information.previous_movement}
 Previous visual summary: {information.summary or "none"}
+Long-term experience memory:
+{information.memory or "none"}
 New visual observations:
 {observations}
 Optional user dialogue: {information.dialogue or "none"}

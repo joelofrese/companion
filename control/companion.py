@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 
-from control.mind import MacMind, Telemetry
+from control.mind import CompanionMemory, MacMind, Telemetry
 from control.mind_runtime import MindRuntime
 from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
 from control.dialogue import DialogueInput
@@ -36,6 +36,11 @@ def build_parser():
     parser.add_argument("--vlm-model", default="gemma3:4b")
     parser.add_argument("--llm-model", default="gemma3:4b")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
+    parser.add_argument(
+        "--memory",
+        default="~/.companion/memory.txt",
+        help="editable experience-memory file",
+    )
     parser.add_argument("--command-port", type=int, default=5001)
     parser.add_argument("--video-port", type=int, default=5000)
     parser.add_argument("--width", type=int, default=640)
@@ -74,6 +79,7 @@ async def run(args):
     brain = MacMind(
         OllamaVisionModel(client, args.vlm_model),
         OllamaLanguageModel(client, args.llm_model),
+        memory=CompanionMemory(args.memory),
     )
     brain.set_intent(intent)
     control = MindRuntime(brain)
