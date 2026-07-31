@@ -68,6 +68,10 @@ HOVER_START_S = 5.8
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 
 
+def _is_following(intent: str) -> bool:
+    return intent == "following" or parse_intent(intent) == "following"
+
+
 @dataclass(frozen=True)
 class WorldStep:
     obstacle_distance_m: Optional[float] = 2.0
@@ -158,7 +162,7 @@ class WorldVisualModel:
         else:
             movement = "forward"
             description = "the person is ahead"
-        if intent != "following":
+        if not _is_following(intent):
             movement = "stop"
         return VisualObservation(
             timestamp_s=timestamp_s,
@@ -202,7 +206,7 @@ class WorldLanguageModel:
             summary = information.new_observations[-1].description
         return ConsciousDecision(
             intent=self.intent,
-            focus="person" if self.intent == "following" else "",
+            focus="person" if _is_following(self.intent) else "",
             dialogue=dialogue,
             summary=summary or "The simulated world is running.",
         )
@@ -228,8 +232,9 @@ async def run(
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
-    if initial_intent not in {"hover", "following"}:
-        raise ValueError("initial exploratory intent must be hover or following")
+    if not isinstance(initial_intent, str) or not initial_intent.strip():
+        raise ValueError("initial intent must be a non-empty string")
+    initial_intent = initial_intent.strip()
     if camera and depth:
         raise ValueError("camera and depth modes cannot run together")
     if depth and not exploratory:
@@ -753,9 +758,8 @@ if __name__ == "__main__":
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     parser.add_argument(
         "--intent",
-        choices=("hover", "following"),
         default="hover",
-        help="initial intent for an exploratory run",
+        help="initial high-level intent for an exploratory run",
     )
     args = parser.parse_args()
     try:

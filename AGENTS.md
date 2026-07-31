@@ -124,6 +124,9 @@ Use `--world walls`, `forest`, `windy`, or another PX4 Gazebo world, and
 `--duration` for a longer run.
 Use `--request` to inject one dialogue request without typing, which makes
 the conscious interaction path repeatable in unattended simulation.
+Use `--intent TEXT` to start with any short high-level goal; explicit
+stop/hover goals remain stationary, while a clear follow goal drives the
+synthetic person fixture.
 Add `--memory PATH` to persist conscious experience across exploratory runs.
 
 Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
@@ -174,6 +177,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   records requests, decisions, and responses in at most 64 entries of 240
   characters each.
 - `--request` can exercise one dialogue interaction without manual stdin input.
+- Exploratory `--intent` accepts natural high-level text instead of a fixed
+  state list; synthetic following recognizes clear follow phrases safely.
 - Simulation argument validation lives in one runner boundary, so CLI and
   direct callers reject the same invalid combinations before PX4 starts.
 - Empty scripted dialogue is rejected before PX4 starts; open-ended dialogue

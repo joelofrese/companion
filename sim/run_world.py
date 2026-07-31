@@ -210,8 +210,8 @@ def run(
         raise RuntimeError("camera mode cannot use an RTP image")
     if depth and image_path is not None:
         raise RuntimeError("depth mode cannot use an RTP image")
-    if initial_intent not in {"hover", "following"}:
-        raise RuntimeError("initial exploratory intent must be hover or following")
+    if not isinstance(initial_intent, str) or not initial_intent.strip():
+        raise RuntimeError("initial intent must be a non-empty string")
     if camera and depth:
         raise RuntimeError("camera and depth modes cannot run together")
     if camera and not exploratory:
@@ -303,9 +303,8 @@ def main(argv=None):
     )
     parser.add_argument(
         "--intent",
-        choices=("hover", "following"),
         default="hover",
-        help="initial intent for an exploratory run",
+        help="initial high-level intent for an exploratory run",
     )
     parser.add_argument(
         "--pose",
