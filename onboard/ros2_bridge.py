@@ -2,70 +2,12 @@
 
 import argparse
 import asyncio
-import math
 import threading
-import time
-from numbers import Real
 
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_forwarder import Ros2VelocityForwarder
-
-
-DISTANCE_TIMEOUT_S = 0.15
-
-
-def _finite_real(value):
-    return not isinstance(value, bool) and isinstance(value, Real) and math.isfinite(value)
-
-
-class LatestDistanceSensor:
-    """Keep the newest distance reading; missing data is unsafe."""
-
-    def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
-        if (
-            isinstance(timeout_s, bool)
-            or not isinstance(timeout_s, Real)
-            or not math.isfinite(timeout_s)
-            or timeout_s <= 0.0
-        ):
-            raise ValueError("distance timeout must be positive")
-        self._distance_m = math.nan
-        self._clock = clock
-        self._timeout_s = timeout_s
-        self._updated_at_s = None
-        self._lock = threading.Lock()
-
-    def update(self, message):
-        distance_m = getattr(message, "current_distance", math.nan)
-        minimum_m = getattr(message, "min_distance", None)
-        maximum_m = getattr(message, "max_distance", None)
-        valid = (
-            _finite_real(distance_m)
-            and distance_m >= 0.0
-            and (minimum_m is None or (_finite_real(minimum_m) and minimum_m >= 0.0))
-            and (maximum_m is None or (_finite_real(maximum_m) and maximum_m >= 0.0))
-            and (minimum_m is None or maximum_m is None or minimum_m <= maximum_m)
-            and (minimum_m is None or distance_m >= minimum_m)
-            and (maximum_m is None or distance_m <= maximum_m)
-        )
-        if not valid:
-            distance_m = math.nan
-        with self._lock:
-            self._distance_m = distance_m
-            self._updated_at_s = self._clock()
-
-    def read(self):
-        now = self._clock()
-        with self._lock:
-            if (
-                self._updated_at_s is None
-                or not _finite_real(now)
-                or now < self._updated_at_s
-                or now - self._updated_at_s > self._timeout_s
-            ):
-                return math.nan
-            return self._distance_m
+from onboard.safety import LatestDistanceSensor
 
 
 class Ros2SafetyBridge:
