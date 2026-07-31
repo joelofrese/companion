@@ -43,7 +43,10 @@ async def run():
     cm5_started_at = None
 
     def cm5_obstacle_distance():
-        return 2.0 if time.monotonic() - cm5_started_at < 0.12 else 0.5
+        elapsed_s = time.monotonic() - cm5_started_at
+        if elapsed_s < 0.08:
+            return None
+        return 2.0 if elapsed_s < 0.12 else 0.5
 
     async def frame_reader():
         nonlocal frame_count
@@ -79,6 +82,8 @@ async def run():
             commands.append(forwarder.commands.get_nowait())
         if VelocityCommand(north_m_s=0.25) not in commands:
             raise RuntimeError(f"Mac control service did not produce a fresh follow command: {commands}")
+        if VelocityCommand() not in commands:
+            raise RuntimeError("CM5 did not stop when obstacle data was missing")
         if VelocityCommand(north_m_s=-0.2) not in commands:
             raise RuntimeError(f"Mac control service did not produce obstacle backoff: {commands}")
         if not any(
@@ -106,7 +111,7 @@ async def run():
             raise RuntimeError("command service did not send zero on shutdown")
         print(
             "Mac control service=verified; CM5 telemetry=verified; "
-            "obstacle command=verified; shutdown=zero"
+            "missing sensor=zero; obstacle command=verified; shutdown=zero"
         )
     finally:
         if sender is not None:

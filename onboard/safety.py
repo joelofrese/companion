@@ -136,11 +136,11 @@ class OnboardSafetyEnvelope:
             return VelocityCommand()
         if timestamp_s - self._received_at_s > self.command_timeout_s:
             return VelocityCommand()
-        if obstacle_distance_m is not None and (
-            not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0
-        ):
+        if obstacle_distance_m is None:
             return VelocityCommand()
-        if obstacle_distance_m is not None and obstacle_distance_m < OBSTACLE_STOP_M:
+        if not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0:
+            return VelocityCommand()
+        if obstacle_distance_m < OBSTACLE_STOP_M:
             return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
         if not self._command_is_safe(self._command):
             return VelocityCommand()

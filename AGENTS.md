@@ -173,9 +173,9 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   dialogue remains with the conscious model.
 - Missing frames, stale or invalid sensor data, malformed commands, command
   dropout, low visual confidence, and model shutdown fail safely.
-- The CM5 returns fresh TOF data, enforces command bounds, and remains the
-  final safety authority. ROS 2 forwarding and physical sensors remain
-  hardware-gated.
+- The CM5 returns fresh TOF data, stops when it is missing, enforces command
+  bounds, and remains the final safety authority. ROS 2 forwarding and
+  physical sensors remain hardware-gated.
 - PX4’s stock GPS-denied optical-flow model is not verified: its flow quality
   stayed at zero and it remained in constant-position mode. Its internal range
   sensor is not DEXI 3 hardware.
