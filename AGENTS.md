@@ -176,6 +176,7 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   is passed to the conscious model.
 - Clear dialogue commands immediately override stale movement; open-ended
   dialogue remains with the conscious model.
+- Explicit hover or stop intent overrides any visual movement suggestion.
 - Missing frames, stale or invalid sensor data, malformed commands, command
   dropout, low visual confidence, and model shutdown fail safely.
 - Media cleanup tolerates a child process that has already exited, preserving

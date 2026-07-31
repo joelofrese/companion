@@ -90,6 +90,8 @@ class MindRuntime:
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
             ):
                 movement = self._observation.movement
+        if parse_intent(self.mind.intent) == "hover":
+            movement = "stop"
         desired = movement_command(movement, obstacle_distance_m)
         return self.watchdog.emit(timestamp_s, desired)
 
