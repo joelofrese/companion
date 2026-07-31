@@ -11,6 +11,7 @@ from control.velocity import VelocityCommand
 
 
 MIN_MOVEMENT_CONFIDENCE = 0.5
+MAX_MOVEMENT_AGE_S = 1.5
 
 
 class MindRuntime:
@@ -70,7 +71,7 @@ class MindRuntime:
             age_s = timestamp_s - self._observation.timestamp_s
             if (
                 self._observation_intent == self.mind.intent
-                and 0.0 <= age_s <= 0.5
+                and 0.0 <= age_s <= MAX_MOVEMENT_AGE_S
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
             ):
                 movement = self._observation.movement

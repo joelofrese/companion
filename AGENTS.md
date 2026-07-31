@@ -159,7 +159,8 @@ watchdog emits zero; the later command dropout separately exercises CM5 expiry.
 The non-Ollama Gazebo camera fallback stops with zero confidence when no frame
 is available instead of generating movement from synthetic scene state.
 Mac motion also stops immediately when the current camera frame is missing;
-it never reuses an older visual movement for that tick.
+it never reuses an older visual movement without a live camera frame. A valid
+visual movement expires after 1.5 seconds even while the camera remains live.
 The forest camera scenario and a 120-second exploratory flight also passed with
 bounded telemetry, landing, and disarm.
 PX4’s stock GPS-denied optical-flow model was investigated but is not a
