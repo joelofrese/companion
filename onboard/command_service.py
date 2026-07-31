@@ -18,6 +18,9 @@ class SafetyCommandService:
         forwarder,
         tick_period_s: float = 0.02,
         obstacle_distance: Optional[Callable[[], Optional[float]]] = None,
+        velocity_provider: Optional[
+            Callable[[], tuple[Optional[float], Optional[float], Optional[float]]]
+        ] = None,
     ):
         if (
             isinstance(tick_period_s, bool)
@@ -30,6 +33,7 @@ class SafetyCommandService:
         self.forwarder = forwarder
         self.tick_period_s = tick_period_s
         self.obstacle_distance = obstacle_distance or (lambda: None)
+        self.velocity_provider = velocity_provider or (lambda: (None, None, None))
 
     def start(self):
         """Start the receiver."""
@@ -43,7 +47,10 @@ class SafetyCommandService:
             while not stop_event.is_set():
                 obstacle_distance_m = self.obstacle_distance()
                 command = self.receiver.poll(obstacle_distance_m=obstacle_distance_m)
-                self.receiver.send_telemetry(obstacle_distance_m)
+                self.receiver.send_telemetry(
+                    obstacle_distance_m,
+                    *self.velocity_provider(),
+                )
                 await self.forwarder.send(command)
                 await asyncio.sleep(self.tick_period_s)
         finally:

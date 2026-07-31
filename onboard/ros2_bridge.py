@@ -7,7 +7,7 @@ import threading
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.ros2_forwarder import Ros2VelocityForwarder
-from onboard.safety import LatestDistanceSensor
+from onboard.safety import LatestDistanceSensor, LatestVelocity
 
 
 class Ros2SafetyBridge:
@@ -22,13 +22,16 @@ class Ros2SafetyBridge:
         heartbeat_message,
         setpoint_message,
         distance_message,
+        velocity_message,
         qos_profile,
         bind_host: str = "0.0.0.0",
         command_port: int = 5001,
         distance_topic: str = "/fmu/out/distance_sensor",
+        velocity_topic: str = "/fmu/out/vehicle_local_position",
         tick_period_s: float = 0.02,
     ):
         self._distance = LatestDistanceSensor()
+        self._velocity = LatestVelocity()
         self._receiver = UdpSafetyReceiver(bind_host=bind_host, port=command_port)
         self._forwarder = Ros2VelocityForwarder(
             heartbeat_publisher=node.create_publisher(
@@ -51,11 +54,18 @@ class Ros2SafetyBridge:
             self._distance.update,
             qos_profile,
         )
+        node.create_subscription(
+            velocity_message,
+            velocity_topic,
+            self._velocity.update,
+            qos_profile,
+        )
         self._service = SafetyCommandService(
             self._receiver,
             self._forwarder,
             tick_period_s=tick_period_s,
             obstacle_distance=self._distance.read,
+            velocity_provider=self._velocity.read,
         )
         self._stop = threading.Event()
         self._thread = None
@@ -106,11 +116,20 @@ def main(argv=None):
     parser.add_argument("--bind-host", default="0.0.0.0")
     parser.add_argument("--command-port", type=int, default=5001)
     parser.add_argument("--distance-topic", default="/fmu/out/distance_sensor")
+    parser.add_argument(
+        "--velocity-topic",
+        default="/fmu/out/vehicle_local_position",
+    )
     parser.add_argument("--tick-period", type=float, default=0.02)
     args = parser.parse_args(argv)
 
     import rclpy
-    from px4_msgs.msg import DistanceSensor, OffboardControlMode, TrajectorySetpoint
+    from px4_msgs.msg import (
+        DistanceSensor,
+        OffboardControlMode,
+        TrajectorySetpoint,
+        VehicleLocalPosition,
+    )
     from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 
     rclpy.init()
@@ -126,10 +145,12 @@ def main(argv=None):
         heartbeat_message=OffboardControlMode,
         setpoint_message=TrajectorySetpoint,
         distance_message=DistanceSensor,
+        velocity_message=VehicleLocalPosition,
         qos_profile=qos_profile,
         bind_host=args.bind_host,
         command_port=args.command_port,
         distance_topic=args.distance_topic,
+        velocity_topic=args.velocity_topic,
         tick_period_s=args.tick_period,
     )
     bridge_error = None

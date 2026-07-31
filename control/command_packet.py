@@ -90,26 +90,36 @@ class CommandPacket:
 
 @dataclass(frozen=True)
 class TelemetryPacket:
-    """Return the newest CM5 distance reading to the Mac."""
+    """Return the newest CM5 sensor and PX4 velocity readings to the Mac."""
 
     sequence: int
     obstacle_distance_m: Optional[float]
+    north_velocity_m_s: Optional[float] = None
+    east_velocity_m_s: Optional[float] = None
+    down_velocity_m_s: Optional[float] = None
 
     def encode(self) -> bytes:
         if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 0:
             raise ValueError("sequence must be non-negative")
-        if self.obstacle_distance_m is not None and (
-            isinstance(self.obstacle_distance_m, bool)
-            or not isinstance(self.obstacle_distance_m, Real)
-            or not math.isfinite(self.obstacle_distance_m)
-            or self.obstacle_distance_m < 0.0
-        ):
+        if self.obstacle_distance_m is not None and not _distance(self.obstacle_distance_m):
             raise ValueError("obstacle distance must be finite or none")
+        velocities = (
+            self.north_velocity_m_s,
+            self.east_velocity_m_s,
+            self.down_velocity_m_s,
+        )
+        if any(value is not None and not _finite(value) for value in velocities):
+            raise ValueError("velocity telemetry must be finite or none")
         payload = {
             "type": "telemetry",
             "version": PROTOCOL_VERSION,
             "sequence": self.sequence,
-            "telemetry": {"obstacle_distance_m": self.obstacle_distance_m},
+            "telemetry": {
+                "obstacle_distance_m": self.obstacle_distance_m,
+                "north_velocity_m_s": self.north_velocity_m_s,
+                "east_velocity_m_s": self.east_velocity_m_s,
+                "down_velocity_m_s": self.down_velocity_m_s,
+            },
         }
         encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
         if len(encoded) > MAX_PACKET_BYTES:
@@ -125,7 +135,16 @@ class TelemetryPacket:
             version = data["version"]
             packet_type = data["type"]
             sequence = data["sequence"]
-            distance = data["telemetry"]["obstacle_distance_m"]
+            telemetry = data["telemetry"]
+            distance = telemetry["obstacle_distance_m"]
+            velocities = tuple(
+                telemetry.get(name)
+                for name in (
+                    "north_velocity_m_s",
+                    "east_velocity_m_s",
+                    "down_velocity_m_s",
+                )
+            )
         except (
             AttributeError,
             KeyError,
@@ -144,11 +163,20 @@ class TelemetryPacket:
             or sequence < 0
         ):
             raise ValueError("invalid telemetry packet header")
-        if distance is not None and (
-            isinstance(distance, bool)
-            or not isinstance(distance, Real)
-            or not math.isfinite(distance)
-            or distance < 0.0
-        ):
+        if distance is not None and not _distance(distance):
             raise ValueError("invalid obstacle distance")
-        return cls(sequence, distance)
+        if any(value is not None and not _finite(value) for value in velocities):
+            raise ValueError("invalid velocity telemetry")
+        return cls(sequence, distance, *velocities)
+
+
+def _finite(value: object) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, Real)
+        and math.isfinite(value)
+    )
+
+
+def _distance(value: object) -> bool:
+    return _finite(value) and value >= 0.0

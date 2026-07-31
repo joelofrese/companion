@@ -11,6 +11,14 @@ from control.velocity import VelocityCommand
 from onboard.safety import OnboardSafetyEnvelope
 
 
+def _finite_or_none(value):
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
+        return None
+    return value
+
+
 class UdpSafetyReceiver:
     """Read Mac packets and return only safe commands."""
 
@@ -69,8 +77,14 @@ class UdpSafetyReceiver:
                 self._client_address = address
         return self.safety.tick(time.monotonic(), obstacle_distance_m=obstacle_distance_m)
 
-    def send_telemetry(self, obstacle_distance_m: Optional[float] = None):
-        """Return the latest sensor value to the Mac command sender."""
+    def send_telemetry(
+        self,
+        obstacle_distance_m: Optional[float] = None,
+        north_velocity_m_s: Optional[float] = None,
+        east_velocity_m_s: Optional[float] = None,
+        down_velocity_m_s: Optional[float] = None,
+    ):
+        """Return the latest sensor and vehicle readings to the Mac."""
 
         if self._socket is None or self._client_address is None:
             return
@@ -87,6 +101,9 @@ class UdpSafetyReceiver:
         payload = TelemetryPacket(
             self._telemetry_sequence,
             obstacle_distance_m,
+            _finite_or_none(north_velocity_m_s),
+            _finite_or_none(east_velocity_m_s),
+            _finite_or_none(down_velocity_m_s),
         ).encode()
         self._socket.sendto(payload, self._client_address)
         self._telemetry_sequence += 1

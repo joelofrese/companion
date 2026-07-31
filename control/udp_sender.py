@@ -5,6 +5,7 @@ import socket
 import time
 
 from control.command_packet import MAX_PACKET_BYTES, CommandPacket, TelemetryPacket
+from control.mind import Telemetry
 from control.velocity import VelocityCommand
 
 
@@ -33,6 +34,9 @@ class UdpCommandSender:
         self._sequence = 0
         self._telemetry_sequence = None
         self._obstacle_distance_m = None
+        self._north_velocity_m_s = None
+        self._east_velocity_m_s = None
+        self._down_velocity_m_s = None
         self._telemetry_received_at_s = None
 
     def start(self):
@@ -53,8 +57,31 @@ class UdpCommandSender:
     def obstacle_distance(self) -> float:
         """Return a fresh CM5 distance, or NaN when it is unavailable."""
 
+        return self.telemetry().obstacle_distance_m
+
+    def telemetry(self) -> Telemetry:
+        """Return fresh CM5 sensor and PX4 velocity telemetry."""
+
+        self._read_telemetry()
+        if (
+            self._telemetry_received_at_s is None
+            or time.monotonic() - self._telemetry_received_at_s > TELEMETRY_TIMEOUT_S
+        ):
+            return Telemetry(obstacle_distance_m=math.nan)
+        return Telemetry(
+            obstacle_distance_m=(
+                self._obstacle_distance_m
+                if self._obstacle_distance_m is not None
+                else math.nan
+            ),
+            north_velocity_m_s=self._north_velocity_m_s,
+            east_velocity_m_s=self._east_velocity_m_s,
+            down_velocity_m_s=self._down_velocity_m_s,
+        )
+
+    def _read_telemetry(self):
         if self._socket is None:
-            return math.nan
+            return
         while True:
             try:
                 payload, _ = self._socket.recvfrom(MAX_PACKET_BYTES + 1)
@@ -71,14 +98,10 @@ class UdpCommandSender:
                 continue
             self._telemetry_sequence = packet.sequence
             self._obstacle_distance_m = packet.obstacle_distance_m
+            self._north_velocity_m_s = packet.north_velocity_m_s
+            self._east_velocity_m_s = packet.east_velocity_m_s
+            self._down_velocity_m_s = packet.down_velocity_m_s
             self._telemetry_received_at_s = time.monotonic()
-        if (
-            self._telemetry_received_at_s is None
-            or time.monotonic() - self._telemetry_received_at_s > TELEMETRY_TIMEOUT_S
-            or self._obstacle_distance_m is None
-        ):
-            return math.nan
-        return self._obstacle_distance_m
 
     def close(self):
         """Release the UDP socket."""

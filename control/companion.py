@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 
-from control.mind import CompanionMemory, MacMind, Telemetry
+from control.mind import CompanionMemory, MacMind
 from control.mind_runtime import MindRuntime
 from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
 from control.dialogue import DialogueInput
@@ -98,9 +98,7 @@ async def run(args):
     mind_task = asyncio.create_task(
         control.think_loop(
             mind_stop,
-            telemetry_provider=lambda: Telemetry(
-                obstacle_distance_m=sender.obstacle_distance()
-            ),
+            telemetry_provider=sender.telemetry,
             dialogue_provider=dialogue_input.next if dialogue_input else None,
         )
     )

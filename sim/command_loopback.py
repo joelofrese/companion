@@ -48,6 +48,9 @@ async def run():
             return None
         return 2.0 if elapsed_s < 0.12 else 0.5
 
+    def cm5_velocity():
+        return (0.12, -0.04, 0.03)
+
     async def frame_reader():
         nonlocal frame_count
         frame_count += 1
@@ -56,7 +59,12 @@ async def run():
             mac_stop_event.set()
         return time.monotonic(), None
 
-    cm5_service = SafetyCommandService(receiver, forwarder, obstacle_distance=cm5_obstacle_distance)
+    cm5_service = SafetyCommandService(
+        receiver,
+        forwarder,
+        obstacle_distance=cm5_obstacle_distance,
+        velocity_provider=cm5_velocity,
+    )
     cm5_task = None
     mac_task = None
     sender = None
@@ -104,6 +112,13 @@ async def run():
             raise RuntimeError(
                 f"Mac did not receive the CM5 obstacle distance: {control.obstacle_distances}"
             )
+        telemetry = sender.telemetry()
+        if (
+            telemetry.north_velocity_m_s != 0.12
+            or telemetry.east_velocity_m_s != -0.04
+            or telemetry.down_velocity_m_s != 0.03
+        ):
+            raise RuntimeError(f"Mac did not receive CM5 velocity telemetry: {telemetry}")
         cm5_stop_event.set()
         await cm5_task
         shutdown_command = await _next_command(forwarder)
@@ -111,7 +126,8 @@ async def run():
             raise RuntimeError("command service did not send zero on shutdown")
         print(
             "Mac control service=verified; CM5 telemetry=verified; "
-            "missing sensor=zero; obstacle command=verified; shutdown=zero"
+            "velocity telemetry=verified; missing sensor=zero; "
+            "obstacle command=verified; shutdown=zero"
         )
     finally:
         if sender is not None:

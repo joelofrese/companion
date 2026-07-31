@@ -9,7 +9,7 @@ import time
 from mavsdk import System
 
 from control.command_packet import CommandPacket
-from control.mind import MacMind, Telemetry
+from control.mind import MacMind
 from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
@@ -90,6 +90,7 @@ async def run(image_path: str, expect_person: bool = False):
     north_velocity_m_s = None
     east_velocity_m_s = None
     down_velocity_m_s = None
+    velocity_telemetry_seen = False
     frames_received = 0
     video_fault_reported = False
     target_loss_reported = False
@@ -130,6 +131,11 @@ async def run(image_path: str, expect_person: bool = False):
             safe_commands,
             tick_period_s=SETPOINT_PERIOD_S,
             obstacle_distance=cm5_obstacle_distance,
+            velocity_provider=lambda: (
+                north_velocity_m_s,
+                east_velocity_m_s,
+                down_velocity_m_s,
+            ),
         )
         cm5_service.start()
         cm5_task = asyncio.create_task(cm5_service.run(cm5_stop))
@@ -183,15 +189,25 @@ async def run(image_path: str, expect_person: bool = False):
             )
         )
         flight_started_at = time.monotonic()
+
+        def brain_telemetry():
+            nonlocal velocity_telemetry_seen
+            telemetry = sender.telemetry()
+            if any(
+                value is not None
+                for value in (
+                    telemetry.north_velocity_m_s,
+                    telemetry.east_velocity_m_s,
+                    telemetry.down_velocity_m_s,
+                )
+            ):
+                velocity_telemetry_seen = True
+            return telemetry
+
         mind_task = asyncio.create_task(
             control.think_loop(
                 mind_stop,
-                telemetry_provider=lambda: Telemetry(
-                    obstacle_distance_m=sender.obstacle_distance(),
-                    north_velocity_m_s=north_velocity_m_s,
-                    east_velocity_m_s=east_velocity_m_s,
-                    down_velocity_m_s=down_velocity_m_s,
-                ),
+                telemetry_provider=brain_telemetry,
             )
         )
 
@@ -265,7 +281,10 @@ async def run(image_path: str, expect_person: bool = False):
             raise RuntimeError("full stack did not observe a Mac visual observation")
         if not control.latest_decision.summary:
             raise RuntimeError("full stack did not retain a conscious visual summary")
+        if not velocity_telemetry_seen:
+            raise RuntimeError("full stack did not feed CM5 velocity telemetry to the Mac brain")
         print("Conscious Mac decision=verified through full Mac/CM5 stack.")
+        print("Mac velocity telemetry=verified through full Mac/CM5 stack.")
         print("Conscious visual memory=verified through full Mac/CM5 stack.")
         print("Mac visual observation=verified through full Mac/CM5 stack.")
         try:

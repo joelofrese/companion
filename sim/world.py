@@ -276,6 +276,10 @@ async def run(
     armed = False
     landed = False
     distance_sensor = LatestDistanceSensor()
+    north_velocity_m_s = None
+    east_velocity_m_s = None
+    down_velocity_m_s = None
+    velocity_telemetry_seen = False
     try:
         world = SyntheticWorld(exploratory)
         if camera or depth:
@@ -302,6 +306,11 @@ async def run(
             safe_commands,
             tick_period_s=SETPOINT_PERIOD_S,
             obstacle_distance=distance_sensor.read,
+            velocity_provider=lambda: (
+                north_velocity_m_s,
+                east_velocity_m_s,
+                down_velocity_m_s,
+            ),
         )
         service.start()
         service_task = asyncio.create_task(service.run(service_stop))
@@ -326,9 +335,6 @@ async def run(
         depth_samples = 0
         valid_depth_samples = 0
         minimum_depth_distance = math.inf
-        north_velocity_m_s = None
-        east_velocity_m_s = None
-        down_velocity_m_s = None
 
         def read_step(elapsed_s: float):
             nonlocal depth_samples, valid_depth_samples, minimum_depth_distance
@@ -401,15 +407,25 @@ async def run(
                 return message
 
             dialogue_provider = read_dialogue
+
+        def brain_telemetry():
+            nonlocal velocity_telemetry_seen
+            telemetry = sender.telemetry()
+            if any(
+                value is not None
+                for value in (
+                    telemetry.north_velocity_m_s,
+                    telemetry.east_velocity_m_s,
+                    telemetry.down_velocity_m_s,
+                )
+            ):
+                velocity_telemetry_seen = True
+            return telemetry
+
         mind_task = asyncio.create_task(
             control.think_loop(
                 mind_stop,
-                telemetry_provider=lambda: Telemetry(
-                    obstacle_distance_m=sender.obstacle_distance(),
-                    north_velocity_m_s=north_velocity_m_s,
-                    east_velocity_m_s=east_velocity_m_s,
-                    down_velocity_m_s=down_velocity_m_s,
-                ),
+                telemetry_provider=brain_telemetry,
                 dialogue_provider=dialogue_provider,
             )
         )
@@ -525,6 +541,9 @@ async def run(
             raise RuntimeError("SITL did not complete a Mac VLM observation")
         if control.decision_count == 0:
             raise RuntimeError("SITL did not complete a conscious thought")
+        if not velocity_telemetry_seen:
+            raise RuntimeError("SITL did not feed CM5 velocity telemetry to the Mac brain")
+        print("Mac velocity telemetry=verified.")
         if requested_intent is not None:
             if applied_dialogue_intent != requested_intent:
                 raise RuntimeError(

@@ -74,6 +74,45 @@ class LatestDistanceSensor:
             return self._distance_m
 
 
+class LatestVelocity:
+    """Keep the newest PX4 NED velocity; missing data is unavailable."""
+
+    def __init__(self, clock=time.monotonic, timeout_s: float = DISTANCE_TIMEOUT_S):
+        if (
+            isinstance(timeout_s, bool)
+            or not isinstance(timeout_s, Real)
+            or not math.isfinite(timeout_s)
+            or timeout_s <= 0.0
+        ):
+            raise ValueError("velocity timeout must be positive")
+        self._velocity = (math.nan, math.nan, math.nan)
+        self._clock = clock
+        self._timeout_s = timeout_s
+        self._updated_at_s = None
+        self._lock = threading.Lock()
+
+    def update(self, message):
+        velocity = tuple(getattr(message, name, math.nan) for name in ("vx", "vy", "vz"))
+        if not all(_finite_real(value) for value in velocity):
+            velocity = (math.nan, math.nan, math.nan)
+        with self._lock:
+            self._velocity = velocity
+            self._updated_at_s = self._clock()
+
+    def read(self):
+        now = self._clock()
+        with self._lock:
+            if (
+                self._updated_at_s is None
+                or not _finite_real(now)
+                or now < self._updated_at_s
+                or now - self._updated_at_s > self._timeout_s
+                or not all(_finite_real(value) for value in self._velocity)
+            ):
+                return (None, None, None)
+            return self._velocity
+
+
 class OnboardSafetyEnvelope:
     """Expire old commands and stop for a forward obstacle."""
 
