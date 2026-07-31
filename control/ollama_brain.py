@@ -15,6 +15,7 @@ from voice.intent import parse_intent
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
+MAX_OUTPUT_TOKENS = 128
 
 VISION_SCHEMA = {
     "type": "object",
@@ -133,7 +134,7 @@ class OllamaClient:
             "messages": [message],
             "stream": False,
             "format": schema,
-            "options": {"temperature": 0},
+            "options": {"temperature": 0, "num_predict": MAX_OUTPUT_TOKENS},
             "keep_alive": "5m",
         }
         if think is not None:
