@@ -9,6 +9,7 @@ from typing import Any, Optional, Protocol
 
 MAX_PENDING_OBSERVATIONS = 32
 MAX_MEMORY_LINES = 64
+MAX_MEMORY_CHARS = 240
 MEMORY_CONTEXT_LINES = 8
 
 
@@ -26,7 +27,11 @@ class CompanionMemory:
             lines = self.path.read_text(encoding="utf-8").splitlines()
         except FileNotFoundError:
             return []
-        return [line.strip() for line in lines if line.strip()][-MAX_MEMORY_LINES:]
+        return [
+            line.strip()[:MAX_MEMORY_CHARS]
+            for line in lines
+            if line.strip()
+        ][-MAX_MEMORY_LINES:]
 
     def context(self) -> str:
         """Return the newest memories for the conscious prompt."""
@@ -36,7 +41,7 @@ class CompanionMemory:
     def remember(self, entry: str):
         """Save one new memory and keep the file bounded."""
 
-        entry = " ".join(entry.split())
+        entry = " ".join(entry.split())[:MAX_MEMORY_CHARS]
         if not entry or (self._lines and self._lines[-1] == entry):
             return
         self._lines = (self._lines + [entry])[-MAX_MEMORY_LINES:]

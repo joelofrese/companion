@@ -183,6 +183,8 @@ while the conscious summary and editable experience memory carry longer
 context.
 Exploratory runs can persist that experience with `--memory` so later runs can
 receive it. Empty thoughts are not saved; visual observations and dialogue are.
+Each memory entry is capped at 240 characters so long model output cannot make
+future prompts grow without bound.
 Use the default or a longer duration for local model runs; a short exploratory
 flight may land before its first VLM observation finishes.
 The CM5 returns fresh TOF distance telemetry over the command socket so the
