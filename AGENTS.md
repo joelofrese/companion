@@ -153,63 +153,23 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 
 ## Current state
 
-The deterministic mission, person and non-person RTP images, rendered Gazebo
-camera and depth input, local Ollama camera and depth input, live
-exploratory dialogue, command loopback, safety faults, recovery, landing, and
-disarm have been verified. Near-wall exploratory runs measure real sensor
-distances and trigger a bounded CM5 backoff command. Both Gazebo sensor
-readers use one small shared topic-reader lifecycle while keeping their camera
-and depth decoders explicit.
-The deterministic heartbeat pause resumes with one Mac tick so the Mac
-watchdog emits zero; the later command dropout separately exercises CM5 expiry.
-Missing Gazebo camera frames never fall back to synthetic scene movement. Mac
-motion stops immediately without a live camera frame, and a valid visual
-movement expires after 1.5 seconds even while the camera remains live.
-The forest camera scenario and a 120-second exploratory flight also passed with
-bounded telemetry, landing, and disarm.
-PX4’s stock GPS-denied optical-flow model was investigated but is not a
-verified path here: its flow quality stayed at zero and PX4 remained in
-constant-position mode. Its internal range sensor is not DEXI 3 hardware.
-Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
-boot-readiness failures. The simulation loop remains the main development
-path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
-without replacing it. The voice path is a direct one-utterance pipeline, and
-unavailable local model services now produce one concise simulation error after
-PX4/Gazebo cleanup. The conscious model receives each visual observation’s
-focused answer and confidence. Typed dialogue now uses the same non-blocking
-input path in simulation and the production Mac entry point. Mac motion now
-requires at least 0.5 visual confidence, and pending observations are bounded
-while the conscious summary and editable experience memory carry longer
-context.
-Exploratory runs can persist that experience with `--memory` so later runs can
-receive it. Empty thoughts are not saved; visual observations and dialogue are.
-Each memory entry is capped at 240 characters so long model output cannot make
-future prompts grow without bound.
-Use the default or a longer duration for local model runs; a short exploratory
-flight may land before its first VLM observation finishes.
-The CM5 returns fresh TOF distance telemetry over the command socket so the
-Mac brain and CM5 safety layer use the same body reading without adding a
-second transport. Missing or stale telemetry becomes zero motion on the Mac.
-The qwen3-vl:2b VLM runs with local reasoning disabled so it returns compact
-structured observations quickly; the conscious LLM remains the reasoning
-layer. The mixed brain passed rendered-camera and near-wall depth SITL runs.
-Conscious shutdown is stop-aware,
-so a slow model cannot delay zero-command cleanup. The CM5 also bounds yaw to
-±180° along with its velocity limits. MAVSDK forwarding is simulation-only;
-the onboard hardware path remains the ROS 2 forwarder.
-The obsolete synthetic camera fallback was removed after the live-frame stop
-boundary made it unreachable. The deterministic Gazebo mission passed again,
-including faults, recovery, landing, and disarm.
-The Mac obstacle-telemetry callback no longer carries an unused timestamp;
-production, UDP loopback, deterministic SITL, and RTP/person SITL all passed
-through the simpler direct sender method.
-The shared H.264 configuration rejects UDP ports above 65535 before starting
-GStreamer; its boundary check and the full RTP/person SITL path passed.
-Simulation preparation now times out after 30 seconds with a clear connection
-or readiness error instead of hanging when an estimator or sensor path fails.
-The deterministic and RTP/person SITL paths plus UDP loopback passed again; the
-GPS-denied optical-flow model still fails to become armable and remains
-unverified.
+- Deterministic Gazebo missions pass the full control path, visual fixtures,
+  CM5 safety faults, recovery, hover, landing, and disarm.
+- RTP image runs pass both person-following and non-person safe-stop behavior;
+  rendered-camera and depth runs pass bounded exploratory flight and sensor
+  checks. Local Ollama brain runs have also passed this path.
+- Exploratory dialogue and editable experience memory work across runs. Memory
+  is limited to 64 entries of 240 characters each.
+- Missing frames, stale or invalid sensor data, malformed commands, command
+  dropout, low visual confidence, and slow model shutdown fail safely.
+- The CM5 returns fresh TOF data, enforces command bounds, and remains the
+  final safety authority. ROS 2 forwarding and physical sensors remain
+  hardware-gated.
+- PX4’s stock GPS-denied optical-flow model is not verified: its flow quality
+  stayed at zero and it remained in constant-position mode. Its internal range
+  sensor is not DEXI 3 hardware.
+- Simulation preparation reports a clear connection or readiness error after
+  30 seconds instead of hanging. Simulation-only fixtures stay under `sim/`.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
