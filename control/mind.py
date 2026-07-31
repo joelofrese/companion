@@ -217,7 +217,7 @@ class MacMind:
         if self.memory_store is not None and (
             information.new_observations or information.dialogue
         ):
-            entry = f"intent={intent}; {summary}"
+            entry = f"intent={intent}; focus={decision.focus or 'none'}; {summary}"
             if isinstance(decision.dialogue, str) and decision.dialogue.strip():
                 entry += f"; response={decision.dialogue}"
             if information.dialogue:

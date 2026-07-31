@@ -168,9 +168,9 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   visual answers, bounded motion, long runs, landing, and disarm are verified.
 - RTP image runs pass person-following and non-person safe-stop behavior.
   Camera transport stays stopped until a visual model is configured.
-- Dialogue and bounded editable memory work across runs. Natural initial
-  intents, clear follow/hover commands, conscious focus, and open-ended
-  requests are supported through one shared intent path.
+- Dialogue and bounded editable memory work across runs. Memory preserves
+  requests, decisions, focus, and responses; natural intents and open-ended
+  requests use one shared intent path.
 - Simulation arguments are validated once before PX4 starts. Missing or stale
   frames and sensors, malformed commands, command dropout, low confidence,
   and model shutdown fail safely.
