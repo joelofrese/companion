@@ -199,6 +199,7 @@ async def run(
     vlm_model: str = "gemma3:4b",
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
+    initial_intent: str = "hover",
 ):
     """Run one complete Gazebo world simulation."""
 
@@ -206,6 +207,8 @@ async def run(
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
+    if initial_intent not in {"hover", "following"}:
+        raise ValueError("initial exploratory intent must be hover or following")
     if camera and lidar:
         raise ValueError("camera and lidar simulation modes cannot run together")
     if lidar and not exploratory:
@@ -279,17 +282,20 @@ async def run(
         camera_frames = 0
         lidar_samples = 0
         valid_lidar_samples = 0
+        minimum_lidar_distance = math.inf
 
         def read_step(elapsed_s: float):
-            nonlocal lidar_samples, valid_lidar_samples
+            nonlocal lidar_samples, valid_lidar_samples, minimum_lidar_distance
             step = world.step(elapsed_s)
             if gazebo_rangefinder is not None:
                 sample = gazebo_rangefinder.latest()
                 if sample is not None:
                     distance_sensor.update(sample)
                     lidar_samples += 1
-                    if math.isfinite(distance_sensor.read()):
+                    distance = distance_sensor.read()
+                    if math.isfinite(distance):
                         valid_lidar_samples += 1
+                        minimum_lidar_distance = min(minimum_lidar_distance, distance)
                 return replace(
                     step,
                     obstacle_distance_m=distance_sensor.read(),
@@ -319,7 +325,7 @@ async def run(
             if step.transmit:
                 sender.send(step.command_override or command)
 
-        starting_intent = "hover" if exploratory else "following"
+        starting_intent = initial_intent if exploratory else "following"
         send_packet(
             time.monotonic(),
             read_step(0.0),
@@ -435,6 +441,14 @@ async def run(
         commands = safe_commands.commands
         if not commands or commands[-1][1] != VelocityCommand():
             raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
+        if lidar:
+            minimum_forwarded_north = min(
+                command.north_m_s for _, command in commands
+            )
+            print(
+                "Minimum CM5-forwarded north command: "
+                f"{minimum_forwarded_north:.2f}m/s"
+            )
 
         decision = control.latest_decision
         if decision is None:
@@ -616,6 +630,7 @@ async def run(
                 "Gazebo lidar samples=verified: "
                 f"{valid_lidar_samples} valid of {lidar_samples}."
             )
+            print(f"Minimum Gazebo lidar distance: {minimum_lidar_distance:.2f}m")
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
@@ -667,6 +682,12 @@ if __name__ == "__main__":
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--world", default="default")
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
+    parser.add_argument(
+        "--intent",
+        choices=("hover", "following"),
+        default="hover",
+        help="initial intent for an exploratory run",
+    )
     args = parser.parse_args()
     asyncio.run(
         run(
@@ -679,5 +700,6 @@ if __name__ == "__main__":
             vlm_model=args.vlm_model,
             llm_model=args.llm_model,
             ollama_timeout=args.ollama_timeout,
+            initial_intent=args.intent,
         )
     )

@@ -61,6 +61,21 @@ def _stop_process_group(process, process_group_id):
         process.wait()
 
 
+def _validate_pose(pose: Optional[str]) -> Optional[str]:
+    if pose is None:
+        return None
+    values = pose.split(",")
+    if len(values) != 6:
+        raise RuntimeError("model pose must contain x,y,z,roll,pitch,yaw")
+    try:
+        numbers = [float(value) for value in values]
+    except ValueError as error:
+        raise RuntimeError("model pose must contain six numbers") from error
+    if not all(math.isfinite(value) for value in numbers):
+        raise RuntimeError("model pose must contain finite numbers")
+    return ",".join(str(value) for value in numbers)
+
+
 def _run_once(
     px4_dir: Path,
     companion_dir: Path,
@@ -76,9 +91,13 @@ def _run_once(
     vlm_model: str,
     llm_model: str,
     ollama_timeout: float,
+    initial_intent: str,
+    model_pose: Optional[str],
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
+    if model_pose is not None:
+        environment["PX4_GZ_MODEL_POSE"] = model_pose
     model = "gz_x500"
     if camera:
         model = "gz_x500_mono_cam"
@@ -133,6 +152,8 @@ def _run_once(
                 scenario.append("--camera")
             if lidar:
                 scenario.append("--lidar")
+            if exploratory:
+                scenario += ["--intent", initial_intent]
             if ollama:
                 scenario += [
                     "--ollama",
@@ -166,6 +187,8 @@ def run(
     vlm_model: str = "gemma3:4b",
     llm_model: str = "gemma3:4b",
     ollama_timeout: float = 60.0,
+    initial_intent: str = "hover",
+    model_pose: Optional[str] = None,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -174,12 +197,15 @@ def run(
         raise RuntimeError(f"PX4 directory does not exist: {px4_dir}")
     if image_path is not None and not image_path.is_file():
         raise RuntimeError(f"scenario image does not exist: {image_path}")
+    if initial_intent not in {"hover", "following"}:
+        raise RuntimeError("initial exploratory intent must be hover or following")
     if camera and lidar:
         raise RuntimeError("camera and lidar simulation modes cannot run together")
     if lidar and not exploratory:
         raise RuntimeError("Gazebo lidar mode requires exploratory simulation")
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
+    model_pose = _validate_pose(model_pose)
     world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
     if not world_file.is_file():
         raise RuntimeError(f"Gazebo world does not exist: {world_file}")
@@ -201,6 +227,8 @@ def run(
                 vlm_model,
                 llm_model,
                 ollama_timeout,
+                initial_intent,
+                model_pose,
             )
         except _BootError:
             if attempt == BOOT_RETRIES:
@@ -239,6 +267,16 @@ def main(argv=None):
         "--lidar",
         action="store_true",
         help="use Gazebo's x500_lidar_front and feed its range readings to CM5 safety",
+    )
+    parser.add_argument(
+        "--intent",
+        choices=("hover", "following"),
+        default="hover",
+        help="initial intent for an exploratory run",
+    )
+    parser.add_argument(
+        "--pose",
+        help="PX4 spawn pose as x,y,z,roll,pitch,yaw",
     )
     parser.add_argument(
         "--ollama",
@@ -290,6 +328,8 @@ def main(argv=None):
             args.vlm_model,
             args.llm_model,
             args.ollama_timeout,
+            args.intent,
+            args.pose,
         )
     except KeyboardInterrupt:
         return 130
