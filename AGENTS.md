@@ -150,6 +150,9 @@ disarm have been verified. Near-wall exploratory runs measure real sensor
 distances and trigger a bounded CM5 backoff command. Both Gazebo sensor
 readers use one small shared topic-reader lifecycle while keeping their camera
 and depth decoders explicit.
+PX4’s stock GPS-denied optical-flow model was investigated but is not a
+verified path here: its flow quality stayed at zero and PX4 remained in
+constant-position mode. Its internal range sensor is not DEXI 3 hardware.
 Simulation-only fixtures stay under `sim/`, and the runner retries only PX4
 boot-readiness failures. The simulation loop remains the main development
 path. Hardware bring-up will add camera, network, sensor, and vehicle evidence
