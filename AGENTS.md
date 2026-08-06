@@ -170,6 +170,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Exploratory runs pass in default, walls, forest, windy, kthspacelab, and
   moving_platform worlds with rendered camera, simulated TOF, local brains,
   bounded motion, landing, and disarm.
+- A 120-second exploratory run completed 2,342 VLM observations and 240
+  conscious thoughts with telemetry, memory, landing, and disarm.
 - Near-wall depth simulation observed a 0.53 m obstacle and a bounded CM5
   backoff before landing and disarm.
 - The default `moondream` VLM and `gemma3:4b` conscious model produce valid
