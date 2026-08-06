@@ -42,8 +42,9 @@ merge and delete it.
 - Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.
-- CM5 returns fresh TOF telemetry over the same UDP link; missing or stale
-  readings stop Mac motion while CM5 remains the final safety authority.
+- CM5 returns fresh TOF and vehicle telemetry over the same UDP link; missing
+  or stale readings stop Mac motion while CM5 remains the final safety
+  authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
 The brain never sends motor or attitude commands. The flight interface is
@@ -83,9 +84,9 @@ Keep two simulation modes:
 
 - Deterministic missions prove flight, perception fixtures, transport, and
   safety behavior.
-- Exploratory worlds start hovering and let the brain and dialogue choose what
-  happens next. They still verify bounded motion, safety, landing, and disarm,
-  but not exact decisions.
+- Exploratory worlds start with an open-ended goal and let the brain and
+  dialogue choose what happens next. They still verify bounded motion, safety,
+  landing, and disarm, but not exact decisions.
 
 From `companion/`, use:
 
@@ -124,9 +125,9 @@ Use `--world walls`, `forest`, `windy`, or another PX4 Gazebo world, and
 `--duration` for a longer run.
 Use `--request` to inject one dialogue request without typing, which makes
 the conscious interaction path repeatable in unattended simulation.
-Use `--intent TEXT` to start with any short high-level goal; explicit
-stop/hover goals remain stationary, while a clear follow goal drives the
-synthetic person fixture.
+Use `--intent TEXT` to replace the default open-ended goal with any short
+high-level goal; explicit stop/hover goals remain stationary, while a clear
+follow goal drives the synthetic person fixture.
 Add `--memory PATH` to persist conscious experience across exploratory runs.
 
 Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
@@ -143,16 +144,17 @@ Ollama models; simulation-only fixtures live under `sim/`.
 After installing Ollama and pulling a local vision-capable model:
 
 ```sh
-ollama pull qwen3-vl:2b
+ollama pull moondream
 ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip>
 .venv/bin/python -m control.companion <cm5-ip> --dialogue
 ```
 
 The production entry point uses separate VLM and LLM sessions. It defaults to
-the faster `qwen3-vl:2b` for visual perception and `gemma3:4b` for conscious
-language. Set `--vlm-model` and `--llm-model` when different local models are
-preferred.
+the faster `moondream` for vision and `gemma3:4b` for conscious language so the
+two sessions can run independently; set `--vlm-model` or `--llm-model` when a
+different local model is preferred. `qwen3-vl:2b` remains an explicit option
+when broader visual reasoning is worth the added latency.
 The initial `--intent` may be any short plain-language goal. Add `--dialogue`
 to type natural requests for the conscious LLM while flight control continues;
 replies are printed only when the model provides one. It keeps a small,
@@ -161,29 +163,33 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 
 ## Current state
 
-- Deterministic Gazebo missions pass the full control path, perception
+- Deterministic Gazebo missions pass the complete control path, perception
   fixtures, CM5 safety faults, recovery, hover, landing, and disarm.
-- Exploratory brain-driven runs pass in default, walls, forest, and windy
-  worlds. Local Ollama VLM/LLM, rendered camera, simulated depth/TOF, focused
-  visual answers, bounded motion, long runs, landing, and disarm are verified.
+- Exploratory runs pass in default, walls, forest, windy, kthspacelab, and
+  moving_platform worlds with rendered camera, simulated TOF, local brains,
+  bounded motion, landing, and disarm.
+- Near-wall depth simulation observed a 0.53 m obstacle and a bounded CM5
+  backoff before landing and disarm.
+- The default `moondream` VLM and `gemma3:4b` conscious model produce valid
+  structured decisions. In 45 seconds, moondream produced 18 observations in
+  forest and 17 in moving_platform; Qwen remains an explicit slower option.
+- Dialogue, focused visual questions, and bounded editable memory work across
+  runs. A dialogue request is applied, while later conscious decisions may
+  still adapt to the world.
+- Intent changes discard stale visual context. Missing or stale frames and
+  sensors, malformed commands, low confidence, command dropout, and model
+  shutdown fail safely.
+- Both Mac brain loops receive simulated NED velocity forwarded through the
+  CM5 packet; the conscious loop also receives recent experience. The ROS 2
+  velocity topic seam is implemented; DEXI hardware remains unverified.
+- CM5 TOF freshness, command bounds, obstacle protection, and zero-on-failure
+  remain the final vehicle-side safety authority.
 - RTP image runs pass person-following and non-person safe-stop behavior.
-  Camera transport stays stopped until a visual model is configured.
-- Dialogue and bounded editable memory work across runs. Memory preserves
-  requests, decisions, focus, and responses; natural intents and open-ended
-  requests use one shared intent path.
-- Changing intent clears older visual context before new perception or
-  conscious decisions are used.
-- Simulation arguments are validated once before PX4 starts. Missing or stale
-  frames and sensors, malformed commands, command dropout, low confidence,
-  and model shutdown fail safely.
-- The CM5 returns fresh TOF data, enforces command bounds, and remains the
-  final safety authority. ROS 2 forwarding and physical sensors are still
-  hardware-gated.
-- PX4’s stock GPS-denied optical-flow model is not verified; its flow quality
-  stayed at zero in SITL. Simulation preparation, flight actions, landing,
-  and disarm waits are bounded.
+- PX4’s stock GPS-denied optical-flow model is not verified; raw flow quality
+  remains zero in SITL. Flight readiness, actions, landing, and disarm waits
+  are bounded.
+- Near-term work prioritizes closed-loop world operation, autonomous intent,
+  and simpler code over narrow new behaviors.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
-
-as always, thank you, good luck, and i love you
