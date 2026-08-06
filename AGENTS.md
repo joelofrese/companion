@@ -172,8 +172,9 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Exploratory runs pass in default, walls, forest, windy, kthspacelab,
   moving_platform, baylands, and aruco worlds with rendered camera, simulated
   TOF, local brains, bounded motion, landing, and disarm.
-- A 120-second exploratory run completed 2,342 VLM observations and 240
-  conscious thoughts with telemetry, memory, landing, and disarm.
+- A 120-second live Ollama run in `moving_platform` completed 2,090 camera
+  frames, 41 VLM observations, 23 conscious thoughts, autonomous intent
+  changes, telemetry, memory, landing, and disarm.
 - Live Ollama near-wall depth simulation observed a 0.53 m obstacle, bounded
   CM5 backoff, 16 VLM observations, 6 conscious thoughts, landing, and
   disarm.
