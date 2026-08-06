@@ -50,7 +50,6 @@ def build_parser():
 
 
 async def run(args):
-    intent = args.intent
     voice_request = None
     if args.voice_once:
         from voice.pipeline import PushToTalkVoicePipeline
@@ -82,7 +81,7 @@ async def run(args):
         OllamaLanguageModel(client, args.llm_model),
         memory=CompanionMemory(args.memory),
     )
-    brain.set_intent(intent)
+    brain.set_intent(args.intent)
     control = MindRuntime(brain)
     sender = UdpCommandSender(args.cm5_host, args.command_port)
     service = UdpControlService(
@@ -109,7 +108,7 @@ async def run(args):
         receiver.start()
         print(
             f"Companion ready: video :{video_config.port}, "
-            f"commands {args.cm5_host}:{args.command_port}, intent={intent}, "
+            f"commands {args.cm5_host}:{args.command_port}, intent={args.intent}, "
             f"VLM={args.vlm_model}, LLM={args.llm_model}."
         )
         if args.dialogue:
