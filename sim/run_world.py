@@ -94,6 +94,7 @@ def _run_once(
     model_pose: Optional[str],
     memory_path: Optional[Path],
     dialogue_request: Optional[str],
+    trace: bool,
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -169,6 +170,8 @@ def _run_once(
                 scenario += ["--memory", str(memory_path)]
             if dialogue_request is not None:
                 scenario += ["--request", dialogue_request]
+            if trace:
+                scenario.append("--trace")
             scenario += ["--world", world]
             if duration_s is not None:
                 scenario += ["--duration", str(duration_s)]
@@ -196,6 +199,7 @@ def run(
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
+    trace: bool = False,
 ) -> int:
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
@@ -226,6 +230,8 @@ def run(
         raise RuntimeError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and image_path is not None:
         raise RuntimeError("dialogue request cannot use an RTP image scenario")
+    if trace and image_path is not None:
+        raise RuntimeError("brain trace requires a synthetic world scenario")
     if dialogue_request is not None and not dialogue_request.strip():
         raise RuntimeError("dialogue request must not be empty")
     if ollama and not (exploratory and (camera or depth)):
@@ -262,6 +268,7 @@ def run(
                 model_pose=model_pose,
                 memory_path=memory_path,
                 dialogue_request=dialogue_request,
+                trace=trace,
             )
         except _BootError:
             if attempt == BOOT_RETRIES:
@@ -328,6 +335,11 @@ def main(argv=None):
         help="send one dialogue request automatically during an exploratory run",
     )
     parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="print meaningful VLM observations, conscious decisions, and command reasons",
+    )
+    parser.add_argument(
         "--duration",
         type=float,
         help="world simulation duration in seconds (default: 32)",
@@ -353,6 +365,7 @@ def main(argv=None):
             model_pose=args.pose,
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
             dialogue_request=args.request,
+            trace=args.trace,
         )
     except KeyboardInterrupt:
         return 130

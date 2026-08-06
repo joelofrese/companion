@@ -22,7 +22,12 @@ from control.mind import (
     VisualObservation,
 )
 from control.dialogue import DialogueInput
-from control.mind_runtime import MindRuntime
+from control.mind_runtime import (
+    MAX_MOVEMENT_AGE_S,
+    MIN_MOVEMENT_CONFIDENCE,
+    MindRuntime,
+)
+from control.safety_limits import OBSTACLE_STOP_M
 from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
@@ -222,6 +227,7 @@ async def run(
     depth: bool = False,
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
+    trace: bool = False,
 ):
     """Run one complete Gazebo world simulation."""
 
@@ -391,6 +397,7 @@ async def run(
             )
             if step.transmit:
                 sender.send(step.command_override or command)
+            return command, frame is not None
 
         starting_intent = initial_intent if exploratory else "following"
         send_packet(
@@ -440,6 +447,11 @@ async def run(
         min_north_velocity = 0.0
         max_east_velocity = 0.0
         min_east_velocity = 0.0
+        last_traced_observation = 0
+        last_traced_decision = 0
+        last_observation_signature = None
+        last_decision_signature = None
+        last_traced_command = None
 
         async def observe_velocity():
             nonlocal max_north_velocity, min_north_velocity
@@ -482,6 +494,92 @@ async def run(
                 return "intent changed to hover"
             return None
 
+        def trace_brain(elapsed_s, step, mac_command, frame_available):
+            nonlocal last_traced_observation, last_traced_decision
+            nonlocal last_observation_signature, last_decision_signature
+            nonlocal last_traced_command
+            if not trace:
+                return
+
+            def clean(value):
+                return " ".join(str(value).split()) or "none"
+
+            if control.observation_count != last_traced_observation:
+                observation = control.latest_observation
+                if observation is not None:
+                    signature = (
+                        clean(observation.description),
+                        clean(observation.next_focus),
+                        observation.movement,
+                        round(observation.confidence, 2),
+                    )
+                    if signature != last_observation_signature:
+                        print(
+                            f"[VLM {elapsed_s:5.1f}s] "
+                            f"{signature[0]}; focus={signature[1]}; "
+                            f"movement={signature[2]}; "
+                            f"confidence={signature[3]:.2f}",
+                            flush=True,
+                        )
+                        last_observation_signature = signature
+                last_traced_observation = control.observation_count
+
+            if control.decision_count != last_traced_decision:
+                decision = control.latest_decision
+                if decision is not None:
+                    signature = (
+                        clean(decision.intent),
+                        clean(decision.focus),
+                        clean(decision.summary),
+                    )
+                    if signature != last_decision_signature:
+                        print(
+                            f"[LLM {elapsed_s:5.1f}s] "
+                            f"intent={signature[0]}; focus={signature[1]}; "
+                            f"summary={signature[2]}",
+                            flush=True,
+                        )
+                        last_decision_signature = signature
+                last_traced_decision = control.decision_count
+
+            distance = step.obstacle_distance_m
+            if not step.transmit:
+                reason = "command link dropout"
+            elif not step.distance_fresh or distance is None or not math.isfinite(distance):
+                reason = "CM5 has no fresh distance reading"
+            elif distance < OBSTACLE_STOP_M:
+                reason = f"CM5 obstacle protection at {distance:.2f}m"
+            elif step.command_override is not None:
+                reason = "CM5 rejected the injected invalid command"
+            elif mac_command == VelocityCommand():
+                decision = control.latest_decision
+                observation = control.latest_observation
+                if decision is not None and parse_intent(decision.intent) == "hover":
+                    reason = "conscious intent is hover"
+                elif not frame_available:
+                    reason = "waiting for a fresh camera frame"
+                elif observation is None:
+                    reason = "waiting for the first VLM observation"
+                elif time.monotonic() - observation.timestamp_s > MAX_MOVEMENT_AGE_S:
+                    reason = "VLM observation is stale"
+                elif observation.confidence < MIN_MOVEMENT_CONFIDENCE:
+                    reason = "VLM confidence is below the movement threshold"
+                elif observation.movement in ("stop", "hover"):
+                    reason = f"VLM suggested {observation.movement}"
+                else:
+                    reason = "Mac timing or intent refresh held zero"
+            else:
+                reason = "Mac suggested movement"
+            forwarded = safe_commands.commands[-1][1] if safe_commands.commands else None
+            command_state = (mac_command, forwarded, reason)
+            if command_state != last_traced_command:
+                print(
+                    f"[CMD {elapsed_s:5.1f}s] mac={mac_command}; "
+                    f"cm5={forwarded or 'pending'}; reason={reason}",
+                    flush=True,
+                )
+                last_traced_command = command_state
+
         try:
             while (elapsed := time.monotonic() - started_at) < duration_s:
                 now = time.monotonic()
@@ -496,9 +594,12 @@ async def run(
                         reported.add("Mac control pause")
                     await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
                     now = time.monotonic()
-                    send_packet(now, read_step(now - started_at))
+                    step = read_step(now - started_at)
+                    command, frame_available = send_packet(now, step)
+                    trace_brain(now - started_at, step, command, frame_available)
                     continue
-                send_packet(now, step)
+                command, frame_available = send_packet(now, step)
+                trace_brain(elapsed, step, command, frame_available)
                 await asyncio.sleep(SETPOINT_PERIOD_S)
             await asyncio.wait_for(offboard_task, timeout=5.0)
             print("Offboard telemetry=verified through synthetic world and CM5 safety.")
@@ -798,6 +899,11 @@ if __name__ == "__main__":
         "--request",
         help="send one dialogue request automatically at the start of an exploratory run",
     )
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="print meaningful VLM observations, conscious decisions, and command reasons",
+    )
     parser.add_argument("--world", default="default")
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     parser.add_argument(
@@ -821,6 +927,7 @@ if __name__ == "__main__":
                 initial_intent=args.intent,
                 memory_path=args.memory,
                 dialogue_request=args.request,
+                trace=args.trace,
             )
         )
     except (RuntimeError, ValueError) as error:

@@ -98,6 +98,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --world walls
 .venv/bin/python -m sim.run_world --explore --request "follow me" --duration 12
+.venv/bin/python -m sim.run_world --explore --camera --ollama --trace
 .venv/bin/python -m sim.run_world --explore --camera
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --camera --ollama
@@ -129,6 +130,10 @@ With `--ollama`, keep the default 32-second duration or use longer; local model
 startup can make a shorter run land safely before its first conscious thought.
 Use `--request` to inject one dialogue request without typing, which makes
 the conscious interaction path repeatable in unattended simulation.
+Use `--trace` to print each meaningful structured VLM observation, conscious decision,
+and the reason the Mac or CM5 held or changed the command. It shows decisions,
+not hidden model reasoning, and is useful when an exploratory run appears to
+hover.
 Use `--intent TEXT` to replace the default open-ended goal with any short
 high-level goal; explicit stop/hover goals remain stationary, while a clear
 follow goal drives the synthetic person fixture.
@@ -190,6 +195,9 @@ reach the conscious LLM.
   runs. Voice-once transcripts use the same dialogue path. Explicit stop
   requests become persistent hover; open-ended requests reach the conscious
   mind, which can choose a new intent and visual focus.
+- Exploratory `--trace` shows meaningful VLM observations, conscious decisions,
+  and the Mac or CM5 reason for held or changed commands without repeating
+  unchanged model output.
 - Intent changes discard stale visual context. When conscious focus is empty,
   the latest VLM next-focus suggestion continues the visual loop. Missing or
   stale frames and sensors, malformed commands, low confidence, command
