@@ -176,9 +176,10 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Dialogue, focused visual questions, and bounded editable memory work across
   runs. A dialogue request is applied, while later conscious decisions may
   still adapt to the world.
-- Intent changes discard stale visual context. Missing or stale frames and
-  sensors, malformed commands, low confidence, command dropout, and model
-  shutdown fail safely.
+- Intent changes discard stale visual context. When conscious focus is empty,
+  the latest VLM next-focus suggestion continues the visual loop. Missing or
+  stale frames and sensors, malformed commands, low confidence, command
+  dropout, and model shutdown fail safely.
 - Both Mac brain loops receive simulated NED velocity forwarded through the
   CM5 packet; the conscious loop also receives recent experience. The ROS 2
   velocity topic seam is implemented; DEXI hardware remains unverified.

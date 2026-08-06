@@ -228,12 +228,16 @@ class MacMind:
         if not isinstance(decision.intent, str) or not decision.intent.strip():
             raise ValueError("language model returned an empty intent")
         intent = decision.intent.strip()
+        focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
+        if not focus and information.new_observations:
+            next_focus = information.new_observations[-1].next_focus
+            focus = next_focus.strip() if isinstance(next_focus, str) else ""
         summary = decision.summary.strip() if isinstance(decision.summary, str) else ""
         if not summary:
             summary = information.summary
         decision = ConsciousDecision(
             intent=intent,
-            focus=decision.focus,
+            focus=focus,
             dialogue=decision.dialogue,
             summary=summary,
         )
