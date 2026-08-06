@@ -176,8 +176,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   bounded motion, depth safety, landing, and disarm; Qwen remains an explicit
   slower option.
 - Dialogue, focused visual questions, and bounded editable memory work across
-  runs. A dialogue request is applied, while later conscious decisions may
-  still adapt to the world.
+  runs. Explicit stop requests become hover; open-ended requests reach the
+  conscious mind, which can choose a new intent and visual focus.
 - Intent changes discard stale visual context. When conscious focus is empty,
   the latest VLM next-focus suggestion continues the visual loop. Missing or
   stale frames and sensors, malformed commands, low confidence, command
