@@ -52,15 +52,13 @@ def build_parser():
 async def run(args):
     voice_request = None
     if args.voice_once:
-        from voice.pipeline import PushToTalkVoicePipeline
         from voice.recorder import PushToTalkRecorder
         from voice.transcriber import WhisperTranscriber
 
         def listen_once():
-            return PushToTalkVoicePipeline(
-                PushToTalkRecorder(duration_s=args.record_duration),
-                WhisperTranscriber(model_size=args.whisper_model),
-            ).listen_once()
+            recorder = PushToTalkRecorder(duration_s=args.record_duration)
+            transcriber = WhisperTranscriber(model_size=args.whisper_model)
+            return transcriber.transcribe(recorder.record()).strip()
 
         voice_request = await asyncio.to_thread(listen_once)
 

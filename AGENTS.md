@@ -96,15 +96,10 @@ From `companion/`, use:
 PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice
 .venv/bin/python -m sim.command_loopback
 .venv/bin/python -m sim.run_world
-.venv/bin/python -m sim.run_world --explore --world walls
-.venv/bin/python -m sim.run_world --explore --request "follow me" --duration 12
-.venv/bin/python -m sim.run_world --explore --camera --ollama --trace
-.venv/bin/python -m sim.run_world --explore --camera
+.venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world walls
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
-.venv/bin/python -m sim.run_world --explore --camera --ollama
-.venv/bin/python -m sim.run_world --explore --depth --ollama --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
-.venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/bus.jpg --expect-person
+.venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/zidane.jpg --expect-person
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
 ```
 
@@ -175,46 +170,22 @@ reach the conscious LLM.
 
 ## Current state
 
-- Deterministic Gazebo missions pass the complete control path, perception
-  fixtures, CM5 safety faults, recovery, hover, landing, and disarm.
-- Velocity commands contain only NED velocities; PX4 holds the current heading,
-  and simulation checks actual heading telemetry for unexpected rotation.
-- Exploratory runs pass in default, walls, forest, windy, kthspacelab,
-  moving_platform, baylands, and aruco worlds with rendered camera, simulated
-  TOF, local brains, bounded motion, landing, and disarm.
-- A 120-second live Ollama run in `moving_platform` completed 2,090 camera
-  frames, 41 VLM observations, 23 conscious thoughts, autonomous intent
-  changes, telemetry, memory, landing, and disarm.
-- Live Ollama near-wall depth simulation observed a 0.53 m obstacle, bounded
-  CM5 backoff, 16 VLM observations, 6 conscious thoughts, landing, and
-  disarm.
-- The default `moondream` VLM and `gemma3:4b` conscious model produce valid
-  structured decisions in default, forest, walls, baylands, and aruco worlds.
-  Recent 20–32 second runs produced 5–16 VLM observations and 1–7 conscious
-  thoughts with bounded motion, depth safety, landing, and disarm; Qwen remains
-  an explicit slower option.
-- Dialogue, focused visual questions, and bounded editable memory work across
-  runs. Voice-once transcripts use the same dialogue path. Explicit stop
-  requests become persistent hover; open-ended requests reach the conscious
-  mind, which can choose a new intent and visual focus.
-- Exploratory `--trace` shows meaningful VLM observations, conscious decisions,
-  and the Mac or CM5 reason for held or changed commands without repeating
-  unchanged model output.
-- Intent changes discard stale visual context. When conscious focus is empty,
-  the latest VLM next-focus suggestion continues the visual loop. Missing or
-  stale frames and sensors, malformed commands, low confidence, command
-  dropout, and model shutdown fail safely.
-- Both Mac brain loops receive simulated NED velocity forwarded through the
-  CM5 packet; the conscious loop also receives recent experience. The ROS 2
-  velocity topic seam is implemented; DEXI hardware remains unverified.
-- CM5 TOF freshness, command bounds, obstacle protection, and zero-on-failure
-  remain the final vehicle-side safety authority.
-- RTP image runs pass person-following and non-person safe-stop behavior.
-- PX4’s stock GPS-denied optical-flow model is not verified; raw flow quality
-  remains zero in SITL. Flight readiness, actions, landing, and disarm waits
-  are bounded.
-- Near-term work prioritizes closed-loop world operation, autonomous intent,
-  and simpler code over narrow new behaviors.
+- Deterministic Gazebo missions verify the full control path, perception
+  fixtures, faults, recovery, safety, hover, landing, and disarm.
+- Velocity commands contain only NED velocities; PX4 holds its heading, and
+  synthetic simulation checks actual heading telemetry for rotation.
+- Exploratory camera and depth runs work across varied PX4 worlds with local
+  brains, bounded motion, simulated TOF safety, landing, and disarm.
+- Ollama VLM and LLM sessions produce structured observations and intent; the
+  conscious loop also supports dialogue, focused vision, memory, and voice.
+- Trace output shows VLM observations, conscious decisions, and Mac/CM5 command
+  reasons without exposing hidden model reasoning.
+- Stale frames or sensors, malformed commands, low confidence, command loss,
+  obstacles, and model shutdown fail safely; CM5 remains the final authority.
+- The ROS 2 velocity seam exists, but DEXI 3 hardware and its optical-flow
+  quality remain unverified in SITL.
+- Continue prioritizing closed-loop autonomous world operation and simpler
+  code over narrow new behaviors.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not preserve a long historical log.
