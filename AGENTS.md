@@ -170,18 +170,18 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Deterministic Gazebo missions pass the complete control path, perception
   fixtures, CM5 safety faults, recovery, hover, landing, and disarm.
 - Exploratory runs pass in default, walls, forest, windy, kthspacelab,
-  moving_platform, and baylands worlds with rendered camera, simulated TOF,
-  local brains, bounded motion, landing, and disarm.
+  moving_platform, baylands, and aruco worlds with rendered camera, simulated
+  TOF, local brains, bounded motion, landing, and disarm.
 - A 120-second exploratory run completed 2,342 VLM observations and 240
   conscious thoughts with telemetry, memory, landing, and disarm.
 - Live Ollama near-wall depth simulation observed a 0.53 m obstacle, bounded
   CM5 backoff, 16 VLM observations, 6 conscious thoughts, landing, and
   disarm.
 - The default `moondream` VLM and `gemma3:4b` conscious model produce valid
-  structured decisions in default, forest, walls, and baylands worlds. Recent
-  20–32 second runs produced 5–16 VLM observations and 1–7 conscious thoughts with
-  bounded motion, depth safety, landing, and disarm; Qwen remains an explicit
-  slower option.
+  structured decisions in default, forest, walls, baylands, and aruco worlds.
+  Recent 20–32 second runs produced 5–16 VLM observations and 1–7 conscious
+  thoughts with bounded motion, depth safety, landing, and disarm; Qwen remains
+  an explicit slower option.
 - Dialogue, focused visual questions, and bounded editable memory work across
   runs. Explicit stop requests become persistent hover; open-ended requests
   reach the conscious mind, which can choose a new intent and visual focus.
