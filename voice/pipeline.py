@@ -1,14 +1,12 @@
-"""Connect one recorded utterance to a safe intent."""
-
-from voice.intent import parse_intent
+"""Connect one recorded utterance to the companion dialogue path."""
 
 
 class PushToTalkVoicePipeline:
-    """Capture one utterance and return its intent."""
+    """Capture one utterance and return its transcript."""
 
     def __init__(self, recorder, transcriber):
         self.recorder = recorder
         self.transcriber = transcriber
 
     def listen_once(self):
-        return parse_intent(self.transcriber.transcribe(self.recorder.record()))
+        return self.transcriber.transcribe(self.recorder.record()).strip()

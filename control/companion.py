@@ -51,6 +51,7 @@ def build_parser():
 
 async def run(args):
     intent = args.intent
+    voice_request = None
     if args.voice_once:
         from voice.pipeline import PushToTalkVoicePipeline
         from voice.recorder import PushToTalkRecorder
@@ -62,9 +63,7 @@ async def run(args):
                 WhisperTranscriber(model_size=args.whisper_model),
             ).listen_once()
 
-        voice_state = await asyncio.to_thread(listen_once)
-        if voice_state is not None:
-            intent = voice_state
+        voice_request = await asyncio.to_thread(listen_once)
 
     client = OllamaClient(args.ollama_url, timeout_s=args.ollama_timeout)
     await asyncio.to_thread(client.check)
@@ -94,7 +93,11 @@ async def run(args):
     )
     stop_event = asyncio.Event()
     mind_stop = asyncio.Event()
-    dialogue_input = DialogueInput() if args.dialogue else None
+    dialogue_input = (
+        DialogueInput(voice_request)
+        if args.dialogue or voice_request
+        else None
+    )
     mind_task = asyncio.create_task(
         control.think_loop(
             mind_stop,
@@ -109,7 +112,7 @@ async def run(args):
             f"commands {args.cm5_host}:{args.command_port}, intent={intent}, "
             f"VLM={args.vlm_model}, LLM={args.llm_model}."
         )
-        if dialogue_input:
+        if args.dialogue:
             dialogue_input.start()
         await service.run(stop_event)
     finally:

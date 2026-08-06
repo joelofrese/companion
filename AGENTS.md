@@ -164,6 +164,9 @@ to type natural requests for the conscious LLM while flight control continues;
 replies are printed only when the model provides one. It keeps a small,
 editable experience memory at `~/.companion/memory.txt`; change it with
 `--memory` when needed.
+Use `--voice-once` to route one spoken request through the same dialogue path;
+explicit movement intents remain safety-checked, while open-ended requests
+reach the conscious LLM.
 
 ## Current state
 
@@ -184,8 +187,9 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   thoughts with bounded motion, depth safety, landing, and disarm; Qwen remains
   an explicit slower option.
 - Dialogue, focused visual questions, and bounded editable memory work across
-  runs. Explicit stop requests become persistent hover; open-ended requests
-  reach the conscious mind, which can choose a new intent and visual focus.
+  runs. Voice-once transcripts use the same dialogue path. Explicit stop
+  requests become persistent hover; open-ended requests reach the conscious
+  mind, which can choose a new intent and visual focus.
 - Intent changes discard stale visual context. When conscious focus is empty,
   the latest VLM next-focus suggestion continues the visual loop. Missing or
   stale frames and sensors, malformed commands, low confidence, command
