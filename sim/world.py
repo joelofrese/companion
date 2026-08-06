@@ -71,6 +71,7 @@ STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
 MAX_EXPLORATORY_SPEED_M_S = 1.0
+MAX_HEADING_CHANGE_DEG = 15.0
 DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
 
 
@@ -120,7 +121,9 @@ class SyntheticWorld:
         if DROPOUT_END_S <= elapsed_s < LINK_RECOVERY_END_S:
             return WorldStep()
         if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
-            return WorldStep(command_override=VelocityCommand(north_m_s=1.0, yaw_deg=181.0))
+            return WorldStep(
+                command_override=VelocityCommand(north_m_s=1.0, east_m_s=1.0)
+            )
         return WorldStep()
 
 
@@ -272,6 +275,7 @@ async def run(
     service_stop = asyncio.Event()
     mind_stop = asyncio.Event()
     telemetry_task = None
+    attitude_task = None
     offboard_task = None
     dialogue_input = DialogueInput(dialogue_request) if exploratory else None
     gazebo_camera = None
@@ -286,6 +290,8 @@ async def run(
     east_velocity_m_s = None
     down_velocity_m_s = None
     velocity_telemetry_seen = False
+    initial_yaw_deg = None
+    max_heading_change_deg = 0.0
     try:
         world = SyntheticWorld(exploratory)
         if camera or depth:
@@ -302,6 +308,22 @@ async def run(
 
         await prepare(drone)
         armed = True
+
+        async def observe_heading():
+            nonlocal initial_yaw_deg, max_heading_change_deg
+            async for attitude in drone.telemetry.attitude_euler():
+                yaw_deg = attitude.yaw_deg
+                if not math.isfinite(yaw_deg):
+                    continue
+                if initial_yaw_deg is None:
+                    initial_yaw_deg = yaw_deg
+                change_deg = (yaw_deg - initial_yaw_deg + 180.0) % 360.0 - 180.0
+                max_heading_change_deg = max(
+                    max_heading_change_deg,
+                    abs(change_deg),
+                )
+
+        attitude_task = asyncio.create_task(observe_heading())
 
         forwarder = MavsdkVelocityForwarder(drone)
 
@@ -613,6 +635,8 @@ async def run(
             control.close()
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
+            attitude_task.cancel()
+            await asyncio.gather(attitude_task, return_exceptions=True)
             if offboard_started:
                 try:
                     await drone.offboard.stop()
@@ -646,6 +670,17 @@ async def run(
         if not velocity_telemetry_seen:
             raise RuntimeError("SITL did not feed CM5 velocity telemetry to the Mac brain")
         print("Mac velocity telemetry=verified.")
+        if initial_yaw_deg is None:
+            raise RuntimeError("SITL did not provide heading telemetry")
+        if max_heading_change_deg > MAX_HEADING_CHANGE_DEG:
+            raise RuntimeError(
+                "SITL heading changed unexpectedly: "
+                f"{max_heading_change_deg:.1f} degrees"
+            )
+        print(
+            "PX4 heading hold=verified: "
+            f"maximum change {max_heading_change_deg:.1f} degrees."
+        )
         if requested_intent is not None:
             if applied_dialogue_intent != requested_intent:
                 raise RuntimeError(

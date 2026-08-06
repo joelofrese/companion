@@ -47,6 +47,7 @@ class Ros2VelocityForwarder:
             command.down_m_s,
         ]
         setpoint.acceleration = [math.nan, math.nan, math.nan]
-        setpoint.yaw = math.radians(command.yaw_deg)
+        # NaN tells PX4 to hold the current heading.
+        setpoint.yaw = math.nan
         setpoint.yawspeed = math.nan
         self.setpoint_publisher.publish(setpoint)

@@ -1,5 +1,7 @@
 """Forward simulated CM5 commands to PX4 through MAVSDK."""
 
+import math
+
 from mavsdk.offboard import VelocityNedYaw
 
 from control.velocity import VelocityCommand
@@ -19,6 +21,6 @@ class MavsdkVelocityForwarder:
                 command.north_m_s,
                 command.east_m_s,
                 command.down_m_s,
-                command.yaw_deg,
+                math.nan,
             )
         )

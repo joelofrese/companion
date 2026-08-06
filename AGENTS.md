@@ -177,6 +177,8 @@ reach the conscious LLM.
 
 - Deterministic Gazebo missions pass the complete control path, perception
   fixtures, CM5 safety faults, recovery, hover, landing, and disarm.
+- Velocity commands contain only NED velocities; PX4 holds the current heading,
+  and simulation checks actual heading telemetry for unexpected rotation.
 - Exploratory runs pass in default, walls, forest, windy, kthspacelab,
   moving_platform, baylands, and aruco worlds with rendered camera, simulated
   TOF, local brains, bounded motion, landing, and disarm.

@@ -9,7 +9,7 @@ from typing import Optional
 from control.velocity import VelocityCommand
 
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 MAX_PACKET_BYTES = 512
 
 
@@ -25,7 +25,6 @@ class CommandPacket:
             self.command.north_m_s,
             self.command.east_m_s,
             self.command.down_m_s,
-            self.command.yaw_deg,
         )
         if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 0:
             raise ValueError("sequence must be non-negative")
@@ -38,7 +37,6 @@ class CommandPacket:
                 "north_m_s": self.command.north_m_s,
                 "east_m_s": self.command.east_m_s,
                 "down_m_s": self.command.down_m_s,
-                "yaw_deg": self.command.yaw_deg,
             },
         }
         encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -55,7 +53,9 @@ class CommandPacket:
             version = data["version"]
             sequence = data["sequence"]
             velocity = data["velocity"]
-            values = tuple(velocity[name] for name in ("north_m_s", "east_m_s", "down_m_s", "yaw_deg"))
+            values = tuple(
+                velocity[name] for name in ("north_m_s", "east_m_s", "down_m_s")
+            )
         except (
             AttributeError,
             KeyError,
