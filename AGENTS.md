@@ -171,8 +171,10 @@ editable experience memory at `~/.companion/memory.txt`; change it with
 - Near-wall depth simulation observed a 0.53 m obstacle and a bounded CM5
   backoff before landing and disarm.
 - The default `moondream` VLM and `gemma3:4b` conscious model produce valid
-  structured decisions. In 45 seconds, moondream produced 18 observations in
-  forest and 17 in moving_platform; Qwen remains an explicit slower option.
+  structured decisions in default, forest, and walls worlds. Recent 20–30
+  second runs produced 5–8 VLM observations and 1–3 conscious thoughts with
+  bounded motion, depth safety, landing, and disarm; Qwen remains an explicit
+  slower option.
 - Dialogue, focused visual questions, and bounded editable memory work across
   runs. A dialogue request is applied, while later conscious decisions may
   still adapt to the world.
