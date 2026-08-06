@@ -23,7 +23,18 @@ def parse_intent(transcript: str) -> Optional[str]:
     if any(word in {"no", "not", "never", "dont", "don't"} for word in words):
         return None
 
-    if any(_contains_phrase(words, phrase) for phrase in ("stop", "hover", "hold", "wait", "stay")):
+    if any(
+        _contains_phrase(words, phrase)
+        for phrase in (
+            "stop",
+            "hover",
+            "hold",
+            "wait",
+            "stay",
+            "remain still",
+            "maintain position",
+        )
+    ):
         return "hover"
 
     intents = {

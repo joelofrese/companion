@@ -37,6 +37,7 @@ class MindRuntime:
         self._observation_count = 0
         self._decision_count = 0
         self._last_command: Optional[VelocityCommand] = None
+        self._intent_override: Optional[str] = None
 
     @property
     def latest_decision(self) -> Optional[ConsciousDecision]:
@@ -115,9 +116,15 @@ class MindRuntime:
         stop_event: asyncio.Event,
         telemetry: Telemetry,
         dialogue: Optional[str],
+        intent_override: Optional[str],
     ) -> Optional[ConsciousDecision]:
         thought = asyncio.create_task(
-            asyncio.to_thread(self.mind.think, telemetry, dialogue)
+            asyncio.to_thread(
+                self.mind.think,
+                telemetry,
+                dialogue,
+                intent_override,
+            )
         )
         stopped = asyncio.create_task(stop_event.wait())
         done, _ = await asyncio.wait(
@@ -145,8 +152,10 @@ class MindRuntime:
         while not stop_event.is_set():
             dialogue = dialogue_provider() if dialogue_provider is not None else None
             explicit_intent = parse_intent(dialogue) if dialogue else None
-            if explicit_intent is not None:
-                self.mind.set_intent(explicit_intent)
+            if dialogue:
+                self._intent_override = explicit_intent
+                if explicit_intent is not None:
+                    self.mind.set_intent(explicit_intent)
             if (
                 self._decision_count == 0
                 and self._observation_intent != self.mind.intent
@@ -166,6 +175,7 @@ class MindRuntime:
                     stop_event,
                     telemetry,
                     dialogue,
+                    self._intent_override,
                 )
             except Exception as error:
                 self._error = error

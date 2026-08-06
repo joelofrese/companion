@@ -552,6 +552,10 @@ async def run(
                     f"expected {requested_intent}, got {applied_dialogue_intent}"
                 )
             print(f"Scripted dialogue=verified: intent={requested_intent}.")
+            if requested_intent == "hover":
+                if any(command != VelocityCommand() for _, command in commands):
+                    raise RuntimeError("explicit hover dialogue commanded motion")
+                print("Explicit hover dialogue stop=verified.")
         elif dialogue_request is not None:
             print("Scripted open-ended dialogue=delivered to the conscious mind.")
         print(

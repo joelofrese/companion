@@ -39,6 +39,8 @@ merge and delete it.
   memory to choose high-level intent.
 - Mac control turns the suggestion into slow velocity commands.
 - A changed intent invalidates older visual context and pending brain results.
+- A recognized dialogue intent stays active until a new open-ended dialogue
+  request releases it.
 - Low-confidence visual suggestions become zero motion.
 - CM5 safety rejects stale, malformed, or unsafe commands and applies local
   obstacle protection.
@@ -180,8 +182,8 @@ editable experience memory at `~/.companion/memory.txt`; change it with
   bounded motion, depth safety, landing, and disarm; Qwen remains an explicit
   slower option.
 - Dialogue, focused visual questions, and bounded editable memory work across
-  runs. Explicit stop requests become hover; open-ended requests reach the
-  conscious mind, which can choose a new intent and visual focus.
+  runs. Explicit stop requests become persistent hover; open-ended requests
+  reach the conscious mind, which can choose a new intent and visual focus.
 - Intent changes discard stale visual context. When conscious focus is empty,
   the latest VLM next-focus suggestion continues the visual loop. Missing or
   stale frames and sensors, malformed commands, low confidence, command
