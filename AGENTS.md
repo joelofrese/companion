@@ -123,6 +123,8 @@ rather than exact decisions. Type a request such as `follow me`, `hover`, or
 `stop` during an exploratory synthetic run to change the conscious intent.
 Use `--world walls`, `forest`, `windy`, or another PX4 Gazebo world, and
 `--duration` for a longer run.
+With `--ollama`, keep the default 32-second duration or use longer; local model
+startup can make a shorter run land safely before its first conscious thought.
 Use `--request` to inject one dialogue request without typing, which makes
 the conscious interaction path repeatable in unattended simulation.
 Use `--intent TEXT` to replace the default open-ended goal with any short
