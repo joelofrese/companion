@@ -7,6 +7,7 @@ import threading
 from typing import Any, Optional, Protocol
 
 from control.velocity import VelocityCommand
+from voice.intent import parse_focus
 
 
 MAX_PENDING_OBSERVATIONS = 32
@@ -279,6 +280,9 @@ class MacMind:
                 intent = information.intent
             intent_changed = intent != information.intent
             focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
+            requested_focus = parse_focus(information.dialogue or "")
+            if requested_focus:
+                focus = requested_focus
             if focus.lower() in FOCUS_PLACEHOLDER_TEXT:
                 focus = information.focus
             if not focus and information.new_observations:
