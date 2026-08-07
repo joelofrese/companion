@@ -480,7 +480,6 @@ async def run(
         if len(safe_commands.commands) < 3:
             raise RuntimeError("CM5 did not forward consecutive priming setpoints")
         print("CM5 priming setpoints=verified.")
-        await asyncio.sleep(SETPOINT_PERIOD_S * 4)
         await drone.offboard.start()
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))

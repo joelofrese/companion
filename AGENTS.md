@@ -174,6 +174,8 @@ and `--memory` for editable experience memory.
   and resize frames to the real 640-pixel camera width. The GUI opens after
   PX4 spawns the model so it does not reframe during takeoff. Depth is only a
   TOF approximation; DEXI 3 has no lidar.
+- Offboard starts immediately after three CM5 priming setpoints, without an
+  extra zero-command delay.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
   remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
