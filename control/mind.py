@@ -176,6 +176,7 @@ class MacMind:
             maxlen=MAX_PENDING_OBSERVATIONS
         )
         self._lock = threading.Lock()
+        self._closed = False
 
     def set_intent(self, intent: str):
         """Set the high-level intent seen by the subconscious."""
@@ -230,7 +231,7 @@ class MacMind:
             telemetry=telemetry,
         )
         with self._lock:
-            if self._intent_generation == intent_generation:
+            if not self._closed and self._intent_generation == intent_generation:
                 self.memory.previous_movement = observation.movement
                 self.memory.previous_observation = observation.description
                 self._new_observations.append(observation)
@@ -301,7 +302,7 @@ class MacMind:
             )
         except Exception:
             with self._lock:
-                if self._intent_generation == intent_generation:
+                if not self._closed and self._intent_generation == intent_generation:
                     pending = tuple(information.new_observations) + tuple(
                         self._new_observations
                     )
@@ -311,7 +312,7 @@ class MacMind:
                     )
             raise
         with self._lock:
-            if self._intent_generation != intent_generation:
+            if self._closed or self._intent_generation != intent_generation:
                 return ConsciousDecision(intent=self.memory.intent)
             if self.memory_store is not None and (
                 information.new_observations or information.dialogue
@@ -332,3 +333,10 @@ class MacMind:
             self.memory.focus = decision.focus
             self.memory.summary = decision.summary
         return decision
+
+    def close(self):
+        """Discard model results that finish after shutdown."""
+
+        with self._lock:
+            self._closed = True
+            self._new_observations.clear()

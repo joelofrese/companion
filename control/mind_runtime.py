@@ -254,6 +254,7 @@ class MindRuntime:
         if self._closed:
             return
         self._closed = True
+        self.mind.close()
         if self._future is not None:
             self._future.cancel()
         self._executor.shutdown(wait=False, cancel_futures=True)
