@@ -159,6 +159,8 @@ and `--memory` for editable experience memory.
 - Exploratory `--faults` runs reuse the deterministic safety schedule without
   requiring exact brain decisions, while checking the observed CM5 safe
   outputs for each reached fault.
+- Mac brain shutdown stops new work immediately, so zero motion does not wait
+  for a model request to finish.
 - Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
   stops Mac motion. CM5 remains the final authority.
 - Intent changes invalidate old visual context; same-goal rewording does not.
