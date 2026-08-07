@@ -323,8 +323,10 @@ async def run(
         raise ValueError("camera and depth modes cannot run together")
     if depth and not exploratory:
         raise ValueError("Gazebo depth mode requires exploratory simulation")
-    if exploratory and world_name == "objects" and not (camera or depth):
-        raise ValueError("the objects world requires --camera or --depth")
+    if exploratory and world_name != "default" and not (camera or depth):
+        raise ValueError(
+            "a non-default exploratory world requires --camera or --depth"
+        )
     if faults and camera:
         raise ValueError("fault injection requires synthetic safety or depth mode")
     if ollama and not (exploratory and (camera or depth)):

@@ -130,7 +130,8 @@ Oversized simulation frames are reduced to the real 640-pixel camera width
 before the VLM sees them. Because `objects` contains collidable objects, use
 `--depth` for moving goals such as following. Camera-only runs have no forward
 range reading, so they check visual behavior and bounded flight, not obstacle
-clearance.
+clearance. Every non-default exploratory world requires `--camera` or
+`--depth`; this prevents blind motion in collidable worlds.
 
 `--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
 its depth readings feed CM5 safety. This is only a simulation approximation of
@@ -162,6 +163,8 @@ and `--memory` for editable experience memory.
 - Exploratory camera and depth worlds run local VLM/LLM brains with dialogue,
   visual focus, and memory. Camera mode holds zero without TOF; depth mode
   verifies simulated TOF safety, bounded motion, landing, and disarm.
+- Non-default exploratory worlds require rendered camera or simulated depth;
+  blind synthetic exploration is limited to the empty default world.
 - The default exploratory goal and explicit "look around" or "wander"
   dialogue use an open-ended exploring intent that can move through clear
   simulated space.

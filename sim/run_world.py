@@ -311,8 +311,10 @@ def run(
         raise RuntimeError("Gazebo camera mode requires exploratory simulation")
     if depth and not exploratory:
         raise RuntimeError("Gazebo depth mode requires exploratory simulation")
-    if exploratory and world == "objects" and not (camera or depth):
-        raise RuntimeError("the objects world requires --camera or --depth")
+    if exploratory and world != "default" and not (camera or depth):
+        raise RuntimeError(
+            "a non-default exploratory world requires --camera or --depth"
+        )
     if faults and camera:
         raise RuntimeError("fault injection requires synthetic safety or depth mode")
     if memory_path is not None and not exploratory:
