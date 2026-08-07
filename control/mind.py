@@ -225,7 +225,19 @@ class MacMind:
                 telemetry=telemetry,
             )
             self._new_observations.clear()
-        decision = self.language_model.think(information)
+        try:
+            decision = self.language_model.think(information)
+        except Exception:
+            with self._lock:
+                if self._intent_generation == intent_generation:
+                    pending = tuple(information.new_observations) + tuple(
+                        self._new_observations
+                    )
+                    self._new_observations.clear()
+                    self._new_observations.extend(
+                        pending[-MAX_PENDING_OBSERVATIONS:]
+                    )
+            raise
         if intent_override is not None:
             if not isinstance(intent_override, str) or not intent_override.strip():
                 raise ValueError("intent override must be a non-empty string")

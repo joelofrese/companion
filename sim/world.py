@@ -213,6 +213,8 @@ class WorldLanguageModel:
         self.exploratory = exploratory
         self.started_at_s = 0.0
         self.intent = None
+        self._conscious_failure_seen = False
+        self.recovered_with_observation = False
 
     def think(self, information) -> ConsciousDecision:
         if self.intent is None:
@@ -228,7 +230,14 @@ class WorldLanguageModel:
         if not self.exploratory:
             elapsed_s = max(0.0, time.monotonic() - self.started_at_s)
             if CONSCIOUS_FAILURE_START_S <= elapsed_s < CONSCIOUS_FAILURE_END_S:
+                self._conscious_failure_seen = True
                 raise RuntimeError("simulated conscious model failure")
+            if self._conscious_failure_seen and not self.recovered_with_observation:
+                if not information.new_observations:
+                    raise RuntimeError(
+                        "simulated conscious recovery lost visual context"
+                    )
+                self.recovered_with_observation = True
             following = (
                 elapsed_s < HOVER_START_S
                 or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
@@ -927,6 +936,11 @@ async def run(
                 raise RuntimeError(f"SITL did not observe {behavior}")
             print(f"Mission objective passed: {behavior}.")
         if not exploratory:
+            if not language_model.recovered_with_observation:
+                raise RuntimeError(
+                    "SITL conscious recovery did not retain visual context"
+                )
+            print("Conscious recovery retained visual context=verified.")
             if not brain_shutdown or not observed(
                 BRAIN_SHUTDOWN_START_S,
                 PROFILE_DURATION_S,

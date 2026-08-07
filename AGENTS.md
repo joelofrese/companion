@@ -143,6 +143,8 @@ and `--memory` for editable experience memory.
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, transient brain failures, safety, hover, landing,
   and disarm.
+- A failed conscious thought holds zero, retries, and retains pending visual
+  context for the recovery.
 - RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera
   runs exercise the real VLM path.
 - The objects world includes a primitive mannequin; the fast VLM currently
