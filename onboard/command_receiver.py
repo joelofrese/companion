@@ -51,7 +51,7 @@ class UdpSafetyReceiver:
         try:
             receiver_socket.bind((self.bind_host, self.port))
             receiver_socket.setblocking(False)
-        except Exception:
+        except OSError:
             receiver_socket.close()
             raise
         self._socket = receiver_socket
