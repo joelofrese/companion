@@ -1,7 +1,6 @@
 """The body-frame velocity command shared by all control layers."""
 
 from dataclasses import dataclass
-import math
 
 
 @dataclass(frozen=True)
