@@ -175,6 +175,7 @@ class MindRuntime:
             return_when=asyncio.FIRST_COMPLETED,
         )
         if stopped in done:
+            thought.cancel()
             await asyncio.gather(thought, return_exceptions=True)
             return None
         stopped.cancel()
