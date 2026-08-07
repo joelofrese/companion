@@ -84,10 +84,7 @@ def _heading_change_deg(start_deg: float, end_deg: float) -> float:
 
 
 async def prepare(drone):
-    """Connect, wait for arming health, arm, and reach the air.
-
-    Return the heading that every simulated velocity setpoint must hold.
-    """
+    """Connect, wait for arming health, arm, and reach the air."""
 
     print("Waiting for drone connection...")
     try:
@@ -170,9 +167,6 @@ async def prepare(drone):
             "PX4 takeoff heading hold=verified: "
             f"change {heading_change_deg:.1f} degrees."
         )
-        # Use the settled heading for the first offboard setpoint. This avoids
-        # asking PX4 to correct back to the pre-takeoff sample.
-        return takeoff_heading_deg
     except Exception:
         try:
             await asyncio.wait_for(

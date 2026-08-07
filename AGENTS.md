@@ -113,8 +113,7 @@ length, dialogue, goal, and persistent experience. Typed dialogue also works
 during an exploratory run.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
-mannequin for visual exploration. The runner leaves the Gazebo camera
-user-controlled and starts the vehicle at zero yaw.
+mannequin for visual exploration. The runner starts the vehicle at zero yaw.
 
 `--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
 its depth readings feed CM5 safety. This is only a simulation approximation of
@@ -149,9 +148,8 @@ and `--memory` for editable experience memory.
   runs exercise the real VLM path.
 - The objects world includes a primitive mannequin; the fast VLM currently
   does not reliably identify it and stops safely when uncertain.
-- Simulations start at zero yaw, reassert fixed yaw when takeoff hands control
-  to offboard, use the settled heading for every setpoint, and leave the
-  Gazebo camera user-controlled.
+- Simulations start at zero yaw, verify takeoff heading stability, and use
+  velocity-only offboard setpoints that leave the current heading unchanged.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path
   and provides simple objects for rendered-camera perception.
 - With a focused request, the local VLM found the red box and the conscious

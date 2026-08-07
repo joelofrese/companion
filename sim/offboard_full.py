@@ -117,10 +117,10 @@ async def run(image_path: str, expect_person: bool = False):
         )
         print("RTP camera loopback started.")
 
-        heading_deg = await prepare(drone)
+        await prepare(drone)
         armed = True
 
-        forwarder = MavsdkVelocityForwarder(drone, heading_deg)
+        forwarder = MavsdkVelocityForwarder(drone)
         safe_commands = RecordingForwarder(forwarder)
 
         receiver.start()

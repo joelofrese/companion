@@ -120,8 +120,6 @@ def _run_once(
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
     environment["PX4_GZ_MODEL_POSE"] = model_pose or DEFAULT_MODEL_POSE
-    # Leave the Gazebo window user-controlled instead of reorienting it.
-    environment["PX4_GZ_NO_FOLLOW"] = "1"
     local_worlds = companion_dir / "sim/worlds"
     local_world_file = local_worlds / f"{world}.sdf"
     world_processes = []
