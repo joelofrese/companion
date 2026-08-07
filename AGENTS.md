@@ -161,6 +161,9 @@ and `--memory` for editable experience memory.
 - Exploratory camera and depth worlds run local VLM/LLM brains with dialogue,
   visual focus, and memory. Camera mode holds zero without TOF; depth mode
   verifies simulated TOF safety, bounded motion, landing, and disarm.
+- The default exploratory goal and explicit "look around" or "wander"
+  dialogue use an open-ended exploring intent that can move through clear
+  simulated space.
 - RTP person/no-person fixtures verify the video, Mac, CM5, and PX4 path;
   rendered Gazebo frames verify the real local VLM path.
 - Focused Moondream and Qwen runs identify simple objects and make bounded
