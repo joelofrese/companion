@@ -175,8 +175,12 @@ reach the conscious LLM.
 - Velocity commands contain only NED velocities; PX4 holds its heading, and
   synthetic simulation checks actual heading telemetry for rotation.
 - Exploratory camera and depth runs work across varied PX4 worlds with local
-  brains, bounded motion, simulated TOF safety, landing, and disarm; the
-  near-wall depth path has observed 0.56m and forwarded CM5 backoff.
+  brains, bounded motion, simulated TOF safety, landing, and disarm. A real
+  moondream/gemma3 camera run produced bounded movement, and a near-wall depth
+  run observed 0.55m and forwarded CM5 backoff at -0.20m/s.
+- A completed VLM result has a 1.5-second movement lease from completion while
+  fresh camera frames continue; a stale result or camera gap over 0.5 seconds
+  becomes zero motion.
 - A 120-second moving-platform exploration completed 2,318 visual observations
   and 240 conscious cycles with heading hold, landing, and disarm.
 - Simulation keeps 20Hz setpoints but limits MAVSDK velocity telemetry to 10Hz

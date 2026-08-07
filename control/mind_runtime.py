@@ -3,6 +3,7 @@
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
+import time
 from typing import Callable, Optional
 
 from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
@@ -14,6 +15,7 @@ from voice.intent import parse_intent
 
 MIN_MOVEMENT_CONFIDENCE = 0.5
 MAX_MOVEMENT_AGE_S = 1.5
+MAX_FRAME_GAP_S = 0.5
 CONSCIOUS_PERIOD_S = 0.5
 
 
@@ -30,6 +32,8 @@ class MindRuntime:
         self._future: Optional[Future] = None
         self._future_intent: Optional[str] = None
         self._observation = None
+        self._observation_ready_at_s: Optional[float] = None
+        self._last_frame_at_s: Optional[float] = None
         self._observation_intent: Optional[str] = None
         self._decision: Optional[ConsciousDecision] = None
         self._error: Optional[Exception] = None
@@ -50,6 +54,22 @@ class MindRuntime:
         """Return the newest observation processed by the visual model."""
 
         return self._observation
+
+    @property
+    def latest_observation_age_s(self) -> Optional[float]:
+        """Return how long the newest VLM result has been available."""
+
+        if self._observation_ready_at_s is None:
+            return None
+        return max(0.0, time.monotonic() - self._observation_ready_at_s)
+
+    @property
+    def latest_frame_age_s(self) -> Optional[float]:
+        """Return how long ago a fresh camera frame arrived."""
+
+        if self._last_frame_at_s is None:
+            return None
+        return max(0.0, time.monotonic() - self._last_frame_at_s)
 
     @property
     def observation_count(self) -> int:
@@ -77,6 +97,8 @@ class MindRuntime:
         if intent is not None:
             self.mind.set_intent(intent)
         self._collect()
+        if frame is not None:
+            self._last_frame_at_s = time.monotonic()
         if frame is not None and self._future is None and not self._closed:
             self._future_intent = self.mind.intent
             self._future = self._executor.submit(
@@ -86,11 +108,15 @@ class MindRuntime:
                 replace(telemetry, last_command=self._last_command),
             )
         movement = "stop"
-        if frame is not None and self._observation is not None:
-            age_s = timestamp_s - self._observation.timestamp_s
+        if self._observation is not None:
+            age_s = self.latest_observation_age_s
+            frame_age_s = self.latest_frame_age_s
             if (
                 self._observation_intent == self.mind.intent
-                and 0.0 <= age_s <= MAX_MOVEMENT_AGE_S
+                and age_s is not None
+                and age_s <= MAX_MOVEMENT_AGE_S
+                and frame_age_s is not None
+                and frame_age_s <= MAX_FRAME_GAP_S
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
             ):
                 movement = self._observation.movement
@@ -107,6 +133,7 @@ class MindRuntime:
         future = self._future
         self._future = None
         self._observation = future.result()
+        self._observation_ready_at_s = time.monotonic()
         self._observation_count += 1
         self._observation_intent = self._future_intent
         self._future_intent = None

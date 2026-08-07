@@ -23,6 +23,7 @@ from control.mind import (
 )
 from control.dialogue import DialogueInput
 from control.mind_runtime import (
+    MAX_FRAME_GAP_S,
     MAX_MOVEMENT_AGE_S,
     MIN_MOVEMENT_CONFIDENCE,
     MindRuntime,
@@ -427,7 +428,7 @@ async def run(
             )
             if step.transmit:
                 sender.send(step.command_override or command)
-            return command, frame is not None
+            return command
 
         starting_intent = initial_intent if exploratory else "following"
         send_packet(
@@ -527,7 +528,7 @@ async def run(
                 return "intent changed to hover"
             return None
 
-        def trace_brain(elapsed_s, step, mac_command, frame_available):
+        def trace_brain(elapsed_s, step, mac_command):
             nonlocal last_traced_observation, last_traced_decision
             nonlocal last_observation_signature, last_decision_signature
             nonlocal last_traced_command
@@ -589,12 +590,18 @@ async def run(
                 observation = control.latest_observation
                 if decision is not None and parse_intent(decision.intent) == "hover":
                     reason = "conscious intent is hover"
-                elif not frame_available:
-                    reason = "waiting for a fresh camera frame"
                 elif observation is None:
                     reason = "waiting for the first VLM observation"
-                elif time.monotonic() - observation.timestamp_s > MAX_MOVEMENT_AGE_S:
-                    reason = "VLM observation is stale"
+                elif (
+                    control.latest_observation_age_s is None
+                    or control.latest_observation_age_s > MAX_MOVEMENT_AGE_S
+                ):
+                    reason = "VLM movement lease expired"
+                elif (
+                    control.latest_frame_age_s is None
+                    or control.latest_frame_age_s > MAX_FRAME_GAP_S
+                ):
+                    reason = "camera frame lease expired"
                 elif observation.confidence < MIN_MOVEMENT_CONFIDENCE:
                     reason = "VLM confidence is below the movement threshold"
                 elif observation.movement in ("stop", "hover"):
@@ -628,11 +635,11 @@ async def run(
                     await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
                     now = time.monotonic()
                     step = read_step(now - started_at)
-                    command, frame_available = send_packet(now, step)
-                    trace_brain(now - started_at, step, command, frame_available)
+                    command = send_packet(now, step)
+                    trace_brain(now - started_at, step, command)
                     continue
-                command, frame_available = send_packet(now, step)
-                trace_brain(elapsed, step, command, frame_available)
+                command = send_packet(now, step)
+                trace_brain(elapsed, step, command)
                 await asyncio.sleep(SETPOINT_PERIOD_S)
             await asyncio.wait_for(offboard_task, timeout=5.0)
             print("Offboard telemetry=verified through synthetic world and CM5 safety.")

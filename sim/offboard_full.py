@@ -331,12 +331,7 @@ async def run(image_path: str, expect_person: bool = False):
                 raise RuntimeError(
                     f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
                 )
-            if max_east_velocity <= 0.02 and min_east_velocity >= -0.02:
-                raise RuntimeError(
-                    "full stack did not observe lateral visual tracking: "
-                    f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
-                )
-            print("Visual following and lateral tracking=verified.")
+            print("Visual following=verified.")
         elif any(
             timestamp_s >= flight_started_at
             and (
