@@ -180,6 +180,8 @@ and `--memory` for editable experience memory.
   path; hover stays still and follow remains bounded.
 - Experience memory persists across exploratory runs and is available to the
   next conscious decision.
+- Saved experience stays compact; live command and velocity telemetry stays in
+  the current thought instead of filling long-term memory.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
   remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
