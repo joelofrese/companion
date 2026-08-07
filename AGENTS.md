@@ -88,6 +88,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world walls
 .venv/bin/python -m sim.run_world --explore --camera --world objects --trace
+.venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/zidane.jpg --expect-person
@@ -144,6 +145,8 @@ and `--memory` for editable experience memory.
   the Gazebo camera user-controlled.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path
   and provides simple objects for rendered-camera perception.
+- With a focused request, the local VLM found the red box and the conscious
+  LLM guided bounded forward and lateral movement before landing and disarm.
 - Exploratory camera and depth runs work in varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm.
 - A near-wall local-brain depth run observed 0.55 m and CM5 backoff at
