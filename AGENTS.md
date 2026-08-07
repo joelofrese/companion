@@ -174,7 +174,8 @@ reach the conscious LLM.
   fixtures, faults, recovery, brain shutdown, safety, hover, landing, and
   disarm.
 - The Gazebo runner aligns the vehicle's visual frame with PX4 and holds its
-  current heading during automatic takeoff, avoiding the repeated visible turn.
+  current heading during automatic takeoff; shared preparation verifies the
+  heading before and after takeoff to prevent the repeated visible turn.
 - Velocity commands contain only NED velocities; PX4 holds its heading, and
   synthetic simulation checks that actual heading telemetry stays stable.
 - Exploratory camera and depth runs work across varied PX4 worlds with local

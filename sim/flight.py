@@ -1,6 +1,7 @@
 """Shared PX4 flight steps for the simulations."""
 
 import asyncio
+import math
 import time
 
 from mavsdk.telemetry import FlightMode
@@ -9,9 +10,11 @@ from mavsdk.telemetry import LandedState
 
 TAKEOFF_ALTITUDE = 2.0
 TAKEOFF_YAW_MODE = 5
+TAKEOFF_HEADING_LIMIT_DEG = 15.0
 PREPARE_TIMEOUT_S = 30.0
 FLIGHT_ACTION_TIMEOUT_S = 120.0
 VELOCITY_TELEMETRY_RATE_HZ = 10.0
+ATTITUDE_TELEMETRY_RATE_HZ = 5.0
 
 
 class RecordingForwarder:
@@ -70,6 +73,16 @@ async def _wait_until_disarmed(drone):
             return
 
 
+async def _read_heading(drone):
+    async for attitude in drone.telemetry.attitude_euler():
+        if math.isfinite(attitude.yaw_deg):
+            return attitude.yaw_deg
+
+
+def _heading_change_deg(start_deg: float, end_deg: float) -> float:
+    return abs((end_deg - start_deg + 180.0) % 360.0 - 180.0)
+
+
 async def prepare(drone):
     """Connect, wait for arming health, arm, and reach the air."""
 
@@ -91,6 +104,7 @@ async def prepare(drone):
         ) from error
     print("Ready.")
     await drone.telemetry.set_rate_velocity_ned(VELOCITY_TELEMETRY_RATE_HZ)
+    await drone.telemetry.set_rate_attitude_euler(ATTITUDE_TELEMETRY_RATE_HZ)
     # Keep the vehicle's current heading during PX4's automatic takeoff.
     await drone.param.set_param_int("MPC_YAW_MODE", TAKEOFF_YAW_MODE)
     try:
@@ -99,6 +113,16 @@ async def prepare(drone):
         raise RuntimeError(
             "vehicle did not become ready after takeoff heading setup "
             f"within {PREPARE_TIMEOUT_S:.0f}s"
+        ) from error
+    try:
+        initial_heading_deg = await asyncio.wait_for(
+            _read_heading(drone),
+            PREPARE_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            "vehicle did not provide heading before takeoff within "
+            f"{PREPARE_TIMEOUT_S:.0f}s"
         ) from error
 
     print("Arming...")
@@ -117,6 +141,29 @@ async def prepare(drone):
             raise RuntimeError(
                 f"vehicle did not take off within {FLIGHT_ACTION_TIMEOUT_S:.0f}s"
             ) from error
+        try:
+            takeoff_heading_deg = await asyncio.wait_for(
+                _read_heading(drone),
+                PREPARE_TIMEOUT_S,
+            )
+        except asyncio.TimeoutError as error:
+            raise RuntimeError(
+                "vehicle did not provide heading after takeoff within "
+                f"{PREPARE_TIMEOUT_S:.0f}s"
+            ) from error
+        heading_change_deg = _heading_change_deg(
+            initial_heading_deg,
+            takeoff_heading_deg,
+        )
+        if heading_change_deg > TAKEOFF_HEADING_LIMIT_DEG:
+            raise RuntimeError(
+                "PX4 rotated during automatic takeoff: "
+                f"{heading_change_deg:.1f} degrees"
+            )
+        print(
+            "PX4 takeoff heading hold=verified: "
+            f"change {heading_change_deg:.1f} degrees."
+        )
         return
     except Exception:
         try:

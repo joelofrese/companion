@@ -80,7 +80,6 @@ HOVER_START_S = 5.8
 BRAIN_SHUTDOWN_START_S = 29.0
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
-ATTITUDE_TELEMETRY_RATE_HZ = 5.0
 DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
 
 
@@ -324,7 +323,6 @@ async def run(
             gazebo_depth.start()
 
         await prepare(drone)
-        await drone.telemetry.set_rate_attitude_euler(ATTITUDE_TELEMETRY_RATE_HZ)
         armed = True
 
         async def observe_heading():
