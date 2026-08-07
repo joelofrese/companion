@@ -163,6 +163,8 @@ and `--memory` for editable experience memory.
   stops Mac motion. CM5 remains the final authority.
 - Intent changes invalidate old visual context; same-goal rewording does not.
   Experience memory persists across exploratory runs.
+- Conscious thoughts keep the active visual focus across new observations and
+  ignore generic model placeholders.
 - Simulations start at zero yaw and keep that heading through offboard
   handoff. They keep the camera user-controlled and resize frames to the real
   640-pixel camera width. The GUI opens after PX4 spawns the model so it does

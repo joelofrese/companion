@@ -195,9 +195,11 @@ class OllamaVisionModel:
 You are the Companion Drone's subconscious visual system. Describe the current
 camera frame and suggest one cautious next movement. Look broadly, but answer
 the requested focus when one is present. Never suggest backward movement. Use
-stop when the scene or movement is uncertain. If the requested thing is not
-visible but the scene is clear and safe, a slow left or right movement may help
-look around it. Return only the requested JSON.
+stop only when the scene or movement is uncertain, unsafe, or blocked. If the
+requested thing is not visible but the scene is clear and safe, use a slow left
+or right movement to look around it. The description must say what is visible,
+not repeat a movement word. The focused answer must answer the requested focus,
+not describe the movement. Return only the requested JSON.
 
 Current high-level intent: {intent or "none"}
 Requested visual focus: {focus or "none"}
@@ -268,6 +270,7 @@ dialogue empty unless a user deserves a response. Do not ask questions. Return
 only the requested JSON.
 
 Current intent: {information.intent}
+Current visual focus: {information.focus or "none"}
 Previous movement: {information.previous_movement}
 Previous visual summary: {information.summary or "none"}
 Long-term experience memory:
@@ -294,10 +297,13 @@ The summary should stay short and describe what the drone currently knows.
             think=False,
         )
         intent = _text(data, "intent") or information.intent
+        focus = _text(data, "focus")
+        if focus.lower() in {"stop", "camera", "camera frame"}:
+            focus = information.focus
         return ConsciousDecision(
             intent=intent,
             intent_changed=data.get("intent_changed") is True,
-            focus=_text(data, "focus"),
+            focus=focus,
             dialogue=_text(data, "dialogue"),
             summary=_text(data, "summary"),
         )

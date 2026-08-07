@@ -80,6 +80,7 @@ class ConsciousInput:
 
     new_observations: tuple[VisualObservation, ...]
     summary: str
+    focus: str
     memory: str
     intent: str
     previous_movement: str
@@ -219,6 +220,7 @@ class MacMind:
             information = ConsciousInput(
                 new_observations=tuple(self._new_observations),
                 summary=self.memory.summary,
+                focus=self.memory.focus,
                 memory=self.memory_store.context() if self.memory_store else "",
                 intent=self.memory.intent,
                 previous_movement=self.memory.previous_movement,
