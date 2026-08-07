@@ -12,13 +12,16 @@ from control.udp_sender import UdpCommandSender
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
+DEFAULT_INTENT = "explore the surroundings"
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="Run the Mac-side Companion control stack")
     parser.add_argument("cm5_host", help="CM5 IP address or hostname")
     parser.add_argument(
         "--intent",
-        default="hover",
-        help="initial high-level intent in plain language (default: hover)",
+        default=DEFAULT_INTENT,
+        help=f"initial high-level intent in plain language (default: {DEFAULT_INTENT})",
     )
     parser.add_argument(
         "--voice-once",

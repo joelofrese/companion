@@ -125,10 +125,11 @@ ollama pull gemma3:4b
 ```
 
 Production uses separate Ollama VLM and LLM sessions, defaulting to the faster
-`moondream` and `gemma3:4b`. Set `--vlm-model` or `--llm-model` to change
-them; `qwen3-vl:2b` is an explicit slower visual option. Use `--intent` for an
-initial goal, `--dialogue` for typed conversation, `--voice-once` for one
-spoken request, and `--memory` for editable experience memory.
+`moondream` and `gemma3:4b`. It starts with `explore the surroundings` unless
+`--intent` supplies another goal. Set `--vlm-model` or `--llm-model` to change
+the models; `qwen3-vl:2b` is an explicit slower visual option. Use
+`--dialogue` for typed conversation, `--voice-once` for one spoken request,
+and `--memory` for editable experience memory.
 
 ## Current state
 
