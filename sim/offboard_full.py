@@ -490,7 +490,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--expect-person",
         action="store_true",
-        help="require the image to produce following and lateral motion",
+        help="require the image to produce visual following",
     )
     args = parser.parse_args()
     asyncio.run(run(args.image_path, args.expect_person))

@@ -291,7 +291,7 @@ def main(argv=None):
     parser.add_argument(
         "--expect-person",
         action="store_true",
-        help="require the image to produce following and lateral motion",
+        help="require the image to produce visual following",
     )
     parser.add_argument(
         "--explore",
