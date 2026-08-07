@@ -9,7 +9,7 @@ from typing import Optional
 from control.velocity import VelocityCommand
 
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 MAX_PACKET_BYTES = 512
 
 
@@ -22,8 +22,8 @@ class CommandPacket:
 
     def encode(self) -> bytes:
         values = (
-            self.command.north_m_s,
-            self.command.east_m_s,
+            self.command.forward_m_s,
+            self.command.right_m_s,
             self.command.down_m_s,
         )
         if (
@@ -38,8 +38,8 @@ class CommandPacket:
             "version": PROTOCOL_VERSION,
             "sequence": self.sequence,
             "velocity": {
-                "north_m_s": self.command.north_m_s,
-                "east_m_s": self.command.east_m_s,
+                "forward_m_s": self.command.forward_m_s,
+                "right_m_s": self.command.right_m_s,
                 "down_m_s": self.command.down_m_s,
             },
         }
@@ -58,7 +58,7 @@ class CommandPacket:
             sequence = data["sequence"]
             velocity = data["velocity"]
             values = tuple(
-                velocity[name] for name in ("north_m_s", "east_m_s", "down_m_s")
+                velocity[name] for name in ("forward_m_s", "right_m_s", "down_m_s")
             )
         except (
             AttributeError,
@@ -84,12 +84,12 @@ class CommandPacket:
 
 @dataclass(frozen=True)
 class TelemetryPacket:
-    """Return the newest CM5 sensor and PX4 velocity readings to the Mac."""
+    """Return the newest CM5 sensor and body velocity readings to the Mac."""
 
     sequence: int
     obstacle_distance_m: Optional[float]
-    north_velocity_m_s: Optional[float] = None
-    east_velocity_m_s: Optional[float] = None
+    forward_velocity_m_s: Optional[float] = None
+    right_velocity_m_s: Optional[float] = None
     down_velocity_m_s: Optional[float] = None
 
     def encode(self) -> bytes:
@@ -102,8 +102,8 @@ class TelemetryPacket:
         if self.obstacle_distance_m is not None and not _distance(self.obstacle_distance_m):
             raise ValueError("obstacle distance must be finite or none")
         velocities = (
-            self.north_velocity_m_s,
-            self.east_velocity_m_s,
+            self.forward_velocity_m_s,
+            self.right_velocity_m_s,
             self.down_velocity_m_s,
         )
         if any(value is not None and not _finite(value) for value in velocities):
@@ -114,8 +114,8 @@ class TelemetryPacket:
             "sequence": self.sequence,
             "telemetry": {
                 "obstacle_distance_m": self.obstacle_distance_m,
-                "north_velocity_m_s": self.north_velocity_m_s,
-                "east_velocity_m_s": self.east_velocity_m_s,
+                "forward_velocity_m_s": self.forward_velocity_m_s,
+                "right_velocity_m_s": self.right_velocity_m_s,
                 "down_velocity_m_s": self.down_velocity_m_s,
             },
         }
@@ -138,8 +138,8 @@ class TelemetryPacket:
             velocities = tuple(
                 telemetry.get(name)
                 for name in (
-                    "north_velocity_m_s",
-                    "east_velocity_m_s",
+                    "forward_velocity_m_s",
+                    "right_velocity_m_s",
                     "down_velocity_m_s",
                 )
             )

@@ -2,6 +2,7 @@
 
 import asyncio
 import argparse
+import math
 import socket
 import subprocess
 import time
@@ -12,7 +13,7 @@ from control.command_packet import CommandPacket
 from control.mind import MacMind
 from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
-from control.velocity import VelocityCommand
+from control.velocity import VelocityCommand, ned_to_body
 from onboard.safety import LatestDistanceSensor
 from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.fixed_brain import FixedLanguageModel, FixedVisualModel
@@ -77,10 +78,10 @@ async def run(image_path: str, expect_person: bool = False):
     armed = False
     offboard_started = False
     landed = False
-    max_north_velocity = 0.0
-    min_north_velocity = 0.0
-    max_east_velocity = 0.0
-    min_east_velocity = 0.0
+    max_forward_velocity = 0.0
+    min_forward_velocity = 0.0
+    max_right_velocity = 0.0
+    min_right_velocity = 0.0
     north_velocity_m_s = None
     east_velocity_m_s = None
     down_velocity_m_s = None
@@ -115,15 +116,16 @@ async def run(image_path: str, expect_person: bool = False):
         heading_deg = await prepare(drone)
         armed = True
 
+        def body_velocity():
+            values = (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
+            if any(value is None for value in values):
+                return (None, None, None)
+            return ned_to_body(*values, math.radians(heading_deg))
+
         stack = SimulatedSafetyStack(
             drone,
-            heading_deg,
             obstacle_distance=cm5_obstacle_distance,
-            velocity_provider=lambda: (
-                north_velocity_m_s,
-                east_velocity_m_s,
-                down_velocity_m_s,
-            ),
+            velocity_provider=body_velocity,
         )
         sender = stack.start()
         safe_commands = stack.forwarder
@@ -152,7 +154,7 @@ async def run(image_path: str, expect_person: bool = False):
                         fault_socket.sendto(
                             CommandPacket(
                                 0,
-                                VelocityCommand(north_m_s=0.5),
+                                VelocityCommand(forward_m_s=0.5),
                             ).encode(),
                             ("127.0.0.1", stack.receiver.port),
                         )
@@ -180,8 +182,8 @@ async def run(image_path: str, expect_person: bool = False):
             if any(
                 value is not None
                 for value in (
-                    telemetry.north_velocity_m_s,
-                    telemetry.east_velocity_m_s,
+                    telemetry.forward_velocity_m_s,
+                    telemetry.right_velocity_m_s,
                     telemetry.down_velocity_m_s,
                 )
             ):
@@ -242,17 +244,23 @@ async def run(image_path: str, expect_person: bool = False):
         print("Offboard started through full Mac/CM5 stack.")
 
         async def observe_velocity():
-            nonlocal max_north_velocity, min_north_velocity
-            nonlocal max_east_velocity, min_east_velocity
+            nonlocal max_forward_velocity, min_forward_velocity
+            nonlocal max_right_velocity, min_right_velocity
             nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
             async for velocity in drone.telemetry.velocity_ned():
                 north_velocity_m_s = velocity.north_m_s
                 east_velocity_m_s = velocity.east_m_s
                 down_velocity_m_s = velocity.down_m_s
-                max_north_velocity = max(max_north_velocity, velocity.north_m_s)
-                min_north_velocity = min(min_north_velocity, velocity.north_m_s)
-                max_east_velocity = max(max_east_velocity, velocity.east_m_s)
-                min_east_velocity = min(min_east_velocity, velocity.east_m_s)
+                forward, right, _ = ned_to_body(
+                    velocity.north_m_s,
+                    velocity.east_m_s,
+                    velocity.down_m_s,
+                    math.radians(heading_deg),
+                )
+                max_forward_velocity = max(max_forward_velocity, forward)
+                min_forward_velocity = min(min_forward_velocity, forward)
+                max_right_velocity = max(max_right_velocity, right)
+                min_right_velocity = min(min_right_velocity, right)
 
         telemetry_task = asyncio.create_task(observe_velocity())
         await asyncio.sleep(PROFILE_DURATION_S + 2.0)
@@ -293,7 +301,7 @@ async def run(image_path: str, expect_person: bool = False):
 
         def forward_count(start_s, end_s):
             return sum(
-                command.north_m_s > 0.0
+                command.forward_m_s > 0.0
                 for timestamp_s, command in safe_commands.commands
                 if start_s <= timestamp_s - flight_started_at < end_s
             )
@@ -304,21 +312,21 @@ async def run(image_path: str, expect_person: bool = False):
             f"{forward_count(SECOND_FOLLOW_START_S, SECOND_FOLLOW_END_S)}, "
             f"{forward_count(THIRD_FOLLOW_START_S, THIRD_FOLLOW_END_S)}."
         )
-        if min_north_velocity >= -0.05:
+        if min_forward_velocity >= -0.05:
             raise RuntimeError(
-                f"full stack did not observe obstacle backoff: {min_north_velocity:.2f}m/s"
+                f"full stack did not observe obstacle backoff: {min_forward_velocity:.2f}m/s"
             )
         if expect_person:
-            if max_north_velocity <= 0.02:
+            if max_forward_velocity <= 0.02:
                 raise RuntimeError(
-                    f"full stack did not observe visual following: {max_north_velocity:.2f}m/s"
+                    f"full stack did not observe visual following: {max_forward_velocity:.2f}m/s"
                 )
             print("Visual following=verified.")
         elif any(
             timestamp_s >= flight_started_at
             and (
-                command.north_m_s > 0.0
-                or command.east_m_s != 0.0
+                command.forward_m_s > 0.0
+                or command.right_m_s != 0.0
                 or command.down_m_s != 0.0
             )
             for timestamp_s, command in safe_commands.commands
@@ -328,7 +336,7 @@ async def run(image_path: str, expect_person: bool = False):
             print("No-person visual safe stop=verified.")
 
         expected_motion = (
-            (lambda command: command.north_m_s > 0.0)
+            (lambda command: command.forward_m_s > 0.0)
             if expect_person
             else (lambda command: command == VelocityCommand())
         )
@@ -421,11 +429,11 @@ async def run(image_path: str, expect_person: bool = False):
                 raise RuntimeError(f"full stack did not observe {objective} at CM5")
             print(f"Mission objective passed: {objective} through CM5.")
         print("Repeated following and hover intent through CM5=verified.")
-        print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
-        print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
+        print(f"Max observed forward velocity: {max_forward_velocity:.2f}m/s")
+        print(f"Min observed forward velocity: {min_forward_velocity:.2f}m/s")
         print(
-            "Observed east velocity range: "
-            f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
+            "Observed right velocity range: "
+            f"{min_right_velocity:.2f}..{max_right_velocity:.2f}m/s"
         )
         await drone.offboard.stop()
         offboard_started = False

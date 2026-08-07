@@ -47,6 +47,7 @@ class Ros2SafetyBridge:
             heartbeat_factory=heartbeat_message,
             setpoint_factory=setpoint_message,
             timestamp_us=lambda: node.get_clock().now().nanoseconds // 1000,
+            heading_provider=self._velocity.heading,
         )
         node.create_subscription(
             distance_message,

@@ -34,8 +34,8 @@ class UdpCommandSender:
         self._sequence = 0
         self._telemetry_sequence = None
         self._obstacle_distance_m = None
-        self._north_velocity_m_s = None
-        self._east_velocity_m_s = None
+        self._forward_velocity_m_s = None
+        self._right_velocity_m_s = None
         self._down_velocity_m_s = None
         self._telemetry_received_at_s = None
 
@@ -69,8 +69,8 @@ class UdpCommandSender:
                 if self._obstacle_distance_m is not None
                 else math.nan
             ),
-            north_velocity_m_s=self._north_velocity_m_s,
-            east_velocity_m_s=self._east_velocity_m_s,
+            forward_velocity_m_s=self._forward_velocity_m_s,
+            right_velocity_m_s=self._right_velocity_m_s,
             down_velocity_m_s=self._down_velocity_m_s,
         )
 
@@ -93,8 +93,8 @@ class UdpCommandSender:
                 continue
             self._telemetry_sequence = packet.sequence
             self._obstacle_distance_m = packet.obstacle_distance_m
-            self._north_velocity_m_s = packet.north_velocity_m_s
-            self._east_velocity_m_s = packet.east_velocity_m_s
+            self._forward_velocity_m_s = packet.forward_velocity_m_s
+            self._right_velocity_m_s = packet.right_velocity_m_s
             self._down_velocity_m_s = packet.down_velocity_m_s
             self._telemetry_received_at_s = time.monotonic()
 

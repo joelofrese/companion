@@ -58,8 +58,8 @@ class Telemetry:
 
     obstacle_distance_m: Optional[float] = None
     last_command: Optional[VelocityCommand] = None
-    north_velocity_m_s: Optional[float] = None
-    east_velocity_m_s: Optional[float] = None
+    forward_velocity_m_s: Optional[float] = None
+    right_velocity_m_s: Optional[float] = None
     down_velocity_m_s: Optional[float] = None
 
 
@@ -74,13 +74,13 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         return "?" if number is None else f"{number:.2f}"
 
     command_values = (
-        command.north_m_s,
-        command.east_m_s,
+        command.forward_m_s,
+        command.right_m_s,
         command.down_m_s,
     )
     velocity_values = (
-        telemetry.north_velocity_m_s,
-        telemetry.east_velocity_m_s,
+        telemetry.forward_velocity_m_s,
+        telemetry.right_velocity_m_s,
         telemetry.down_velocity_m_s,
     )
     return (

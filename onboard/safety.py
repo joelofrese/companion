@@ -8,7 +8,7 @@ from typing import Optional
 
 from control.command_packet import CommandPacket
 from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
-from control.velocity import VelocityCommand
+from control.velocity import VelocityCommand, ned_to_body
 
 
 MAX_HORIZONTAL_SPEED_M_S = 0.5
@@ -74,7 +74,7 @@ class LatestDistanceSensor:
 
 
 class LatestVelocity:
-    """Keep the newest PX4 NED velocity; missing data is unavailable."""
+    """Keep fresh PX4 velocity and expose it in the body frame."""
 
     def __init__(self, clock=time.monotonic, timeout_s: float = SENSOR_TIMEOUT_S):
         if (
@@ -85,20 +85,29 @@ class LatestVelocity:
         ):
             raise ValueError("velocity timeout must be positive")
         self._velocity = (math.nan, math.nan, math.nan)
+        self._heading = math.nan
         self._clock = clock
         self._timeout_s = timeout_s
         self._updated_at_s = None
         self._lock = threading.Lock()
 
     def update(self, message):
-        velocity = tuple(getattr(message, name, math.nan) for name in ("vx", "vy", "vz"))
-        if not all(_finite_real(value) for value in velocity):
+        velocity = tuple(
+            getattr(message, name, math.nan) for name in ("vx", "vy", "vz")
+        )
+        heading = getattr(message, "heading", math.nan)
+        if (
+            not all(_finite_real(value) for value in velocity)
+            or not _finite_real(heading)
+        ):
             velocity = (math.nan, math.nan, math.nan)
+            heading = math.nan
         with self._lock:
             self._velocity = velocity
+            self._heading = heading
             self._updated_at_s = self._clock()
 
-    def read(self):
+    def _read(self):
         now = self._clock()
         with self._lock:
             if (
@@ -107,9 +116,25 @@ class LatestVelocity:
                 or now < self._updated_at_s
                 or now - self._updated_at_s > self._timeout_s
                 or not all(_finite_real(value) for value in self._velocity)
+                or not _finite_real(self._heading)
             ):
-                return (None, None, None)
-            return self._velocity
+                return None
+            return (*self._velocity, self._heading)
+
+    def read(self):
+        """Return fresh velocity in forward, right, down coordinates."""
+
+        state = self._read()
+        if state is None:
+            return (None, None, None)
+        north, east, down, heading = state
+        return ned_to_body(north, east, down, heading)
+
+    def heading(self):
+        """Return the fresh PX4 heading in radians."""
+
+        state = self._read()
+        return None if state is None else state[3]
 
 
 class OnboardSafetyEnvelope:
@@ -179,7 +204,7 @@ class OnboardSafetyEnvelope:
         if not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0:
             return VelocityCommand()
         if obstacle_distance_m < OBSTACLE_STOP_M:
-            return VelocityCommand(north_m_s=-BACKOFF_SPEED_M_S)
+            return VelocityCommand(forward_m_s=-BACKOFF_SPEED_M_S)
         if not self._command_is_safe(self._command):
             return VelocityCommand()
         return self._command
@@ -187,14 +212,14 @@ class OnboardSafetyEnvelope:
     @staticmethod
     def _command_is_safe(command: VelocityCommand) -> bool:
         values = (
-            command.north_m_s,
-            command.east_m_s,
+            command.forward_m_s,
+            command.right_m_s,
             command.down_m_s,
         )
         if not all(_finite_real(value) for value in values):
             return False
         return (
-            abs(command.north_m_s) <= MAX_HORIZONTAL_SPEED_M_S
-            and abs(command.east_m_s) <= MAX_HORIZONTAL_SPEED_M_S
+            abs(command.forward_m_s) <= MAX_HORIZONTAL_SPEED_M_S
+            and abs(command.right_m_s) <= MAX_HORIZONTAL_SPEED_M_S
             and abs(command.down_m_s) <= MAX_VERTICAL_SPEED_M_S
         )

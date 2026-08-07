@@ -80,8 +80,8 @@ class UdpSafetyReceiver:
     def send_telemetry(
         self,
         obstacle_distance_m: Optional[float] = None,
-        north_velocity_m_s: Optional[float] = None,
-        east_velocity_m_s: Optional[float] = None,
+        forward_velocity_m_s: Optional[float] = None,
+        right_velocity_m_s: Optional[float] = None,
         down_velocity_m_s: Optional[float] = None,
     ):
         """Return the latest sensor and vehicle readings to the Mac."""
@@ -101,8 +101,8 @@ class UdpSafetyReceiver:
         payload = TelemetryPacket(
             self._telemetry_sequence,
             obstacle_distance_m,
-            _finite_or_none(north_velocity_m_s),
-            _finite_or_none(east_velocity_m_s),
+            _finite_or_none(forward_velocity_m_s),
+            _finite_or_none(right_velocity_m_s),
             _finite_or_none(down_velocity_m_s),
         ).encode()
         self._socket.sendto(payload, self._client_address)

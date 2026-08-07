@@ -21,7 +21,7 @@ class FixedCommandControl:
 
     def tick(self, frame, timestamp_s, intent=None, telemetry=Telemetry()):
         self.obstacle_distances.append(telemetry.obstacle_distance_m)
-        return VelocityCommand(north_m_s=0.25)
+        return VelocityCommand(forward_m_s=0.25)
 
 
 class RecordingForwarder:
@@ -90,14 +90,14 @@ async def run():
         commands = []
         while not forwarder.commands.empty():
             commands.append(forwarder.commands.get_nowait())
-        if VelocityCommand(north_m_s=0.25) not in commands:
+        if VelocityCommand(forward_m_s=0.25) not in commands:
             raise RuntimeError(
                 "Mac control service did not produce a fresh follow command: "
                 f"{commands}"
             )
         if VelocityCommand() not in commands:
             raise RuntimeError("CM5 did not stop when obstacle data was missing")
-        if VelocityCommand(north_m_s=-0.2) not in commands:
+        if VelocityCommand(forward_m_s=-0.2) not in commands:
             raise RuntimeError(f"Mac control service did not produce obstacle backoff: {commands}")
         if not any(
             distance is not None
@@ -119,8 +119,8 @@ async def run():
             )
         telemetry = sender.telemetry()
         if (
-            telemetry.north_velocity_m_s != 0.12
-            or telemetry.east_velocity_m_s != -0.04
+            telemetry.forward_velocity_m_s != 0.12
+            or telemetry.right_velocity_m_s != -0.04
             or telemetry.down_velocity_m_s != 0.03
         ):
             raise RuntimeError(f"Mac did not receive CM5 velocity telemetry: {telemetry}")

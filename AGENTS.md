@@ -36,7 +36,8 @@ merge and delete it.
 - The Mac runs a subconscious VLM and a conscious LLM in separate sessions.
 - The VLM describes images and suggests cautious movement.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
-- Mac control turns that intent and visual suggestion into slow velocity.
+- Mac control turns that intent and visual suggestion into slow body-frame
+  velocity.
 - A real intent change invalidates old visual context and pending brain
   results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
@@ -45,16 +46,17 @@ merge and delete it.
   protects against obstacles, and is the final vehicle-side authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
-The brain sends velocity only: never motor, attitude, or absolute-position
-commands. A fresh obstacle reading may override normal intent. Keep movement
-slow, deliberate, and easy to stop.
+The brain sends body-frame velocity only: never motor, attitude, or
+absolute-position commands. A fresh obstacle reading may override normal
+intent. Keep movement slow, deliberate, and easy to stop.
 
 ## Hardware boundary
 
 Heavy perception, cognition, and interaction run on the Mac. The CM5 relays
 video and telemetry, performs the final safety checks, and forwards approved
-velocity setpoints to PX4. Keep hardware-specific code on the CM5 so Mac
-behavior stays easy to simulate.
+body-frame velocity setpoints to PX4, converting them with fresh vehicle
+heading. Keep hardware-specific code on the CM5 so Mac behavior stays easy to
+simulate.
 
 The target is the DroneBlocks DEXI 3: PX4, optical flow, a TOF distance sensor,
 a Raspberry Pi camera, and a Raspberry Pi CM5. It has no lidar. Keep
@@ -172,15 +174,18 @@ and `--memory` for editable experience memory.
   zero-confidence and cannot cause movement.
 - A focused VLM answer must confirm the requested object or remain empty; it
   must not substitute another visible object.
+- Brain and CM5 commands use forward, right, and down body-frame velocity;
+  CM5 converts them to PX4's local NED frame and backs away from obstacles in
+  the vehicle's forward direction.
 - Simulations start at zero yaw and hold the settled takeoff heading through
-  offboard handoff. They keep the camera user-controlled and resize frames to
-  the real 640-pixel camera width. The GUI opens after PX4 spawns the model so
-  it does not reframe during takeoff. Depth is only a TOF approximation; DEXI
-  3 has no lidar.
+  offboard handoff, while body-frame motion does not depend on North alignment.
+  They keep the camera user-controlled and resize frames to the real 640-pixel
+  camera width. The GUI opens after PX4 spawns the model so it does not reframe
+  during takeoff. Depth is only a TOF approximation; DEXI 3 has no lidar.
 - Offboard starts immediately after three CM5 priming setpoints, without an
   extra zero-command delay.
-- The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
-  remain unverified in SITL.
+- The ROS 2 CM5 seam converts body commands with fresh vehicle heading. DEXI 3
+  hardware and optical-flow quality remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
 
 At the end of a meaningful session, update this section with only the current

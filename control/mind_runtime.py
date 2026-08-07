@@ -122,8 +122,8 @@ class MindRuntime:
         if any(
             value is None
             for value in (
-                telemetry.north_velocity_m_s,
-                telemetry.east_velocity_m_s,
+                telemetry.forward_velocity_m_s,
+                telemetry.right_velocity_m_s,
                 telemetry.down_velocity_m_s,
             )
         ):

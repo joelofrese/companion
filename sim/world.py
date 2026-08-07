@@ -29,7 +29,7 @@ from control.mind_runtime import (
     MindRuntime,
 )
 from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
-from control.velocity import VelocityCommand
+from control.velocity import VelocityCommand, ned_to_body
 from onboard.safety import LatestDistanceSensor
 from sim.flight import (
     close_mavsdk,
@@ -148,8 +148,8 @@ class SyntheticWorld:
         if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
             return WorldStep(
                 command_override=VelocityCommand(
-                    north_m_s=1.0,
-                    east_m_s=1.0,
+                    forward_m_s=1.0,
+                    right_m_s=1.0,
                     down_m_s=1.0,
                 )
             )
@@ -375,11 +375,21 @@ async def run(
         def vehicle_velocity():
             if not vehicle_velocity_fresh:
                 return (None, None, None)
-            return north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
+            if (
+                north_velocity_m_s is None
+                or east_velocity_m_s is None
+                or down_velocity_m_s is None
+            ):
+                return (None, None, None)
+            return ned_to_body(
+                north_velocity_m_s,
+                east_velocity_m_s,
+                down_velocity_m_s,
+                math.radians(heading_deg),
+            )
 
         stack = SimulatedSafetyStack(
             drone,
-            heading_deg,
             obstacle_distance=distance_sensor.read,
             velocity_provider=vehicle_velocity,
         )
@@ -412,8 +422,8 @@ async def run(
             if any(
                 value is not None
                 for value in (
-                    telemetry.north_velocity_m_s,
-                    telemetry.east_velocity_m_s,
+                    telemetry.forward_velocity_m_s,
+                    telemetry.right_velocity_m_s,
                     telemetry.down_velocity_m_s,
                 )
             ):
@@ -512,10 +522,10 @@ async def run(
         else:
             print("Mission: follow, recover, handle faults, hover, land, and disarm.")
 
-        max_north_velocity = 0.0
-        min_north_velocity = 0.0
-        max_east_velocity = 0.0
-        min_east_velocity = 0.0
+        max_forward_velocity = 0.0
+        min_forward_velocity = 0.0
+        max_right_velocity = 0.0
+        min_right_velocity = 0.0
         max_down_velocity = 0.0
         min_down_velocity = 0.0
         last_traced_observation = 0
@@ -525,20 +535,26 @@ async def run(
         last_traced_command = None
 
         async def observe_velocity():
-            nonlocal max_north_velocity, min_north_velocity
-            nonlocal max_east_velocity, min_east_velocity
+            nonlocal max_forward_velocity, min_forward_velocity
+            nonlocal max_right_velocity, min_right_velocity
             nonlocal max_down_velocity, min_down_velocity
             nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
             async for velocity in drone.telemetry.velocity_ned():
                 north_velocity_m_s = velocity.north_m_s
                 east_velocity_m_s = velocity.east_m_s
                 down_velocity_m_s = velocity.down_m_s
-                max_north_velocity = max(max_north_velocity, velocity.north_m_s)
-                min_north_velocity = min(min_north_velocity, velocity.north_m_s)
-                max_east_velocity = max(max_east_velocity, velocity.east_m_s)
-                min_east_velocity = min(min_east_velocity, velocity.east_m_s)
-                max_down_velocity = max(max_down_velocity, velocity.down_m_s)
-                min_down_velocity = min(min_down_velocity, velocity.down_m_s)
+                forward, right, down = ned_to_body(
+                    velocity.north_m_s,
+                    velocity.east_m_s,
+                    velocity.down_m_s,
+                    math.radians(heading_deg),
+                )
+                max_forward_velocity = max(max_forward_velocity, forward)
+                min_forward_velocity = min(min_forward_velocity, forward)
+                max_right_velocity = max(max_right_velocity, right)
+                min_right_velocity = min(min_right_velocity, right)
+                max_down_velocity = max(max_down_velocity, down)
+                min_down_velocity = min(min_down_velocity, down)
 
         telemetry_task = asyncio.create_task(observe_velocity())
         reported = set()
@@ -727,12 +743,12 @@ async def run(
         if not commands or commands[-1][1] != VelocityCommand():
             raise RuntimeError("SITL did not observe zero command on CM5 shutdown")
         if depth:
-            minimum_forwarded_north = min(
-                command.north_m_s for _, command in commands
+            minimum_forward_command = min(
+                command.forward_m_s for _, command in commands
             )
             print(
-                "Minimum CM5-forwarded north command: "
-                f"{minimum_forwarded_north:.2f}m/s"
+                "Minimum CM5-forwarded forward command: "
+                f"{minimum_forward_command:.2f}m/s"
             )
 
         decision = control.latest_decision
@@ -790,7 +806,7 @@ async def run(
 
         def forward_count(start_s, end_s):
             return sum(
-                command.north_m_s > 0.0
+                command.forward_m_s > 0.0
                 for timestamp_s, command in commands
                 if start_s <= timestamp_s - started_at < end_s
             )
@@ -814,7 +830,7 @@ async def run(
                 (
                     OBSTACLE_START_S,
                     OBSTACLE_END_S,
-                    lambda command: command.north_m_s <= -BACKOFF_SPEED_M_S,
+                    lambda command: command.forward_m_s <= -BACKOFF_SPEED_M_S,
                     "CM5 obstacle backoff",
                 ),
                 (
@@ -868,11 +884,11 @@ async def run(
                 print("Exploratory fault passed: brain shutdown zero.")
 
         checks = () if exploratory else (
-            (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),
+            (0.0, 1.0, lambda command: command.forward_m_s > 0.0, "forward following"),
             (
                 TARGET_RIGHT_START_S,
                 TARGET_RIGHT_END_S,
-                lambda command: command.east_m_s > 0.0,
+                lambda command: command.right_m_s > 0.0,
                 "lateral target tracking",
             ),
             (
@@ -884,7 +900,7 @@ async def run(
             (
                 CONTROL_PAUSE_END_S + 0.1,
                 TARGET_RIGHT_END_S,
-                lambda command: command.east_m_s > 0.0,
+                lambda command: command.right_m_s > 0.0,
                 "Mac heartbeat recovery",
             ),
             (
@@ -896,13 +912,13 @@ async def run(
             (
                 OBSTACLE_START_S,
                 OBSTACLE_END_S,
-                lambda command: command.north_m_s < 0.0,
+                lambda command: command.forward_m_s < 0.0,
                 "obstacle backoff",
             ),
             (
                 OBSTACLE_END_S,
                 RECOVERY_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "following recovery after obstacle",
             ),
             (
@@ -920,7 +936,7 @@ async def run(
             (
                 LOW_CONFIDENCE_END_S + 0.1,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "following recovery after low-confidence vision",
             ),
             (
@@ -932,7 +948,7 @@ async def run(
             (
                 VISUAL_FAILURE_END_S + 0.1,
                 LOW_CONFIDENCE_END_S + 0.2,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "visual model recovery",
             ),
             (
@@ -950,13 +966,13 @@ async def run(
             (
                 VELOCITY_TELEMETRY_END_S + 0.1,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "following recovery after missing vehicle velocity telemetry",
             ),
             (
                 STALE_SENSOR_END_S + 0.1,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "following recovery after stale obstacle sensor",
             ),
             (
@@ -968,7 +984,7 @@ async def run(
             (
                 DROPOUT_END_S,
                 LINK_RECOVERY_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "command-link recovery",
             ),
             (
@@ -986,7 +1002,7 @@ async def run(
             (
                 SECOND_FOLLOW_START_S,
                 SECOND_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "following after hover",
             ),
             (
@@ -998,7 +1014,7 @@ async def run(
             (
                 THIRD_FOLLOW_START_S,
                 THIRD_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "following after second hover",
             ),
             (
@@ -1010,7 +1026,7 @@ async def run(
             (
                 CONSCIOUS_FAILURE_END_S + 0.1,
                 THIRD_FOLLOW_END_S,
-                lambda command: command.north_m_s > 0.0,
+                lambda command: command.forward_m_s > 0.0,
                 "conscious model recovery",
             ),
             (
@@ -1037,33 +1053,33 @@ async def run(
             ):
                 raise RuntimeError("SITL did not observe zero after Mac brain shutdown")
             print("Mac brain shutdown fail-safe=verified.")
-            if max_north_velocity <= 0.02:
+            if max_forward_velocity <= 0.02:
                 raise RuntimeError(
                     "SITL did not observe forward following: "
-                    f"{max_north_velocity:.2f}m/s"
+                    f"{max_forward_velocity:.2f}m/s"
                 )
-            if min_north_velocity >= -0.05:
+            if min_forward_velocity >= -0.05:
                 raise RuntimeError(
                     "SITL did not observe obstacle backoff: "
-                    f"{min_north_velocity:.2f}m/s"
+                    f"{min_forward_velocity:.2f}m/s"
                 )
-            if max_east_velocity <= 0.02:
+            if max_right_velocity <= 0.02:
                 raise RuntimeError(
                     "SITL did not observe lateral following: "
-                    f"{max_east_velocity:.2f}m/s"
+                    f"{max_right_velocity:.2f}m/s"
                 )
         if exploratory and max(
-            abs(max_north_velocity),
-            abs(min_north_velocity),
-            abs(max_east_velocity),
-            abs(min_east_velocity),
+            abs(max_forward_velocity),
+            abs(min_forward_velocity),
+            abs(max_right_velocity),
+            abs(min_right_velocity),
             abs(max_down_velocity),
             abs(min_down_velocity),
         ) > MAX_EXPLORATORY_SPEED_M_S:
             raise RuntimeError(
                 "exploratory flight exceeded its telemetry speed envelope: "
-                f"north={min_north_velocity:.2f}..{max_north_velocity:.2f}, "
-                f"east={min_east_velocity:.2f}..{max_east_velocity:.2f}, "
+                f"forward={min_forward_velocity:.2f}..{max_forward_velocity:.2f}, "
+                f"right={min_right_velocity:.2f}..{max_right_velocity:.2f}, "
                 f"down={min_down_velocity:.2f}..{max_down_velocity:.2f}"
             )
         if camera or depth:
@@ -1084,12 +1100,12 @@ async def run(
                 f"{valid_depth_samples} valid of {depth_samples}."
             )
             print(f"Minimum Gazebo depth distance: {minimum_depth_distance:.2f}m")
-        print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
-        print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
-        print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
+        print(f"Max observed forward velocity: {max_forward_velocity:.2f}m/s")
+        print(f"Max observed right velocity: {max_right_velocity:.2f}m/s")
+        print(f"Min observed forward velocity: {min_forward_velocity:.2f}m/s")
         print(
-            "Observed east velocity range: "
-            f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
+            "Observed right velocity range: "
+            f"{min_right_velocity:.2f}..{max_right_velocity:.2f}m/s"
         )
         print(
             "Observed down velocity range: "

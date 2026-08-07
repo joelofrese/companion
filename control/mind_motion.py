@@ -9,9 +9,9 @@ from control.velocity import VelocityCommand
 
 
 MOVEMENT_COMMANDS = {
-    "forward": VelocityCommand(north_m_s=0.25),
-    "left": VelocityCommand(east_m_s=-0.2),
-    "right": VelocityCommand(east_m_s=0.2),
+    "forward": VelocityCommand(forward_m_s=0.25),
+    "left": VelocityCommand(right_m_s=-0.2),
+    "right": VelocityCommand(right_m_s=0.2),
     "up": VelocityCommand(down_m_s=-0.15),
     "down": VelocityCommand(down_m_s=0.15),
     "stop": VelocityCommand(),

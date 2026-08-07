@@ -219,9 +219,9 @@ Requested visual focus: {focus or "none"}
 Previous movement: {previous_movement or "stop"}
 Previous description: {previous_observation or "none"}
 Last requested command: {telemetry.last_command or "none yet"}
-Measured NED velocity:
-north={telemetry.north_velocity_m_s}
-east={telemetry.east_velocity_m_s}
+Measured body velocity:
+forward={telemetry.forward_velocity_m_s}
+right={telemetry.right_velocity_m_s}
 down={telemetry.down_velocity_m_s}
 Forward TOF distance: {telemetry.obstacle_distance_m}
 
@@ -302,9 +302,9 @@ New visual observations:
 {observations}
 Optional user dialogue: {information.dialogue or "none"}
 Last requested command: {information.telemetry.last_command or "none yet"}
-Measured NED velocity:
-north={information.telemetry.north_velocity_m_s}
-east={information.telemetry.east_velocity_m_s}
+Measured body velocity:
+forward={information.telemetry.forward_velocity_m_s}
+right={information.telemetry.right_velocity_m_s}
 down={information.telemetry.down_velocity_m_s}
 Forward TOF distance: {information.telemetry.obstacle_distance_m}
 
