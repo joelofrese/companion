@@ -16,8 +16,25 @@ FOCUS_PHRASES = (
     "show me",
     "where is",
 )
-FOCUS_STOP_WORDS = frozenset(
-    ("around", "and", "in", "near", "on", "over", "then", "under", "while")
+FOCUS_STOP_WORDS = frozenset(("around", "in", "near", "on", "over", "under"))
+FOCUS_CONNECTORS = frozenset(("and", "then", "while"))
+FOCUS_ACTION_WORDS = frozenset(
+    (
+        "find",
+        "follow",
+        "fly",
+        "go",
+        "inspect",
+        "locate",
+        "look",
+        "move",
+        "search",
+        "show",
+        "spot",
+        "stop",
+        "wander",
+        "where",
+    )
 )
 NEGATION_WORDS = frozenset(("no", "not", "never", "dont", "don't"))
 MOTION_WORDS = frozenset(
@@ -41,6 +58,18 @@ def _contains_phrase(words: list[str], phrase: str) -> bool:
     )
 
 
+def _focus_boundary(words: list[str], position: int) -> bool:
+    word = words[position]
+    if word in FOCUS_STOP_WORDS:
+        return True
+    if word not in FOCUS_CONNECTORS:
+        return False
+    position += 1
+    while position < len(words) and words[position] in FOCUS_CONNECTORS:
+        position += 1
+    return position < len(words) and words[position] in FOCUS_ACTION_WORDS
+
+
 def parse_focus(transcript: str) -> Optional[str]:
     """Return the subject of a direct visual request, if there is one."""
 
@@ -59,8 +88,8 @@ def parse_focus(transcript: str) -> Optional[str]:
             stop = next(
                 (
                     position
-                    for position, word in enumerate(subject)
-                    if word in FOCUS_STOP_WORDS
+                    for position in range(len(subject))
+                    if _focus_boundary(subject, position)
                 ),
                 len(subject),
             )
