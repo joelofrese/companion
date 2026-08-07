@@ -124,6 +124,7 @@ async def run(image_path: str, expect_person: bool = False):
 
         stack = SimulatedSafetyStack(
             drone,
+            heading_deg,
             obstacle_distance=cm5_obstacle_distance,
             velocity_provider=body_velocity,
         )

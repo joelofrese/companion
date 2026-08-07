@@ -390,6 +390,7 @@ async def run(
 
         stack = SimulatedSafetyStack(
             drone,
+            heading_deg,
             obstacle_distance=distance_sensor.read,
             velocity_provider=vehicle_velocity,
         )
