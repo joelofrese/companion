@@ -29,11 +29,14 @@ class MindRuntime:
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future: Optional[Future] = None
         self._future_intent: Optional[str] = None
+        self._future_started_at_s: Optional[float] = None
         self._observation = None
         self._observation_ready_at_s: Optional[float] = None
+        self._observation_duration_s: Optional[float] = None
         self._last_frame_at_s: Optional[float] = None
         self._observation_intent: Optional[str] = None
         self._decision: Optional[ConsciousDecision] = None
+        self._decision_duration_s: Optional[float] = None
         self._thought_error: Optional[Exception] = None
         self._closed = False
         self._observation_count = 0
@@ -81,6 +84,18 @@ class MindRuntime:
 
         return self._decision_count
 
+    @property
+    def latest_observation_duration_s(self) -> Optional[float]:
+        """Return how long the newest VLM request took."""
+
+        return self._observation_duration_s
+
+    @property
+    def latest_decision_duration_s(self) -> Optional[float]:
+        """Return how long the newest conscious thought took."""
+
+        return self._decision_duration_s
+
     def tick(
         self,
         frame,
@@ -99,6 +114,7 @@ class MindRuntime:
             self._last_frame_at_s = time.monotonic()
         if frame is not None and self._future is None and not self._closed:
             self._future_intent = self.mind.intent
+            self._future_started_at_s = time.monotonic()
             self._future = self._executor.submit(
                 self.mind.see,
                 frame,
@@ -139,6 +155,10 @@ class MindRuntime:
             return
         future = self._future
         self._future = None
+        started_at_s = self._future_started_at_s
+        self._future_started_at_s = None
+        if started_at_s is not None:
+            self._observation_duration_s = max(0.0, time.monotonic() - started_at_s)
         try:
             observation = future.result()
         except Exception:
@@ -211,6 +231,7 @@ class MindRuntime:
                     pass
                 continue
             try:
+                started_at_s = time.monotonic()
                 telemetry = replace(
                     telemetry_provider(),
                     last_command=self._last_command,
@@ -239,6 +260,7 @@ class MindRuntime:
             if decision is None:
                 return
             self._thought_error = None
+            self._decision_duration_s = max(0.0, time.monotonic() - started_at_s)
             self._decision = decision
             self._decision_count += 1
             if decision.dialogue:

@@ -113,8 +113,8 @@ checks camera transport through a zero-confidence placeholder and keeps motion
 stopped. With `--ollama`, local VLM and LLM sessions make the run exploratory,
 but CM5 keeps motion stopped because this model has no TOF reading. Use
 `--depth` when the brain should be allowed to move.
-Use `--trace` to print visual observations, conscious decisions, and command
-reasons. Use `--world`,
+Use `--trace` to print visual observations, conscious decisions, model
+latencies, and command reasons. Use `--world`,
 `--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
 length, dialogue, goal, and persistent experience. Typed dialogue also works
 during an exploratory run. Add `--faults` to inject the normal obstacle,
@@ -168,6 +168,8 @@ and `--memory` for editable experience memory.
   rendered Gazebo frames verify the real local VLM path.
 - Focused Qwen runs identify simple objects but are much slower; faster
   Moondream may remain uncertain, and uncertainty still stops safely.
+- Traces report each completed VLM and LLM latency so local model choices can
+  be compared in the real control loop.
 - Exploratory `--faults` runs reuse the deterministic safety schedule without
   requiring exact brain decisions, while checking the observed CM5 safe
   outputs for each reached fault.

@@ -655,7 +655,8 @@ async def run(
                             f"[VLM {elapsed_s:5.1f}s] "
                             f"{signature[0]}; answer={signature[1]}; "
                             f"focus={signature[2]}; movement={signature[3]}; "
-                            f"confidence={signature[4]:.2f}",
+                            f"confidence={signature[4]:.2f}; "
+                            f"latency={control.latest_observation_duration_s:.2f}s",
                             flush=True,
                         )
                         last_observation_signature = signature
@@ -674,7 +675,8 @@ async def run(
                         print(
                             f"[LLM {elapsed_s:5.1f}s] "
                             f"intent={signature[0]}; changed={signature[1]}; "
-                            f"focus={signature[2]}; summary={signature[3]}",
+                            f"focus={signature[2]}; summary={signature[3]}; "
+                            f"latency={control.latest_decision_duration_s:.2f}s",
                             flush=True,
                         )
                         last_decision_signature = signature
