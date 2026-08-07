@@ -244,8 +244,9 @@ memory, telemetry, and optional dialogue to choose the next high-level intent.
 Continue the current goal when it still makes sense, but think proactively:
 choose the next useful thing to notice or do when the world gives you a reason.
 You may choose a short natural intent, but do not issue motor or velocity
-commands.
-Return only the requested JSON.
+commands. Keep intent under six words, focus under four words, summary under
+twelve words, and dialogue under twelve words. Leave dialogue empty unless a
+user deserves a response. Do not ask questions. Return only the requested JSON.
 
 Current intent: {information.intent}
 Previous movement: {information.previous_movement}
@@ -266,7 +267,6 @@ Treat measured velocity as what actually happened. Compare it with the last
 requested command and adapt the next intent when the vehicle did not respond
 as expected.
 The summary should stay short and describe what the drone currently knows.
-Dialogue should be empty unless a user deserves a response.
 """.strip()
         data = self.client.chat(
             self.model,
@@ -274,9 +274,7 @@ Dialogue should be empty unless a user deserves a response.
             CONSCIOUS_SCHEMA,
             think=False,
         )
-        intent = _text(data, "intent")
-        if not intent:
-            raise RuntimeError("Ollama returned an empty conscious intent")
+        intent = _text(data, "intent") or information.intent
         return ConsciousDecision(
             intent=intent,
             focus=_text(data, "focus"),

@@ -173,8 +173,8 @@ reach the conscious LLM.
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, brain shutdown, safety, hover, landing, and
   disarm.
-- The Gazebo runner starts the default vehicle with its visual frame aligned
-  to PX4, so it does not appear to rotate 90 degrees during takeoff.
+- The Gazebo runner aligns the vehicle's visual frame with PX4 and holds its
+  current heading during automatic takeoff, avoiding the repeated visible turn.
 - Velocity commands contain only NED velocities; PX4 holds its heading, and
   synthetic simulation checks that actual heading telemetry stays stable.
 - Exploratory camera and depth runs work across varied PX4 worlds with local
@@ -188,8 +188,10 @@ reach the conscious LLM.
   and 240 conscious cycles with heading hold, landing, and disarm.
 - Simulation keeps 20Hz setpoints but limits MAVSDK velocity telemetry to 10Hz
   and attitude telemetry to 5Hz, avoiding long-run callback backlog.
-- Ollama VLM and LLM sessions produce structured observations and intent; the
-  conscious loop also supports dialogue, focused vision, memory, and voice.
+- Ollama VLM and LLM sessions produce structured observations and intent; an
+  omitted intent keeps the current goal, while visual freshness still gates
+  movement. The conscious loop also supports dialogue, focused vision, memory,
+  and voice.
 - Trace output shows VLM observations, conscious decisions, and Mac/CM5 command
   reasons without exposing hidden model reasoning.
 - Stale frames or sensors, malformed commands, low confidence, command loss,

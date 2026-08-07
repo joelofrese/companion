@@ -8,6 +8,7 @@ from mavsdk.telemetry import LandedState
 
 
 TAKEOFF_ALTITUDE = 2.0
+TAKEOFF_YAW_MODE = 5
 PREPARE_TIMEOUT_S = 30.0
 FLIGHT_ACTION_TIMEOUT_S = 120.0
 VELOCITY_TELEMETRY_RATE_HZ = 10.0
@@ -90,6 +91,15 @@ async def prepare(drone):
         ) from error
     print("Ready.")
     await drone.telemetry.set_rate_velocity_ned(VELOCITY_TELEMETRY_RATE_HZ)
+    # Keep the vehicle's current heading during PX4's automatic takeoff.
+    await drone.param.set_param_int("MPC_YAW_MODE", TAKEOFF_YAW_MODE)
+    try:
+        await asyncio.wait_for(_wait_until_ready(drone), PREPARE_TIMEOUT_S)
+    except asyncio.TimeoutError as error:
+        raise RuntimeError(
+            "vehicle did not become ready after takeoff heading setup "
+            f"within {PREPARE_TIMEOUT_S:.0f}s"
+        ) from error
 
     print("Arming...")
     try:
