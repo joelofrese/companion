@@ -63,6 +63,34 @@ class Telemetry:
     down_velocity_m_s: Optional[float] = None
 
 
+def _experience_outcome(telemetry: Telemetry) -> str:
+    """Return a short record of the last command and measured result."""
+
+    command = telemetry.last_command
+    if command is None:
+        return ""
+
+    def value(number):
+        return "?" if number is None else f"{number:.2f}"
+
+    command_values = (
+        command.north_m_s,
+        command.east_m_s,
+        command.down_m_s,
+    )
+    velocity_values = (
+        telemetry.north_velocity_m_s,
+        telemetry.east_velocity_m_s,
+        telemetry.down_velocity_m_s,
+    )
+    return (
+        "; command="
+        + ",".join(value(number) for number in command_values)
+        + "; velocity="
+        + ",".join(value(number) for number in velocity_values)
+    )
+
+
 @dataclass(frozen=True)
 class VisualObservation:
     """One VLM description of an image."""
@@ -292,6 +320,7 @@ class MacMind:
                     f"intent={intent}; focus={decision.focus or 'none'}; "
                     f"summary={summary}"
                 )
+                entry += _experience_outcome(information.telemetry)
                 if isinstance(decision.dialogue, str) and decision.dialogue.strip():
                     entry += f"; response={decision.dialogue}"
                 if information.dialogue:
