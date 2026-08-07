@@ -14,6 +14,9 @@ MAX_MEMORY_LINES = 64
 MAX_MEMORY_CHARS = 240
 MEMORY_CONTEXT_LINES = 8
 PLACEHOLDER_TEXT = frozenset(("stop", "camera", "camera frame"))
+FOCUS_PLACEHOLDER_TEXT = PLACEHOLDER_TEXT | frozenset(
+    ("forward", "backward", "left", "right", "up", "down", "hover")
+)
 
 
 class CompanionMemory:
@@ -276,7 +279,7 @@ class MacMind:
                 intent = information.intent
             intent_changed = intent != information.intent
             focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
-            if focus.lower() in PLACEHOLDER_TEXT:
+            if focus.lower() in FOCUS_PLACEHOLDER_TEXT:
                 focus = information.focus
             if not focus and information.new_observations:
                 next_focus = information.new_observations[-1].next_focus
@@ -284,7 +287,7 @@ class MacMind:
                     next_focus = next_focus.strip()
                 else:
                     next_focus = ""
-                if next_focus.lower() not in PLACEHOLDER_TEXT:
+                if next_focus.lower() not in FOCUS_PLACEHOLDER_TEXT:
                     focus = next_focus
             if not focus:
                 focus = information.focus

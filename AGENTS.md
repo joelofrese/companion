@@ -171,8 +171,8 @@ and `--memory` for editable experience memory.
   Experience memory persists recent observations, decisions, and measured
   command outcomes across exploratory runs.
 - Conscious thoughts keep the active visual focus across new observations and
-  ignore generic model placeholders. Generic or unclear VLM descriptions are
-  zero-confidence and cannot cause movement.
+  ignore generic placeholders and movement words. Generic or unclear VLM
+  descriptions are zero-confidence and cannot cause movement.
 - A focused VLM answer must confirm the requested object or remain empty; it
   must not substitute another visible object.
 - Brain and CM5 commands use forward, right, and down body-frame velocity;

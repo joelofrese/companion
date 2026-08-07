@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 from control.mind import (
+    FOCUS_PLACEHOLDER_TEXT,
     PLACEHOLDER_TEXT,
     ConsciousDecision,
     ConsciousInput,
@@ -267,6 +268,8 @@ worth checking next, or empty.
             movement = "stop"
         description = _meaningful_text(data, "description")
         next_focus = _meaningful_text(data, "next_focus")
+        if next_focus.lower() in FOCUS_PLACEHOLDER_TEXT:
+            next_focus = ""
         focused_answer = _confirmed_focus(
             _meaningful_text(data, "focused_answer"),
             focus,
