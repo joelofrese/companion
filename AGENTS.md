@@ -178,6 +178,8 @@ and `--memory` for editable experience memory.
   observable decisions and Mac/CM5 command reasons.
 - Scripted hover and follow requests are verified through the rendered-camera
   path; hover stays still and follow remains bounded.
+- The synthetic and RTP runners share one small simulated CM5 safety-stack
+  lifecycle while keeping their scenarios separate.
 - Experience memory persists across exploratory runs and is available to the
   next conscious decision.
 - Saved experience stays compact; live command and velocity telemetry stays in

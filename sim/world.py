@@ -29,13 +29,9 @@ from control.mind_runtime import (
     MindRuntime,
 )
 from control.safety_limits import OBSTACLE_STOP_M
-from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
-from onboard.command_receiver import UdpSafetyReceiver
-from onboard.command_service import SafetyCommandService
 from onboard.safety import LatestDistanceSensor
 from sim.flight import (
-    RecordingForwarder,
     close_mavsdk,
     land,
     prepare,
@@ -43,7 +39,6 @@ from sim.flight import (
 )
 from sim.gazebo_camera import GazeboCamera
 from sim.gazebo_depth import GazeboDepthRangefinder
-from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
     PROFILE_DURATION_S,
@@ -53,6 +48,7 @@ from sim.offboard_control import (
     THIRD_FOLLOW_END_S,
     THIRD_FOLLOW_START_S,
 )
+from sim.safety_stack import SimulatedSafetyStack
 from voice.intent import parse_intent
 
 
@@ -307,12 +303,10 @@ async def run(
         await asyncio.to_thread(ollama_client.preload, llm_model)
     memory_store = CompanionMemory(memory_path) if memory_path is not None else None
 
-    receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     sender = None
     drone = System()
-    service_task = None
+    stack = None
     mind_task = None
-    service_stop = asyncio.Event()
     mind_stop = asyncio.Event()
     telemetry_task = None
     attitude_task = None
@@ -366,14 +360,8 @@ async def run(
 
         attitude_task = asyncio.create_task(observe_heading())
 
-        forwarder = MavsdkVelocityForwarder(drone)
-
-        safe_commands = RecordingForwarder(forwarder)
-
-        service = SafetyCommandService(
-            receiver,
-            safe_commands,
-            tick_period_s=SETPOINT_PERIOD_S,
+        stack = SimulatedSafetyStack(
+            drone,
             obstacle_distance=distance_sensor.read,
             velocity_provider=lambda: (
                 north_velocity_m_s,
@@ -381,9 +369,8 @@ async def run(
                 down_velocity_m_s,
             ),
         )
-        service.start()
-        service_task = asyncio.create_task(service.run(service_stop))
-        sender = UdpCommandSender("127.0.0.1", receiver.port)
+        sender = stack.start()
+        safe_commands = stack.forwarder
         started_at = time.monotonic()
         if ollama_client is None:
             visual_model = WorldVisualModel(
@@ -696,9 +683,7 @@ async def run(
             await asyncio.wait_for(offboard_task, timeout=5.0)
             print("Offboard telemetry=verified through synthetic world and CM5 safety.")
         finally:
-            sender.close()
-            service_stop.set()
-            await service_task
+            await stack.stop()
             mind_stop.set()
             if mind_task is not None:
                 await mind_task
@@ -1002,16 +987,12 @@ async def run(
         await land(drone)
         landed = True
     finally:
-        receiver.close()
         if gazebo_camera is not None:
             gazebo_camera.close()
         if gazebo_depth is not None:
             gazebo_depth.close()
-        if sender is not None:
-            sender.close()
-        if service_task is not None and not service_task.done():
-            service_stop.set()
-            await service_task
+        if stack is not None:
+            await stack.stop()
         mind_stop.set()
         if mind_task is not None and not mind_task.done():
             await mind_task

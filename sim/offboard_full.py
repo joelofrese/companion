@@ -12,14 +12,10 @@ from control.command_packet import CommandPacket
 from control.mind import MacMind
 from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
-from control.udp_sender import UdpCommandSender
 from control.velocity import VelocityCommand
-from onboard.command_receiver import UdpSafetyReceiver
-from onboard.command_service import SafetyCommandService
 from onboard.safety import LatestDistanceSensor
-from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
+from sim.flight import close_mavsdk, land, prepare, wait_for_offboard
 from sim.fixed_brain import FixedLanguageModel, FixedVisualModel
-from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
     COMMAND_DROPOUT_END_S,
@@ -41,6 +37,7 @@ from sim.offboard_control import (
     demo_state,
 )
 from sim.video_loopback import image_sender_command
+from sim.safety_stack import SimulatedSafetyStack
 from vision.video_stream import (
     AsyncLatestFrameReader,
     GStreamerH264Receiver,
@@ -65,16 +62,14 @@ async def run(image_path: str, expect_person: bool = False):
     video_receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(video_receiver)
     camera_process = None
-    receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
+    stack = None
     sender = None
     drone = System()
     control = None
-    cm5_task = None
     mac_task = None
     mind_task = None
     telemetry_task = None
     offboard_task = None
-    cm5_stop = asyncio.Event()
     mac_stop = asyncio.Event()
     mind_stop = asyncio.Event()
     distance_sensor = LatestDistanceSensor()
@@ -120,15 +115,8 @@ async def run(image_path: str, expect_person: bool = False):
         await prepare(drone)
         armed = True
 
-        forwarder = MavsdkVelocityForwarder(drone)
-        safe_commands = RecordingForwarder(forwarder)
-
-        receiver.start()
-        fault_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        cm5_service = SafetyCommandService(
-            receiver,
-            safe_commands,
-            tick_period_s=SETPOINT_PERIOD_S,
+        stack = SimulatedSafetyStack(
+            drone,
             obstacle_distance=cm5_obstacle_distance,
             velocity_provider=lambda: (
                 north_velocity_m_s,
@@ -136,9 +124,9 @@ async def run(image_path: str, expect_person: bool = False):
                 down_velocity_m_s,
             ),
         )
-        cm5_service.start()
-        cm5_task = asyncio.create_task(cm5_service.run(cm5_stop))
-        sender = UdpCommandSender("127.0.0.1", receiver.port)
+        sender = stack.start()
+        safe_commands = stack.forwarder
+        fault_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         class ScenarioSender:
             def start(self):
@@ -155,7 +143,7 @@ async def run(image_path: str, expect_person: bool = False):
                     if not malformed_packet_reported:
                         fault_socket.sendto(
                             b"not-a-command",
-                            ("127.0.0.1", receiver.port),
+                            ("127.0.0.1", stack.receiver.port),
                         )
                         print("Malformed command packet injected during dropout.")
                         malformed_packet_reported = True
@@ -165,7 +153,7 @@ async def run(image_path: str, expect_person: bool = False):
                                 0,
                                 VelocityCommand(north_m_s=0.5),
                             ).encode(),
-                            ("127.0.0.1", receiver.port),
+                            ("127.0.0.1", stack.receiver.port),
                         )
                         print("Stale command packet injected during dropout.")
                         stale_packet_reported = True
@@ -295,8 +283,7 @@ async def run(image_path: str, expect_person: bool = False):
         mind_stop.set()
         await mind_task
         control.close()
-        cm5_stop.set()
-        await cm5_task
+        await stack.stop()
         if not safe_commands.commands or safe_commands.commands[-1][1] != VelocityCommand():
             raise RuntimeError("full stack did not observe CM5 shutdown zero")
         if frames_received == 0:
@@ -446,7 +433,11 @@ async def run(image_path: str, expect_person: bool = False):
         landed = True
     finally:
         await _stop_task(mac_task, mac_stop)
-        await _stop_task(cm5_task, cm5_stop)
+        if stack is not None:
+            try:
+                await stack.stop()
+            except Exception:
+                pass
         mind_stop.set()
         if mind_task is not None and not mind_task.done():
             await mind_task
@@ -468,12 +459,9 @@ async def run(image_path: str, expect_person: bool = False):
                 await land(drone)
             except Exception:
                 pass
-        receiver.close()
         video_receiver.close()
         if camera_process is not None:
             close_subprocess(camera_process)
-        if sender is not None:
-            sender.close()
         if fault_socket is not None:
             fault_socket.close()
         close_mavsdk(drone)
