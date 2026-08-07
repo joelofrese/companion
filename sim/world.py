@@ -828,6 +828,14 @@ async def run(
                 print("Explicit hover dialogue stop=verified.")
         elif dialogue_request is not None:
             print("Scripted open-ended dialogue=delivered to the conscious mind.")
+        initial_focus = parse_focus(initial_intent)
+        if initial_focus:
+            if decision.focus != initial_focus:
+                raise RuntimeError(
+                    "SITL did not honor the initial visual focus: "
+                    f"expected {initial_focus}, got {decision.focus or 'none'}"
+                )
+            print(f"Initial visual focus=verified: {initial_focus}.")
         requested_focus = parse_focus(dialogue_request or "")
         if requested_focus:
             if decision.focus != requested_focus and not requested_focus_answered:
