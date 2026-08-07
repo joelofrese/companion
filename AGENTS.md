@@ -177,6 +177,8 @@ reach the conscious LLM.
 - Exploratory camera and depth runs work across varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm; the
   near-wall depth path has observed 0.56m and forwarded CM5 backoff.
+- A 120-second moving-platform exploration completed 2,364 visual observations
+  and 240 conscious cycles with heading hold, landing, and disarm.
 - Ollama VLM and LLM sessions produce structured observations and intent; the
   conscious loop also supports dialogue, focused vision, memory, and voice.
 - Trace output shows VLM observations, conscious decisions, and Mac/CM5 command
