@@ -32,6 +32,7 @@ FOCUS_ACTION_WORDS = frozenset(
         "show",
         "spot",
         "stop",
+        "stay",
         "wander",
         "where",
     )
@@ -111,6 +112,9 @@ def parse_intent(transcript: str) -> Optional[str]:
         if any(word in MOTION_WORDS for word in words):
             return "hover"
         return None
+
+    if _contains_phrase(words, "stay with me"):
+        return "following"
 
     if any(
         _contains_phrase(words, phrase)

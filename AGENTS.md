@@ -194,6 +194,7 @@ and `--memory` for editable experience memory.
   as the visual focus even when the conscious model omits it.
 - Combined requests preserve both parts, such as a visual focus in
   "look for the person and follow me."
+- "Stay with me" is treated as following, not hovering.
 - Exploratory simulation acknowledges those visual requests while keeping the
   open-ended goal active.
 - A focused VLM answer must confirm the requested object or remain empty; it
