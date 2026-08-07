@@ -211,10 +211,19 @@ class WorldVisualModel:
             description = "the person is ahead" if following else "open space is ahead"
         if not (following or exploring):
             movement = "stop"
+        focus_text = " ".join(focus.lower().split())
+        description_text = " ".join(description.lower().split())
+        focused_answer = (
+            description
+            if focus_text
+            and focus_text in description_text
+            and f"no {focus_text}" not in description_text
+            else ""
+        )
         return VisualObservation(
             timestamp_s=timestamp_s,
             description=description,
-            focused_answer=description if focus else "",
+            focused_answer=focused_answer,
             movement=movement,
             next_focus=focus or ("person" if following else ""),
             confidence=self.world.vision_confidence(elapsed_s),

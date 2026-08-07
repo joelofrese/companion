@@ -194,6 +194,10 @@ class MacMind:
                 return
             self.memory.intent = intent
             self._invalidate_visual_context()
+            focus = parse_focus(intent)
+            if focus:
+                self.memory.focus = focus
+                self.memory.focus_requested = True
 
     def _invalidate_visual_context(self):
         """Discard visual context that belongs to the previous intent."""
