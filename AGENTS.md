@@ -170,6 +170,8 @@ and `--memory` for editable experience memory.
 - Conscious thoughts keep the active visual focus across new observations and
   ignore generic model placeholders. Generic or unclear VLM descriptions are
   zero-confidence and cannot cause movement.
+- A focused VLM answer must confirm the requested object or remain empty; it
+  must not substitute another visible object.
 - Simulations start at zero yaw and send velocity-only setpoints, so PX4 holds
   that heading through offboard handoff. They keep the camera user-controlled
   and resize frames to the real 640-pixel camera width. The GUI opens after

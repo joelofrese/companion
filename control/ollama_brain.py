@@ -210,7 +210,9 @@ stop only when the scene or movement is uncertain, unsafe, or blocked. If the
 requested thing is not visible but the scene is clear and safe, use a slow left
 or right movement to look around it. The description must say what is visible,
 not repeat a movement word. The focused answer must answer the requested focus,
-not describe the movement. Return only the requested JSON.
+not describe the movement. Never substitute another visible object for the
+requested focus; if the focus cannot be confirmed, say it is not visible.
+Return only the requested JSON.
 
 Current high-level intent: {intent or "none"}
 Requested visual focus: {focus or "none"}
