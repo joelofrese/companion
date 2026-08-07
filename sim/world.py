@@ -692,7 +692,7 @@ async def run(
                     reported.add(event)
                 if not exploratory and CONTROL_PAUSE_START_S <= elapsed < CONTROL_PAUSE_END_S:
                     if "Mac control pause" not in reported:
-                        print("Mac control pause; watchdog holds zero.")
+                        print("Mac control pause; CM5 timeout holds zero.")
                         reported.add("Mac control pause")
                     await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
                     now = time.monotonic()

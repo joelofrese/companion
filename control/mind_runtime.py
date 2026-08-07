@@ -8,7 +8,6 @@ from typing import Callable, Optional
 
 from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
 from control.mind_motion import movement_command
-from control.watchdog import SetpointWatchdog
 from control.velocity import VelocityCommand
 from voice.intent import parse_intent
 
@@ -27,7 +26,6 @@ class MindRuntime:
         mind: MacMind,
     ):
         self.mind = mind
-        self.watchdog = SetpointWatchdog()
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future: Optional[Future] = None
         self._future_intent: Optional[str] = None
@@ -133,9 +131,8 @@ class MindRuntime:
         if parse_intent(self.mind.intent) == "hover":
             movement = "stop"
         desired = movement_command(movement, telemetry.obstacle_distance_m)
-        command = self.watchdog.emit(timestamp_s, desired)
-        self._last_command = command
-        return command
+        self._last_command = desired
+        return desired
 
     def _collect(self):
         if self._future is None or not self._future.done():
