@@ -172,11 +172,11 @@ and `--memory` for editable experience memory.
   zero-confidence and cannot cause movement.
 - A focused VLM answer must confirm the requested object or remain empty; it
   must not substitute another visible object.
-- Simulations start at zero yaw and send velocity-only setpoints, so PX4 holds
-  that heading through offboard handoff. They keep the camera user-controlled
-  and resize frames to the real 640-pixel camera width. The GUI opens after
-  PX4 spawns the model so it does not reframe during takeoff. Depth is only a
-  TOF approximation; DEXI 3 has no lidar.
+- Simulations start at zero yaw and hold the settled takeoff heading through
+  offboard handoff. They keep the camera user-controlled and resize frames to
+  the real 640-pixel camera width. The GUI opens after PX4 spawns the model so
+  it does not reframe during takeoff. Depth is only a TOF approximation; DEXI
+  3 has no lidar.
 - Offboard starts immediately after three CM5 priming setpoints, without an
   extra zero-command delay.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality

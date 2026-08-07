@@ -167,6 +167,7 @@ async def prepare(drone):
             "PX4 takeoff heading hold=verified: "
             f"change {heading_change_deg:.1f} degrees."
         )
+        return takeoff_heading_deg
     except Exception:
         try:
             await asyncio.wait_for(

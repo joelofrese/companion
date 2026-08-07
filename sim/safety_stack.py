@@ -17,6 +17,7 @@ class SimulatedSafetyStack:
     def __init__(
         self,
         drone,
+        heading_deg: float,
         obstacle_distance: Callable[[], Optional[float]],
         velocity_provider: Callable[
             [], tuple[Optional[float], Optional[float], Optional[float]]
@@ -25,7 +26,7 @@ class SimulatedSafetyStack:
     ):
         self.receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
         self.forwarder = RecordingForwarder(
-            MavsdkVelocityForwarder(drone)
+            MavsdkVelocityForwarder(drone, heading_deg)
         )
         self.obstacle_distance = obstacle_distance
         self.velocity_provider = velocity_provider
