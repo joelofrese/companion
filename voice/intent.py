@@ -18,6 +18,9 @@ FOCUS_PHRASES = (
 )
 FOCUS_STOP_WORDS = frozenset(("around", "in", "near", "on", "over", "under"))
 NEGATION_WORDS = frozenset(("no", "not", "never", "dont", "don't"))
+MOTION_WORDS = frozenset(
+    ("move", "follow", "fly", "go", "explore", "wander", "search")
+)
 
 
 def _words(transcript: str) -> list[str]:
@@ -74,6 +77,8 @@ def parse_intent(transcript: str) -> Optional[str]:
         return None
 
     if any(word in NEGATION_WORDS for word in words):
+        if any(word in MOTION_WORDS for word in words):
+            return "hover"
         return None
 
     if any(

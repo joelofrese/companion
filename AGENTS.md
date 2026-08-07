@@ -41,6 +41,7 @@ merge and delete it.
 - A real intent change invalidates old visual context and pending brain
   results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
+- Negative movement requests become hover before model interpretation.
 - Low-confidence, stale, malformed, or missing input becomes zero motion.
 - CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
   protects against obstacles, and is the final vehicle-side authority.
