@@ -17,8 +17,8 @@ BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
 BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
-# Align Gazebo's model frame with PX4's NED heading at startup.
-DEFAULT_MODEL_POSE = "0,0,0,0,0,1.57079632679"
+# Start the model facing the Gazebo view instead of turning it left on takeoff.
+DEFAULT_MODEL_POSE = "0,0,0,0,0,0"
 
 
 class _BootError(RuntimeError):

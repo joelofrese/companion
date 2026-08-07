@@ -135,8 +135,8 @@ and `--memory` for editable experience memory.
 
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, safety, hover, landing, and disarm.
-- Automatic takeoff aligns the visual frame with PX4 and holds heading;
-  telemetry verifies that it does not make the repeated visible turn.
+- Simulations start at zero yaw and hold that heading through takeoff, so the
+  model does not make a repeated visible turn.
 - Exploratory camera and depth runs work in varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm.
 - A near-wall local-brain depth run observed 0.55 m and CM5 backoff at
