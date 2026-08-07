@@ -16,7 +16,9 @@ FOCUS_PHRASES = (
     "show me",
     "where is",
 )
-FOCUS_STOP_WORDS = frozenset(("around", "in", "near", "on", "over", "under"))
+FOCUS_STOP_WORDS = frozenset(
+    ("around", "and", "in", "near", "on", "over", "then", "under", "while")
+)
 NEGATION_WORDS = frozenset(("no", "not", "never", "dont", "don't"))
 MOTION_WORDS = frozenset(
     ("move", "follow", "fly", "go", "explore", "wander", "search")

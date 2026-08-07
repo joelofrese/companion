@@ -192,6 +192,8 @@ and `--memory` for editable experience memory.
   descriptions are zero-confidence and cannot cause movement.
 - Direct find, look, search, inspect, and locate requests set their subject
   as the visual focus even when the conscious model omits it.
+- Combined requests preserve both parts, such as a visual focus in
+  "look for the person and follow me."
 - Exploratory simulation acknowledges those visual requests while keeping the
   open-ended goal active.
 - A focused VLM answer must confirm the requested object or remain empty; it
