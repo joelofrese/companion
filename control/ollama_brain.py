@@ -294,6 +294,8 @@ worth checking next, or empty.
             or description_key == "the scene is clear and safe"
         ):
             description = "the scene is unclear"
+            focused_answer = ""
+            movement = "stop"
             confidence = 0.0
         return VisualObservation(
             timestamp_s=timestamp_s,
