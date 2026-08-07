@@ -496,7 +496,10 @@ async def run(
                 return "target moved right"
             if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
                 return "target lost; holding"
-            if step.obstacle_distance_m is not None and step.obstacle_distance_m < 0.6:
+            if (
+                step.obstacle_distance_m is not None
+                and step.obstacle_distance_m < OBSTACLE_STOP_M
+            ):
                 return "obstacle detected; backing off"
             if not step.distance_fresh:
                 return "distance sensor dropout"

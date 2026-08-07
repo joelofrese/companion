@@ -7,6 +7,7 @@ import time
 from control.udp_sender import UdpCommandSender
 from control.udp_control import UdpControlService
 from control.mind import Telemetry
+from control.safety_limits import OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
@@ -107,7 +108,7 @@ async def run():
         if not any(
             distance is not None
             and not (isinstance(distance, float) and math.isnan(distance))
-            and distance < 0.6
+            and distance < OBSTACLE_STOP_M
             for distance in control.obstacle_distances
         ):
             raise RuntimeError(

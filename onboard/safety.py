@@ -115,7 +115,7 @@ class LatestVelocity:
 class OnboardSafetyEnvelope:
     """Expire old commands and stop for a forward obstacle."""
 
-    def __init__(self, command_timeout_s: float = 0.15):
+    def __init__(self, command_timeout_s: float = SENSOR_TIMEOUT_S):
         if (
             isinstance(command_timeout_s, bool)
             or not isinstance(command_timeout_s, Real)
