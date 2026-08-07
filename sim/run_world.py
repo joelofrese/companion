@@ -105,6 +105,7 @@ def _run_once(
     world: str,
     stdbuf: str,
     exploratory: bool,
+    faults: bool,
     camera: bool,
     depth: bool,
     duration_s: Optional[float],
@@ -228,6 +229,8 @@ def _run_once(
             scenario += ["sim.world"]
             if exploratory:
                 scenario.append("--explore")
+            if faults:
+                scenario.append("--faults")
             if camera:
                 scenario.append("--camera")
             if depth:
@@ -267,6 +270,7 @@ def run(
     expect_person: bool = False,
     world: str = "default",
     exploratory: bool = False,
+    faults: bool = False,
     camera: bool = False,
     depth: bool = False,
     duration_s: Optional[float] = None,
@@ -289,6 +293,8 @@ def run(
         raise RuntimeError(f"scenario image does not exist: {image_path}")
     if exploratory and image_path is not None:
         raise RuntimeError("exploratory simulation cannot use an RTP image")
+    if faults and not exploratory:
+        raise RuntimeError("fault injection requires exploratory simulation")
     if camera and image_path is not None:
         raise RuntimeError("camera mode cannot use an RTP image")
     if depth and image_path is not None:
@@ -339,6 +345,7 @@ def run(
                 world=world,
                 stdbuf=stdbuf,
                 exploratory=exploratory,
+                faults=faults,
                 camera=camera,
                 depth=depth,
                 duration_s=duration_s,
@@ -379,6 +386,11 @@ def main(argv=None):
         "--explore",
         action="store_true",
         help="run the synthetic world with live dialogue and observation-only behavior",
+    )
+    parser.add_argument(
+        "--faults",
+        action="store_true",
+        help="inject the normal safety and link faults into an exploratory run",
     )
     parser.add_argument(
         "--camera",
@@ -440,6 +452,7 @@ def main(argv=None):
             expect_person=args.expect_person,
             world=args.world,
             exploratory=args.explore,
+            faults=args.faults,
             camera=args.camera,
             depth=args.depth,
             duration_s=args.duration,

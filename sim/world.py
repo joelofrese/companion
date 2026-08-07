@@ -100,8 +100,9 @@ class WorldStep:
 class SyntheticWorld:
     """Provide fixed targets, sensors, and link faults."""
 
-    def __init__(self, exploratory: bool = False):
+    def __init__(self, exploratory: bool = False, faults: bool = False):
         self.exploratory = exploratory
+        self.faults = faults
 
     def target_offset_east(self, elapsed_s: float) -> Optional[float]:
         if TARGET_LOST_START_S <= elapsed_s < TARGET_LOST_END_S:
@@ -126,7 +127,7 @@ class SyntheticWorld:
         self,
         elapsed_s: float,
     ) -> WorldStep:
-        if self.exploratory:
+        if self.exploratory and not self.faults:
             return WorldStep()
         if elapsed_s >= BRAIN_SHUTDOWN_START_S:
             return WorldStep(brain_shutdown=True)
@@ -262,6 +263,7 @@ class WorldLanguageModel:
 
 async def run(
     exploratory: bool = False,
+    faults: bool = False,
     camera: bool = False,
     world_name: str = "default",
     duration_s: float = PROFILE_DURATION_S,
@@ -281,6 +283,8 @@ async def run(
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
         raise ValueError("deterministic simulation duration cannot be shorter than its profile")
+    if faults and not exploratory:
+        raise ValueError("fault injection requires exploratory simulation")
     if not isinstance(initial_intent, str) or not initial_intent.strip():
         raise ValueError("initial intent must be a non-empty string")
     initial_intent = initial_intent.strip()
@@ -336,7 +340,7 @@ async def run(
     initial_yaw_deg = None
     max_heading_change_deg = 0.0
     try:
-        world = SyntheticWorld(exploratory)
+        world = SyntheticWorld(exploratory, faults)
         if camera or depth:
             camera_sensor = "IMX214" if depth else "camera"
             camera_model = "x500_depth" if depth else "x500_mono_cam"
@@ -1048,6 +1052,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the synthetic companion world")
     parser.add_argument("--explore", action="store_true")
+    parser.add_argument(
+        "--faults",
+        action="store_true",
+        help="inject the normal safety and link faults into an exploratory run",
+    )
     parser.add_argument("--camera", action="store_true")
     parser.add_argument("--depth", action="store_true")
     parser.add_argument("--ollama", action="store_true")
@@ -1076,6 +1085,7 @@ if __name__ == "__main__":
         asyncio.run(
             run(
                 exploratory=args.explore,
+                faults=args.faults,
                 camera=args.camera,
                 depth=args.depth,
                 world_name=args.world,

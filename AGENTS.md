@@ -90,6 +90,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world walls
 .venv/bin/python -m sim.run_world --explore --camera --world objects --trace
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
+.venv/bin/python -m sim.run_world --explore --faults --camera --ollama --trace --world objects --duration 20
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
@@ -111,7 +112,9 @@ VLM and LLM sessions make the run exploratory. Use `--trace` to print visual
 observations, conscious decisions, and command reasons. Use `--world`,
 `--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
 length, dialogue, goal, and persistent experience. Typed dialogue also works
-during an exploratory run.
+during an exploratory run. Add `--faults` to inject the normal obstacle,
+sensor, link, invalid-command, and brain-shutdown schedule into an exploratory
+run.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
@@ -153,6 +156,8 @@ and `--memory` for editable experience memory.
   rendered Gazebo frames verify the real local VLM path.
 - Focused Qwen runs identify simple objects and make bounded movement;
   faster Moondream remains conservative when the scene is unclear.
+- Exploratory `--faults` runs reuse the deterministic safety schedule without
+  requiring exact brain decisions.
 - Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
   stops Mac motion. CM5 remains the final authority.
 - Intent changes invalidate old visual context; same-goal rewording does not.
