@@ -178,6 +178,8 @@ and `--memory` for editable experience memory.
   for a model request to finish.
 - Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
   stops Mac motion. CM5 remains the final authority.
+- Local VLM prompt boilerplate becomes unclear zero-confidence input and cannot
+  cause movement.
 - Intent changes invalidate old visual context; same-goal rewording does not.
   Experience memory persists recent observations, decisions, and measured
   command outcomes across exploratory runs.

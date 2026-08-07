@@ -21,6 +21,17 @@ from control.mind import (
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
+DESCRIPTION_PLACEHOLDERS = PLACEHOLDER_TEXT | frozenset(
+    (
+        "current high-level intent",
+        "requested visual focus",
+        "previous movement",
+        "previous description",
+        "last requested command",
+        "measured body velocity",
+        "forward tof distance",
+    )
+)
 MAX_OUTPUT_TOKENS = 64
 MAX_IMAGE_SIDE = 640
 
@@ -275,9 +286,10 @@ worth checking next, or empty.
             focus,
         )
         confidence = _confidence(data)
-        description_key = description.lower().strip(" .!?")
+        description_key = " ".join(description.lower().split()).strip(" .!?")
         if (
             not description
+            or description_key in DESCRIPTION_PLACEHOLDERS
             or "unclear" in description_key
             or description_key == "the scene is clear and safe"
         ):
