@@ -28,7 +28,7 @@ from control.mind_runtime import (
     MIN_MOVEMENT_CONFIDENCE,
     MindRuntime,
 )
-from control.safety_limits import OBSTACLE_STOP_M
+from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 from onboard.safety import LatestDistanceSensor
 from sim.flight import (
@@ -806,6 +806,64 @@ async def run(
                 start_s <= timestamp_s - started_at < end_s and predicate(command)
                 for timestamp_s, command in commands
             )
+
+        if exploratory and faults:
+            fault_checks = (
+                (
+                    OBSTACLE_START_S,
+                    OBSTACLE_END_S,
+                    lambda command: command.north_m_s <= -BACKOFF_SPEED_M_S,
+                    "CM5 obstacle backoff",
+                ),
+                (
+                    INVALID_SENSOR_START_S,
+                    INVALID_SENSOR_END_S,
+                    lambda command: command == VelocityCommand(),
+                    "invalid distance fail-safe",
+                ),
+                (
+                    DROPOUT_START_S + 0.2,
+                    DROPOUT_END_S,
+                    lambda command: command == VelocityCommand(),
+                    "command link dropout expiry",
+                ),
+                (
+                    INVALID_COMMAND_START_S,
+                    INVALID_COMMAND_END_S,
+                    lambda command: command == VelocityCommand(),
+                    "invalid command rejection",
+                ),
+                (
+                    VELOCITY_TELEMETRY_START_S,
+                    VELOCITY_TELEMETRY_END_S,
+                    lambda command: command == VelocityCommand(),
+                    "missing vehicle velocity fail-safe",
+                ),
+                (
+                    STALE_SENSOR_START_S + 0.2,
+                    STALE_SENSOR_END_S,
+                    lambda command: command == VelocityCommand(),
+                    "stale distance fail-safe",
+                ),
+            )
+            for start_s, end_s, predicate, behavior in fault_checks:
+                if depth or duration_s < end_s:
+                    continue
+                if not observed(start_s, end_s, predicate):
+                    raise RuntimeError(
+                        f"exploratory fault run did not observe {behavior}"
+                    )
+                print(f"Exploratory fault passed: {behavior}.")
+            if duration_s >= BRAIN_SHUTDOWN_START_S + 0.2:
+                if not brain_shutdown or not observed(
+                    BRAIN_SHUTDOWN_START_S,
+                    duration_s,
+                    lambda command: command == VelocityCommand(),
+                ):
+                    raise RuntimeError(
+                        "exploratory fault run did not observe brain shutdown zero"
+                    )
+                print("Exploratory fault passed: brain shutdown zero.")
 
         checks = () if exploratory else (
             (0.0, 1.0, lambda command: command.north_m_s > 0.0, "forward following"),

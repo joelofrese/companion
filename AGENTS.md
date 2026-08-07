@@ -157,7 +157,8 @@ and `--memory` for editable experience memory.
 - Focused Qwen runs identify simple objects and make bounded movement;
   faster Moondream remains conservative when the scene is unclear.
 - Exploratory `--faults` runs reuse the deterministic safety schedule without
-  requiring exact brain decisions.
+  requiring exact brain decisions, while checking the observed CM5 safe
+  outputs for each reached fault.
 - Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
   stops Mac motion. CM5 remains the final authority.
 - Intent changes invalidate old visual context; same-goal rewording does not.
