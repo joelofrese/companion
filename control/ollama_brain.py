@@ -243,7 +243,12 @@ worth checking next, or empty.
         next_focus = _meaningful_text(data, "next_focus")
         focused_answer = _meaningful_text(data, "focused_answer")
         confidence = _confidence(data)
-        if not description or "unclear" in description.lower():
+        description_key = description.lower().strip(" .!?")
+        if (
+            not description
+            or "unclear" in description_key
+            or description_key == "the scene is clear and safe"
+        ):
             description = "the scene is unclear"
             confidence = 0.0
         return VisualObservation(

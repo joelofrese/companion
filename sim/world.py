@@ -646,7 +646,11 @@ async def run(
                 if decision is not None and parse_intent(decision.intent) == "hover":
                     reason = "conscious intent is hover"
                 elif observation is None:
-                    reason = "waiting for the first VLM observation"
+                    reason = (
+                        "waiting for the first VLM observation"
+                        if control.observation_count == 0
+                        else "latest VLM observation failed"
+                    )
                 elif (
                     control.latest_observation_age_s is None
                     or control.latest_observation_age_s > MAX_MOVEMENT_AGE_S
@@ -734,8 +738,6 @@ async def run(
         decision = control.latest_decision
         if decision is None:
             raise RuntimeError("SITL did not observe a conscious Mac decision")
-        if control.latest_observation is None:
-            raise RuntimeError("SITL did not observe a Mac visual observation")
         if not decision.summary:
             raise RuntimeError("SITL did not retain a conscious visual summary")
         if control.observation_count == 0:
