@@ -46,6 +46,7 @@ class FixedLanguageModel:
             summary = information.new_observations[-1].description
         return ConsciousDecision(
             intent=information.intent,
+            intent_changed=False,
             focus="person" if information.intent == "following" else "",
             summary=summary or "The simulated world is running.",
         )

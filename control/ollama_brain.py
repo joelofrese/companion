@@ -39,11 +39,18 @@ CONSCIOUS_SCHEMA = {
     "type": "object",
     "properties": {
         "intent": {"type": "string"},
+        "intent_changed": {"type": "boolean"},
         "focus": {"type": "string"},
         "dialogue": {"type": "string"},
         "summary": {"type": "string"},
     },
-    "required": ["intent", "focus", "dialogue", "summary"],
+    "required": [
+        "intent",
+        "intent_changed",
+        "focus",
+        "dialogue",
+        "summary",
+    ],
 }
 
 
@@ -249,10 +256,13 @@ You are the Companion Drone's conscious mind. Use the visual observations,
 memory, telemetry, and optional dialogue to choose the next high-level intent.
 Continue the current goal when it still makes sense, but think proactively:
 choose the next useful thing to notice or do when the world gives you a reason.
-You may choose a short natural intent, but do not issue motor or velocity
-commands. Keep intent under six words, focus under four words, summary under
-twelve words, and dialogue under twelve words. Leave dialogue empty unless a
-user deserves a response. Do not ask questions. Return only the requested JSON.
+Set intent_changed true only when the high-level goal really changes. When
+continuing the current goal, set it false and copy the current intent exactly;
+do not rephrase it. You may choose a short natural intent, but do not issue
+motor or velocity commands. Keep intent under six words, focus under four
+words, summary under twelve words, and dialogue under twelve words. Leave
+dialogue empty unless a user deserves a response. Do not ask questions. Return
+only the requested JSON.
 
 Current intent: {information.intent}
 Previous movement: {information.previous_movement}
@@ -283,6 +293,7 @@ The summary should stay short and describe what the drone currently knows.
         intent = _text(data, "intent") or information.intent
         return ConsciousDecision(
             intent=intent,
+            intent_changed=data.get("intent_changed") is True,
             focus=_text(data, "focus"),
             dialogue=_text(data, "dialogue"),
             summary=_text(data, "summary"),

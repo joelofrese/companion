@@ -92,6 +92,7 @@ class ConsciousDecision:
     """The result of one conscious thought."""
 
     intent: str
+    intent_changed: bool = False
     focus: str = ""
     dialogue: str = ""
     summary: str = ""
@@ -227,14 +228,21 @@ class MacMind:
             self._new_observations.clear()
         try:
             decision = self.language_model.think(information)
+            intent_changed = decision.intent_changed is True
             if intent_override is not None:
                 if not isinstance(intent_override, str) or not intent_override.strip():
                     raise ValueError("intent override must be a non-empty string")
                 intent = intent_override.strip()
-            else:
+                intent_changed = intent != information.intent
+            elif intent_changed:
                 if not isinstance(decision.intent, str) or not decision.intent.strip():
                     raise ValueError("language model returned an empty intent")
                 intent = decision.intent.strip()
+            else:
+                # A continuing goal may be worded differently by the model.
+                # Keep the current text so fresh VLM work remains usable.
+                intent = information.intent
+            intent_changed = intent != information.intent
             focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
             if not focus and information.new_observations:
                 next_focus = information.new_observations[-1].next_focus
@@ -244,6 +252,7 @@ class MacMind:
                 summary = information.summary
             decision = ConsciousDecision(
                 intent=intent,
+                intent_changed=intent_changed,
                 focus=focus,
                 dialogue=(
                     decision.dialogue.strip()

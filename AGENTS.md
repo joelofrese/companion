@@ -37,7 +37,8 @@ merge and delete it.
 - The VLM describes images and suggests cautious movement.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
 - Mac control turns that intent and visual suggestion into slow velocity.
-- A changed intent invalidates old visual context and pending brain results.
+- A real intent change invalidates old visual context and pending brain
+  results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
 - Low-confidence, stale, malformed, or missing input becomes zero motion.
 - CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
@@ -147,6 +148,8 @@ and `--memory` for editable experience memory.
   and disarm.
 - A failed conscious thought holds zero, retries, and retains pending visual
   context for the recovery.
+- Conscious intent rewording no longer discards a fresh VLM result; only an
+  explicitly reported goal change resets visual context.
 - Malformed conscious decisions preserve pending visual context for the next
   thought as well.
 - RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera

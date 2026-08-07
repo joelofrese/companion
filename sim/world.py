@@ -217,6 +217,7 @@ class WorldLanguageModel:
     def think(self, information) -> ConsciousDecision:
         if self.intent is None:
             self.intent = information.intent
+        previous_intent = self.intent
         dialogue = ""
         if information.dialogue:
             intent = parse_intent(information.dialogue)
@@ -247,6 +248,7 @@ class WorldLanguageModel:
             summary = information.new_observations[-1].description
         return ConsciousDecision(
             intent=self.intent,
+            intent_changed=self.intent != previous_intent,
             focus="person" if parse_intent(self.intent) == "following" else "",
             dialogue=dialogue,
             summary=summary or "The simulated world is running.",
@@ -598,14 +600,15 @@ async def run(
                 if decision is not None:
                     signature = (
                         clean(decision.intent),
+                        decision.intent_changed,
                         clean(decision.focus),
                         clean(decision.summary),
                     )
                     if signature != last_decision_signature:
                         print(
                             f"[LLM {elapsed_s:5.1f}s] "
-                            f"intent={signature[0]}; focus={signature[1]}; "
-                            f"summary={signature[2]}",
+                            f"intent={signature[0]}; changed={signature[1]}; "
+                            f"focus={signature[2]}; summary={signature[3]}",
                             flush=True,
                         )
                         last_decision_signature = signature
