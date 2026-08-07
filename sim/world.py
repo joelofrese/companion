@@ -280,7 +280,7 @@ async def run(
     """Run one complete Gazebo world simulation."""
 
     if world_name is None:
-        world_name = "objects" if exploratory else "default"
+        world_name = "objects" if exploratory and (camera or depth) else "default"
     if not math.isfinite(duration_s) or duration_s <= 0.0:
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
@@ -294,6 +294,10 @@ async def run(
         raise ValueError("camera and depth modes cannot run together")
     if depth and not exploratory:
         raise ValueError("Gazebo depth mode requires exploratory simulation")
+    if exploratory and world_name == "objects" and not (camera or depth):
+        raise ValueError("the objects world requires --camera or --depth")
+    if faults and camera:
+        raise ValueError("fault injection requires synthetic safety or depth mode")
     if ollama and not (exploratory and (camera or depth)):
         raise ValueError("Ollama simulation requires exploratory camera or depth mode")
     if memory_path is not None and not exploratory:
@@ -447,10 +451,17 @@ async def run(
                     if math.isfinite(distance):
                         valid_depth_samples += 1
                         minimum_depth_distance = min(minimum_depth_distance, distance)
+                distance = distance_sensor.read()
                 return replace(
                     step,
-                    obstacle_distance_m=distance_sensor.read(),
-                    distance_fresh=sample is not None,
+                    obstacle_distance_m=distance,
+                    distance_fresh=math.isfinite(distance),
+                )
+            if camera:
+                return replace(
+                    step,
+                    obstacle_distance_m=None,
+                    distance_fresh=False,
                 )
             if step.distance_fresh:
                 distance_sensor.update(
@@ -1089,12 +1100,12 @@ async def run(
             if camera_frames == 0:
                 raise RuntimeError("Gazebo did not provide a camera frame")
             print(f"Gazebo camera frames=verified ({camera_frames}).")
-        if camera and not ollama:
+        if camera:
             if any(command != VelocityCommand() for _, command in commands):
                 raise RuntimeError(
-                    "camera transport run commanded motion without a visual model"
+                    "camera-only run forwarded motion without a TOF reading"
                 )
-            print("Gazebo camera transport safe stop=verified.")
+            print("Gazebo camera-only safe stop=verified.")
         if depth:
             if not valid_depth_samples:
                 raise RuntimeError("Gazebo did not provide a valid depth reading")

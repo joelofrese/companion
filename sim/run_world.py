@@ -287,7 +287,7 @@ def run(
     trace: bool = False,
 ) -> int:
     if world is None:
-        world = "objects" if exploratory else "default"
+        world = "objects" if exploratory and (camera or depth) else "default"
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
         raise RuntimeError("stdbuf is required to observe PX4 boot output")
@@ -311,6 +311,10 @@ def run(
         raise RuntimeError("Gazebo camera mode requires exploratory simulation")
     if depth and not exploratory:
         raise RuntimeError("Gazebo depth mode requires exploratory simulation")
+    if exploratory and world == "objects" and not (camera or depth):
+        raise RuntimeError("the objects world requires --camera or --depth")
+    if faults and camera:
+        raise RuntimeError("fault injection requires synthetic safety or depth mode")
     if memory_path is not None and not exploratory:
         raise RuntimeError("experience memory requires exploratory simulation")
     if memory_path is not None and image_path is not None:

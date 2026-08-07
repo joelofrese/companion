@@ -92,7 +92,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world walls
 .venv/bin/python -m sim.run_world --explore --camera --world objects --trace
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
-.venv/bin/python -m sim.run_world --explore --faults --camera --ollama --trace --world objects --duration 20
+.venv/bin/python -m sim.run_world --explore --faults --world default --duration 32
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
@@ -110,7 +110,9 @@ Gazebo camera with Ollama, not this deterministic fixture.
 
 `--camera` uses Gazebo's rendered camera as VLM input. Without `--ollama`, it
 checks camera transport through a zero-confidence placeholder and keeps motion
-stopped. With `--ollama`, local VLM and LLM sessions make the run exploratory.
+stopped. With `--ollama`, local VLM and LLM sessions make the run exploratory,
+but CM5 keeps motion stopped because this model has no TOF reading. Use
+`--depth` when the brain should be allowed to move.
 Use `--trace` to print visual observations, conscious decisions, and command
 reasons. Use `--world`,
 `--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
@@ -121,8 +123,8 @@ run.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
-and leaves the Gazebo camera user-controlled. Exploratory runs default to this
-world; pass `--world default` to use the empty stock world.
+and leaves the Gazebo camera user-controlled. Camera and depth explorations
+default to this world; other exploratory runs use the empty stock world.
 Oversized simulation frames are reduced to the real 640-pixel camera width
 before the VLM sees them. Because `objects` contains collidable objects, use
 `--depth` for moving goals such as following. Camera-only runs have no forward
@@ -157,8 +159,8 @@ and `--memory` for editable experience memory.
   fixtures, faults, recovery, brain failures, safety, hover, landing, and
   disarm.
 - Exploratory camera and depth worlds run local VLM/LLM brains with dialogue,
-  visual focus, memory, bounded motion, simulated TOF safety, landing, and
-  disarm.
+  visual focus, and memory. Camera mode holds zero without TOF; depth mode
+  verifies simulated TOF safety, bounded motion, landing, and disarm.
 - RTP person/no-person fixtures verify the video, Mac, CM5, and PX4 path;
   rendered Gazebo frames verify the real local VLM path.
 - Focused Moondream and Qwen runs identify simple objects and make bounded
@@ -187,7 +189,7 @@ and `--memory` for editable experience memory.
   camera width. The GUI opens after PX4 spawns the model so it does not reframe
   during takeoff. Depth is only a TOF approximation; DEXI 3 has no lidar.
 - Moving through the collidable `objects` world is verified with `--depth`;
-  camera-only runs do not provide a range reading for obstacle clearance.
+  camera-only runs observe safely but do not provide a range reading.
 - Offboard starts immediately after three CM5 priming setpoints, without an
   extra zero-command delay.
 - The ROS 2 CM5 seam converts body commands with fresh vehicle heading. DEXI 3
