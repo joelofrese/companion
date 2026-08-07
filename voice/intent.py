@@ -7,6 +7,7 @@ from typing import Optional
 FOCUS_PHRASES = (
     "look for",
     "look at",
+    "search for",
     "find",
     "locate",
     "inspect",
