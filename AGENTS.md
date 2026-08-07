@@ -139,6 +139,8 @@ and `--memory` for editable experience memory.
   telemetry verifies that it does not make the repeated visible turn.
 - Exploratory camera and depth runs work in varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm.
+- A near-wall local-brain depth run observed 0.55 m and CM5 backoff at
+  -0.20 m/s before landing and disarm.
 - Fresh visual results permit movement only briefly; stale results, camera
   gaps, stale sensors, malformed commands, low confidence, command loss,
   obstacles, and model shutdown stop safely.
