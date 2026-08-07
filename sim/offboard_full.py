@@ -47,6 +47,9 @@ from vision.video_stream import (
 )
 
 
+MAX_HEADING_CHANGE_DEG = 15.0
+
+
 async def _stop_task(task, stop_event):
     """Stop a service task during cleanup."""
 
@@ -70,6 +73,7 @@ async def run(image_path: str, expect_person: bool = False):
     mac_task = None
     mind_task = None
     telemetry_task = None
+    attitude_task = None
     offboard_task = None
     mac_stop = asyncio.Event()
     mind_stop = asyncio.Event()
@@ -82,6 +86,7 @@ async def run(image_path: str, expect_person: bool = False):
     min_forward_velocity = 0.0
     max_right_velocity = 0.0
     min_right_velocity = 0.0
+    max_heading_change_deg = 0.0
     north_velocity_m_s = None
     east_velocity_m_s = None
     down_velocity_m_s = None
@@ -115,6 +120,21 @@ async def run(image_path: str, expect_person: bool = False):
 
         heading_deg = await prepare(drone)
         armed = True
+
+        async def observe_heading():
+            nonlocal max_heading_change_deg
+            async for attitude in drone.telemetry.attitude_euler():
+                if not math.isfinite(attitude.yaw_deg):
+                    continue
+                change_deg = (
+                    attitude.yaw_deg - heading_deg + 180.0
+                ) % 360.0 - 180.0
+                max_heading_change_deg = max(
+                    max_heading_change_deg,
+                    abs(change_deg),
+                )
+
+        attitude_task = asyncio.create_task(observe_heading())
 
         def body_velocity():
             values = (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
@@ -430,6 +450,15 @@ async def run(image_path: str, expect_person: bool = False):
                 raise RuntimeError(f"full stack did not observe {objective} at CM5")
             print(f"Mission objective passed: {objective} through CM5.")
         print("Repeated following and hover intent through CM5=verified.")
+        if max_heading_change_deg > MAX_HEADING_CHANGE_DEG:
+            raise RuntimeError(
+                "full stack rotated unexpectedly: "
+                f"{max_heading_change_deg:.1f} degrees"
+            )
+        print(
+            "PX4 heading hold=verified through full Mac/CM5 stack: "
+            f"maximum change {max_heading_change_deg:.1f} degrees."
+        )
         print(f"Max observed forward velocity: {max_forward_velocity:.2f}m/s")
         print(f"Min observed forward velocity: {min_forward_velocity:.2f}m/s")
         print(
@@ -453,6 +482,9 @@ async def run(image_path: str, expect_person: bool = False):
         if telemetry_task is not None:
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
+        if attitude_task is not None:
+            attitude_task.cancel()
+            await asyncio.gather(attitude_task, return_exceptions=True)
         if offboard_task is not None and not offboard_task.done():
             offboard_task.cancel()
             await asyncio.gather(offboard_task, return_exceptions=True)
