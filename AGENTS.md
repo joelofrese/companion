@@ -166,8 +166,8 @@ and `--memory` for editable experience memory.
   simulated space.
 - RTP person/no-person fixtures verify the video, Mac, CM5, and PX4 path;
   rendered Gazebo frames verify the real local VLM path.
-- Focused Moondream and Qwen runs identify simple objects and make bounded
-  movement; uncertainty still stops safely.
+- Focused Qwen runs identify simple objects but are much slower; faster
+  Moondream may remain uncertain, and uncertainty still stops safely.
 - Exploratory `--faults` runs reuse the deterministic safety schedule without
   requiring exact brain decisions, while checking the observed CM5 safe
   outputs for each reached fault.
