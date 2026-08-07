@@ -16,6 +16,14 @@ FOCUS_PHRASES = (
     "where is",
 )
 FOCUS_STOP_WORDS = frozenset(("around", "in", "near", "on", "over", "under"))
+NEGATION_WORDS = frozenset(("no", "not", "never", "dont", "don't"))
+
+
+def _words(transcript: str) -> list[str]:
+    if not isinstance(transcript, str):
+        return []
+    normalized = transcript.lower().replace("’", "'")
+    return re.sub(r"[^a-z0-9']", " ", normalized).split()
 
 
 def _contains_phrase(words: list[str], phrase: str) -> bool:
@@ -30,13 +38,8 @@ def _contains_phrase(words: list[str], phrase: str) -> bool:
 def parse_focus(transcript: str) -> Optional[str]:
     """Return the subject of a direct visual request, if there is one."""
 
-    if not isinstance(transcript, str):
-        return None
-    normalized = transcript.lower().replace("’", "'")
-    words = re.sub(r"[^a-z0-9']", " ", normalized).split()
-    if not words or any(
-        word in {"no", "not", "never", "dont", "don't"} for word in words
-    ):
+    words = _words(transcript)
+    if not words or any(word in NEGATION_WORDS for word in words):
         return None
     for phrase in FOCUS_PHRASES:
         phrase_words = phrase.split()
@@ -65,14 +68,11 @@ def parse_focus(transcript: str) -> Optional[str]:
 def parse_intent(transcript: str) -> Optional[str]:
     """Return one clear intent, or none."""
 
-    if not isinstance(transcript, str):
-        return None
-    normalized = transcript.lower().replace("’", "'")
-    words = re.sub(r"[^a-z0-9']", " ", normalized).split()
+    words = _words(transcript)
     if not words:
         return None
 
-    if any(word in {"no", "not", "never", "dont", "don't"} for word in words):
+    if any(word in NEGATION_WORDS for word in words):
         return None
 
     if any(

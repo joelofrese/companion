@@ -49,7 +49,7 @@ from sim.offboard_control import (
     THIRD_FOLLOW_START_S,
 )
 from sim.safety_stack import SimulatedSafetyStack
-from voice.intent import parse_intent
+from voice.intent import parse_focus, parse_intent
 
 
 TARGET_RIGHT_START_S = 1.0
@@ -801,6 +801,14 @@ async def run(
                 print("Explicit hover dialogue stop=verified.")
         elif dialogue_request is not None:
             print("Scripted open-ended dialogue=delivered to the conscious mind.")
+        requested_focus = parse_focus(dialogue_request or "")
+        if requested_focus:
+            if decision.focus != requested_focus:
+                raise RuntimeError(
+                    "SITL did not preserve the scripted visual focus: "
+                    f"expected {requested_focus}, got {decision.focus or 'none'}"
+                )
+            print(f"Scripted visual focus=verified: {requested_focus}.")
         print(
             "Conscious Mac decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."
