@@ -721,6 +721,11 @@ async def run(
                     reason = "camera frame lease expired"
                 elif observation.confidence < MIN_MOVEMENT_CONFIDENCE:
                     reason = "VLM confidence is below the movement threshold"
+                elif (
+                    observation.focused_answer
+                    and parse_intent(control.mind.intent) is None
+                ):
+                    reason = "visual focus confirmed"
                 elif observation.movement in ("stop", "hover"):
                     reason = f"VLM suggested {observation.movement}"
                 else:

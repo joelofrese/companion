@@ -180,6 +180,7 @@ and `--memory` for editable experience memory.
   stops Mac motion. CM5 remains the final authority.
 - Local VLM prompt boilerplate becomes unclear zero-confidence input and cannot
   cause movement.
+- A confirmed one-shot visual focus stops motion; open-ended goals keep going.
 - Intent changes invalidate old visual context; same-goal rewording does not.
   Experience memory persists recent observations, decisions, and measured
   command outcomes across exploratory runs.
