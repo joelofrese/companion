@@ -322,7 +322,7 @@ async def run(
             gazebo_depth = GazeboDepthRangefinder("/depth_camera")
             gazebo_depth.start()
 
-        await prepare(drone)
+        heading_deg = await prepare(drone)
         armed = True
 
         async def observe_heading():
@@ -341,7 +341,7 @@ async def run(
 
         attitude_task = asyncio.create_task(observe_heading())
 
-        forwarder = MavsdkVelocityForwarder(drone)
+        forwarder = MavsdkVelocityForwarder(drone, heading_deg)
 
         safe_commands = RecordingForwarder(forwarder)
 

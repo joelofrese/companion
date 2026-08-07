@@ -141,8 +141,8 @@ and `--memory` for editable experience memory.
 
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, safety, hover, landing, and disarm.
-- Simulations start at zero yaw, hold that heading through takeoff, and leave
-  the Gazebo camera user-controlled.
+- Simulations start at zero yaw, hold it through takeoff and every setpoint,
+  and leave the Gazebo camera user-controlled.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path
   and provides simple objects for rendered-camera perception.
 - With a focused request, the local VLM found the red box and the conscious
