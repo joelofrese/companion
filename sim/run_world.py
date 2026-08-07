@@ -74,6 +74,13 @@ def _stop_process(process):
     _stop_process_group(process, process_group_id)
 
 
+def _stop_processes(processes):
+    """Stop processes in reverse start order."""
+
+    for process in reversed(processes):
+        _stop_process(process)
+
+
 def _validate_pose(pose: Optional[str]) -> Optional[str]:
     if pose is None:
         return None
@@ -138,20 +145,10 @@ def _run_once(
         environment["GZ_SIM_SERVER_CONFIG_PATH"] = str(
             px4_dir / "src/modules/simulation/gz_bridge/server.config"
         )
-        world_processes.append(
-            subprocess.Popen(
-                [gz, "sim", "-r", "-s", str(local_world_file)],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-                env=environment,
-            )
-        )
-        if not environment.get("HEADLESS"):
+        try:
             world_processes.append(
                 subprocess.Popen(
-                    [gz, "sim", "-g"],
+                    [gz, "sim", "-r", "-s", str(local_world_file)],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -159,30 +156,50 @@ def _run_once(
                     env=environment,
                 )
             )
+            if not environment.get("HEADLESS"):
+                world_processes.append(
+                    subprocess.Popen(
+                        [gz, "sim", "-g"],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                        env=environment,
+                    )
+                )
+        except BaseException:
+            _stop_processes(world_processes)
+            raise
     model = "gz_x500"
     if depth:
         model = "gz_x500_depth"
     elif camera:
         model = "gz_x500_mono_cam"
 
-    process = subprocess.Popen(
-        [
-            stdbuf,
-            "-oL",
-            "-eL",
-            "make",
-            "px4_sitl",
-            model,
-        ],
-        cwd=px4_dir,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL,
-        bufsize=0,
-        start_new_session=True,
-        env=environment,
-    )
-    process_group_id = os.getpgid(process.pid)
+    process = None
+    try:
+        process = subprocess.Popen(
+            [
+                stdbuf,
+                "-oL",
+                "-eL",
+                "make",
+                "px4_sitl",
+                model,
+            ],
+            cwd=px4_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            bufsize=0,
+            start_new_session=True,
+            env=environment,
+        )
+        process_group_id = os.getpgid(process.pid)
+    except BaseException:
+        _stop_process(process)
+        _stop_processes(world_processes)
+        raise
     ready = threading.Event()
     finished = threading.Event()
     output_thread = threading.Thread(
@@ -238,8 +255,7 @@ def _run_once(
         return result.returncode
     finally:
         _stop_process_group(process, process_group_id)
-        for world_process in reversed(world_processes):
-            _stop_process(world_process)
+        _stop_processes(world_processes)
 
 
 def run(
