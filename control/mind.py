@@ -238,7 +238,7 @@ class MacMind:
         )
         with self._lock:
             if not self._closed and self._intent_generation == intent_generation:
-                if observation.focused_answer:
+                if observation.focused_answer and focus == self.memory.focus:
                     self.memory.focus_requested = False
                 self.memory.previous_movement = observation.movement
                 self.memory.previous_observation = observation.description
