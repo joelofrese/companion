@@ -20,7 +20,7 @@ from control.mind import (
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
-MAX_OUTPUT_TOKENS = 128
+MAX_OUTPUT_TOKENS = 64
 MAX_IMAGE_SIDE = 640
 
 VISION_SCHEMA = {

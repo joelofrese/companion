@@ -286,6 +286,8 @@ class MacMind:
                     next_focus = ""
                 if next_focus.lower() not in PLACEHOLDER_TEXT:
                     focus = next_focus
+            if not focus:
+                focus = information.focus
             summary = decision.summary.strip() if isinstance(decision.summary, str) else ""
             if not summary:
                 summary = information.summary
