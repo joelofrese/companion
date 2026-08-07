@@ -93,7 +93,9 @@ class MindRuntime:
         """Run one subconscious step and return one safe command."""
 
         if self._error is not None:
-            raise RuntimeError("conscious brain failed") from self._error
+            raise RuntimeError(
+                f"conscious brain failed: {self._error}"
+            ) from self._error
         if intent is not None:
             self.mind.set_intent(intent)
         self._collect()
