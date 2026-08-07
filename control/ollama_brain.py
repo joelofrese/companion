@@ -297,13 +297,10 @@ The summary should stay short and describe what the drone currently knows.
             think=False,
         )
         intent = _text(data, "intent") or information.intent
-        focus = _text(data, "focus")
-        if focus.lower() in {"stop", "camera", "camera frame"}:
-            focus = information.focus
         return ConsciousDecision(
             intent=intent,
             intent_changed=data.get("intent_changed") is True,
-            focus=focus,
+            focus=_text(data, "focus"),
             dialogue=_text(data, "dialogue"),
             summary=_text(data, "summary"),
         )

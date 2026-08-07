@@ -65,16 +65,16 @@ INVALID_SENSOR_START_S = 4.2
 INVALID_SENSOR_END_S = 4.6
 DROPOUT_START_S = 4.6
 DROPOUT_END_S = 5.2
-LINK_RECOVERY_END_S = 5.35
-INVALID_COMMAND_START_S = 5.35
-INVALID_COMMAND_END_S = 5.75
+LINK_RECOVERY_END_S = 5.6
+INVALID_COMMAND_START_S = 5.6
+INVALID_COMMAND_END_S = 5.95
 LOW_CONFIDENCE_START_S = 12.4
 LOW_CONFIDENCE_END_S = 12.8
 STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
 VELOCITY_TELEMETRY_START_S = 13.1
 VELOCITY_TELEMETRY_END_S = 13.6
-HOVER_START_S = 5.8
+HOVER_START_S = 6.0
 VISUAL_FAILURE_START_S = 12.2
 VISUAL_FAILURE_END_S = 12.6
 CONSCIOUS_FAILURE_START_S = 24.2
@@ -353,7 +353,7 @@ async def run(
             gazebo_depth = GazeboDepthRangefinder("/depth_camera")
             gazebo_depth.start()
 
-        heading_deg = await prepare(drone)
+        await prepare(drone)
         armed = True
 
         async def observe_heading():
@@ -379,7 +379,6 @@ async def run(
 
         stack = SimulatedSafetyStack(
             drone,
-            heading_deg,
             obstacle_distance=distance_sensor.read,
             velocity_provider=vehicle_velocity,
         )

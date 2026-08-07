@@ -13,6 +13,7 @@ MAX_PENDING_OBSERVATIONS = 32
 MAX_MEMORY_LINES = 64
 MAX_MEMORY_CHARS = 240
 MEMORY_CONTEXT_LINES = 8
+FOCUS_PLACEHOLDERS = frozenset(("stop", "camera", "camera frame"))
 
 
 class CompanionMemory:
@@ -246,9 +247,16 @@ class MacMind:
                 intent = information.intent
             intent_changed = intent != information.intent
             focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
+            if focus.lower() in FOCUS_PLACEHOLDERS:
+                focus = information.focus
             if not focus and information.new_observations:
                 next_focus = information.new_observations[-1].next_focus
-                focus = next_focus.strip() if isinstance(next_focus, str) else ""
+                if isinstance(next_focus, str):
+                    next_focus = next_focus.strip()
+                else:
+                    next_focus = ""
+                if next_focus.lower() not in FOCUS_PLACEHOLDERS:
+                    focus = next_focus
             summary = decision.summary.strip() if isinstance(decision.summary, str) else ""
             if not summary:
                 summary = information.summary

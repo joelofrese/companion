@@ -83,7 +83,7 @@ def _heading_change_deg(start_deg: float, end_deg: float) -> float:
     return abs((end_deg - start_deg + 180.0) % 360.0 - 180.0)
 
 
-async def prepare(drone) -> float:
+async def prepare(drone):
     """Connect, wait for arming health, arm, and reach the air."""
 
     print("Waiting for drone connection...")
@@ -167,7 +167,6 @@ async def prepare(drone) -> float:
             "PX4 takeoff heading hold=verified: "
             f"change {heading_change_deg:.1f} degrees."
         )
-        return takeoff_heading_deg
     except Exception:
         try:
             await asyncio.wait_for(

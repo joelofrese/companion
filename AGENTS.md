@@ -165,11 +165,11 @@ and `--memory` for editable experience memory.
   Experience memory persists across exploratory runs.
 - Conscious thoughts keep the active visual focus across new observations and
   ignore generic model placeholders.
-- Simulations start at zero yaw and keep that heading through offboard
-  handoff. They keep the camera user-controlled and resize frames to the real
-  640-pixel camera width. The GUI opens after PX4 spawns the model so it does
-  not reframe during takeoff. Depth is only a TOF approximation; DEXI 3 has no
-  lidar.
+- Simulations start at zero yaw and send velocity-only setpoints, so PX4 holds
+  that heading through offboard handoff. They keep the camera user-controlled
+  and resize frames to the real 640-pixel camera width. The GUI opens after
+  PX4 spawns the model so it does not reframe during takeoff. Depth is only a
+  TOF approximation; DEXI 3 has no lidar.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
   remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
