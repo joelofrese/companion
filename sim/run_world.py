@@ -159,17 +159,6 @@ def _run_once(
                 env=environment,
             )
         )
-        if not environment.get("HEADLESS"):
-            world_processes.append(
-                subprocess.Popen(
-                    [gz, "sim", "-g", "--gui-config", str(gui_config)],
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                    env=environment,
-                )
-            )
     except BaseException:
         _stop_processes(world_processes)
         raise
@@ -220,6 +209,19 @@ def _run_once(
                 )
             if time.monotonic() >= deadline:
                 raise _BootError("PX4 did not reach pxh> before the boot timeout")
+        if not environment.get("HEADLESS"):
+            # Open the GUI after PX4 has spawned the model. This keeps Gazebo
+            # from reframing or tracking the vehicle as it appears.
+            world_processes.append(
+                subprocess.Popen(
+                    [gz, "sim", "-g", "--gui-config", str(gui_config)],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                    env=environment,
+                )
+            )
         scenario = [sys.executable, "-u", "-m"]
         if image_path:
             scenario += ["sim.offboard_full", str(image_path)]

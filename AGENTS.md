@@ -163,8 +163,9 @@ and `--memory` for editable experience memory.
 - Intent changes invalidate old visual context; same-goal rewording does not.
   Experience memory persists across exploratory runs.
 - Simulations start at zero yaw, keep the camera user-controlled, and resize
-  frames to the real 640-pixel camera width. Depth is only a TOF approximation;
-  DEXI 3 has no lidar.
+  frames to the real 640-pixel camera width. The GUI opens after PX4 spawns the
+  model so it does not reframe during takeoff. Depth is only a TOF
+  approximation; DEXI 3 has no lidar.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
   remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
