@@ -190,12 +190,15 @@ class WorldVisualModel:
             raise RuntimeError("simulated visual model failure")
         target_offset_east_m = self.world.target_offset_east(elapsed_s)
         intent_kind = parse_intent(intent)
+        focus_text = " ".join(focus.lower().split())
+        focused_person = focus_text == "person"
         following = intent_kind == "following"
         exploring = intent_kind == "exploring"
+        tracking_person = following or focused_person
         if target_offset_east_m is None:
             description = (
                 "no person is visible"
-                if following
+                if tracking_person
                 else "no clear path is visible"
             )
             movement = "stop"
@@ -203,15 +206,16 @@ class WorldVisualModel:
             movement = "right"
             description = (
                 "the person is to the right"
-                if following
+                if tracking_person
                 else "open space is to the right"
             )
         else:
             movement = "forward"
-            description = "the person is ahead" if following else "open space is ahead"
-        if not (following or exploring):
+            description = (
+                "the person is ahead" if tracking_person else "open space is ahead"
+            )
+        if not (following or exploring or focused_person):
             movement = "stop"
-        focus_text = " ".join(focus.lower().split())
         description_text = " ".join(description.lower().split())
         focused_answer = (
             description
