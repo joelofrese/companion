@@ -145,6 +145,8 @@ and `--memory` for editable experience memory.
   and disarm.
 - A failed conscious thought holds zero, retries, and retains pending visual
   context for the recovery.
+- Malformed conscious decisions preserve pending visual context for the next
+  thought as well.
 - RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera
   runs exercise the real VLM path.
 - The objects world includes a primitive mannequin; the fast VLM currently

@@ -227,6 +227,31 @@ class MacMind:
             self._new_observations.clear()
         try:
             decision = self.language_model.think(information)
+            if intent_override is not None:
+                if not isinstance(intent_override, str) or not intent_override.strip():
+                    raise ValueError("intent override must be a non-empty string")
+                intent = intent_override.strip()
+            else:
+                if not isinstance(decision.intent, str) or not decision.intent.strip():
+                    raise ValueError("language model returned an empty intent")
+                intent = decision.intent.strip()
+            focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
+            if not focus and information.new_observations:
+                next_focus = information.new_observations[-1].next_focus
+                focus = next_focus.strip() if isinstance(next_focus, str) else ""
+            summary = decision.summary.strip() if isinstance(decision.summary, str) else ""
+            if not summary:
+                summary = information.summary
+            decision = ConsciousDecision(
+                intent=intent,
+                focus=focus,
+                dialogue=(
+                    decision.dialogue.strip()
+                    if isinstance(decision.dialogue, str)
+                    else ""
+                ),
+                summary=summary,
+            )
         except Exception:
             with self._lock:
                 if self._intent_generation == intent_generation:
@@ -238,27 +263,6 @@ class MacMind:
                         pending[-MAX_PENDING_OBSERVATIONS:]
                     )
             raise
-        if intent_override is not None:
-            if not isinstance(intent_override, str) or not intent_override.strip():
-                raise ValueError("intent override must be a non-empty string")
-            intent = intent_override.strip()
-        else:
-            if not isinstance(decision.intent, str) or not decision.intent.strip():
-                raise ValueError("language model returned an empty intent")
-            intent = decision.intent.strip()
-        focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
-        if not focus and information.new_observations:
-            next_focus = information.new_observations[-1].next_focus
-            focus = next_focus.strip() if isinstance(next_focus, str) else ""
-        summary = decision.summary.strip() if isinstance(decision.summary, str) else ""
-        if not summary:
-            summary = information.summary
-        decision = ConsciousDecision(
-            intent=intent,
-            focus=focus,
-            dialogue=decision.dialogue,
-            summary=summary,
-        )
         with self._lock:
             if self._intent_generation != intent_generation:
                 return ConsciousDecision(intent=self.memory.intent)

@@ -80,7 +80,9 @@ HOVER_START_S = 5.8
 VISUAL_FAILURE_START_S = 12.2
 VISUAL_FAILURE_END_S = 12.6
 CONSCIOUS_FAILURE_START_S = 24.2
-CONSCIOUS_FAILURE_END_S = 24.6
+# Leave time for the independent conscious loop to observe the fault and make
+# the Mac command go to zero before recovery is allowed.
+CONSCIOUS_FAILURE_END_S = 25.0
 BRAIN_SHUTDOWN_START_S = 29.0
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
