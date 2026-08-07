@@ -265,7 +265,7 @@ async def run(
     exploratory: bool = False,
     faults: bool = False,
     camera: bool = False,
-    world_name: str = "default",
+    world_name: Optional[str] = None,
     duration_s: float = PROFILE_DURATION_S,
     ollama: bool = False,
     vlm_model: str = "moondream",
@@ -279,6 +279,8 @@ async def run(
 ):
     """Run one complete Gazebo world simulation."""
 
+    if world_name is None:
+        world_name = "objects" if exploratory else "default"
     if not math.isfinite(duration_s) or duration_s <= 0.0:
         raise ValueError("simulation duration must be positive")
     if not exploratory and duration_s < PROFILE_DURATION_S:
@@ -1169,7 +1171,10 @@ if __name__ == "__main__":
         action="store_true",
         help="print meaningful VLM observations, conscious decisions, and command reasons",
     )
-    parser.add_argument("--world", default="default")
+    parser.add_argument(
+        "--world",
+        help="Gazebo world name (exploratory runs default to objects)",
+    )
     parser.add_argument("--duration", type=float, default=PROFILE_DURATION_S)
     parser.add_argument(
         "--intent",

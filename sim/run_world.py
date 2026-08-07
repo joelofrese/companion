@@ -270,7 +270,7 @@ def run(
     companion_dir: Path,
     image_path: Optional[Path] = None,
     expect_person: bool = False,
-    world: str = "default",
+    world: Optional[str] = None,
     exploratory: bool = False,
     faults: bool = False,
     camera: bool = False,
@@ -286,6 +286,8 @@ def run(
     dialogue_request: Optional[str] = None,
     trace: bool = False,
 ) -> int:
+    if world is None:
+        world = "objects" if exploratory else "default"
     stdbuf = shutil.which("stdbuf")
     if stdbuf is None:
         raise RuntimeError("stdbuf is required to observe PX4 boot output")
@@ -442,8 +444,7 @@ def main(argv=None):
     )
     parser.add_argument(
         "--world",
-        default="default",
-        help="PX4 or companion Gazebo world name",
+        help="Gazebo world name (exploratory runs default to objects)",
     )
     args = parser.parse_args(argv)
     try:

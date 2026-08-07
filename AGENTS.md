@@ -121,7 +121,8 @@ run.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
-and leaves the Gazebo camera user-controlled.
+and leaves the Gazebo camera user-controlled. Exploratory runs default to this
+world; pass `--world default` to use the empty stock world.
 Oversized simulation frames are reduced to the real 640-pixel camera width
 before the VLM sees them.
 
