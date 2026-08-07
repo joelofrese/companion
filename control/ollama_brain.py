@@ -15,6 +15,7 @@ from control.mind import ConsciousDecision, ConsciousInput, Telemetry, VisualObs
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
 MAX_OUTPUT_TOKENS = 128
+MAX_IMAGE_SIDE = 640
 
 VISION_SCHEMA = {
     "type": "object",
@@ -76,6 +77,9 @@ def _image_base64(image: Any) -> str:
         if len(shape) == 3 and shape[-1] == 3:
             image = image[:, :, ::-1]
         picture = Image.fromarray(image)
+    if max(picture.size) > MAX_IMAGE_SIDE:
+        picture = picture.copy()
+        picture.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
     buffer = BytesIO()
     picture.save(buffer, format="JPEG", quality=80)
     return base64.b64encode(buffer.getvalue()).decode("ascii")

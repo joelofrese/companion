@@ -115,6 +115,8 @@ during an exploratory run.
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
 and leaves the Gazebo camera user-controlled.
+Oversized simulation frames are reduced to the real 640-pixel camera width
+before the VLM sees them.
 
 `--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
 its depth readings feed CM5 safety. This is only a simulation approximation of
@@ -166,6 +168,8 @@ and `--memory` for editable experience memory.
   observations, and 240 conscious thoughts before landing and disarm.
 - A near-wall local-brain depth run observed 0.55 m and CM5 backoff at
   -0.20 m/s before landing and disarm.
+- Gazebo's 1280x960 camera frames are reduced to 640 pixels before local VLM
+  inference, matching the real camera path and reducing visual latency.
 - Fresh visual results permit movement only briefly; stale results, camera
   gaps, stale sensors, malformed commands, low confidence, command loss,
   obstacles, and model shutdown stop safely.
