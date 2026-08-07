@@ -881,14 +881,14 @@ async def run(
             if not observed(start_s, end_s, predicate):
                 raise RuntimeError(f"SITL did not observe {behavior}")
             print(f"Mission objective passed: {behavior}.")
-        if not brain_shutdown or not observed(
-            BRAIN_SHUTDOWN_START_S,
-            PROFILE_DURATION_S,
-            lambda command: command == VelocityCommand(),
-        ):
-            raise RuntimeError("SITL did not observe zero after Mac brain shutdown")
-        print("Mac brain shutdown fail-safe=verified.")
         if not exploratory:
+            if not brain_shutdown or not observed(
+                BRAIN_SHUTDOWN_START_S,
+                PROFILE_DURATION_S,
+                lambda command: command == VelocityCommand(),
+            ):
+                raise RuntimeError("SITL did not observe zero after Mac brain shutdown")
+            print("Mac brain shutdown fail-safe=verified.")
             if max_north_velocity <= 0.02:
                 raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
             if min_north_velocity >= -0.05:

@@ -17,6 +17,8 @@ BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
 BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
+# Align Gazebo's model frame with PX4's NED heading at startup.
+DEFAULT_MODEL_POSE = "0,0,0,0,0,1.57079632679"
 
 
 class _BootError(RuntimeError):
@@ -98,8 +100,7 @@ def _run_once(
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
-    if model_pose is not None:
-        environment["PX4_GZ_MODEL_POSE"] = model_pose
+    environment["PX4_GZ_MODEL_POSE"] = model_pose or DEFAULT_MODEL_POSE
     model = "gz_x500"
     if depth:
         model = "gz_x500_depth"

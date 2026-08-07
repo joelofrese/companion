@@ -173,6 +173,8 @@ reach the conscious LLM.
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, brain shutdown, safety, hover, landing, and
   disarm.
+- The Gazebo runner starts the default vehicle with its visual frame aligned
+  to PX4, so it does not appear to rotate 90 degrees during takeoff.
 - Velocity commands contain only NED velocities; PX4 holds its heading, and
   synthetic simulation checks that actual heading telemetry stays stable.
 - Exploratory camera and depth runs work across varied PX4 worlds with local
