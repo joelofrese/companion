@@ -92,6 +92,8 @@ class MindRuntime:
     ) -> VelocityCommand:
         """Run one subconscious step and return one safe command."""
 
+        if self._closed:
+            return VelocityCommand()
         if self._error is not None:
             raise RuntimeError(
                 f"conscious brain failed: {self._error}"

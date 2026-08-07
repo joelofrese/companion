@@ -171,7 +171,8 @@ reach the conscious LLM.
 ## Current state
 
 - Deterministic Gazebo missions verify the full control path, perception
-  fixtures, faults, recovery, safety, hover, landing, and disarm.
+  fixtures, faults, recovery, brain shutdown, safety, hover, landing, and
+  disarm.
 - Velocity commands contain only NED velocities; PX4 holds its heading, and
   synthetic simulation checks that actual heading telemetry stays stable.
 - Exploratory camera and depth runs work across varied PX4 worlds with local

@@ -77,6 +77,7 @@ LOW_CONFIDENCE_END_S = 12.8
 STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
+BRAIN_SHUTDOWN_START_S = 29.0
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
 ATTITUDE_TELEMETRY_RATE_HZ = 5.0
@@ -89,6 +90,7 @@ class WorldStep:
     distance_fresh: bool = True
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
+    brain_shutdown: bool = False
 
 
 class SyntheticWorld:
@@ -116,6 +118,8 @@ class SyntheticWorld:
     ) -> WorldStep:
         if self.exploratory:
             return WorldStep()
+        if elapsed_s >= BRAIN_SHUTDOWN_START_S:
+            return WorldStep(brain_shutdown=True)
         if STALE_SENSOR_START_S <= elapsed_s < STALE_SENSOR_END_S:
             return WorldStep(distance_fresh=False)
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
@@ -294,6 +298,7 @@ async def run(
     gazebo_depth = None
     control = None
     applied_dialogue_intent = None
+    brain_shutdown = False
     offboard_started = False
     armed = False
     landed = False
@@ -419,10 +424,14 @@ async def run(
             return replace(step, obstacle_distance_m=distance_sensor.read())
 
         def send_packet(timestamp_s: float, step, intent=None):
-            nonlocal camera_frames
+            nonlocal brain_shutdown, camera_frames
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
+            if step.brain_shutdown and not brain_shutdown:
+                control.close()
+                mind_stop.set()
+                brain_shutdown = True
             telemetry = brain_telemetry()
             command = control.tick(
                 frame=frame,
@@ -533,6 +542,8 @@ async def run(
                 return "intent changed back to following"
             if THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S:
                 return "intent changed to following again"
+            if step.brain_shutdown:
+                return "Mac brain shutdown; holding zero"
             if elapsed_s >= HOVER_START_S:
                 return "intent changed to hover"
             return None
@@ -870,6 +881,13 @@ async def run(
             if not observed(start_s, end_s, predicate):
                 raise RuntimeError(f"SITL did not observe {behavior}")
             print(f"Mission objective passed: {behavior}.")
+        if not brain_shutdown or not observed(
+            BRAIN_SHUTDOWN_START_S,
+            PROFILE_DURATION_S,
+            lambda command: command == VelocityCommand(),
+        ):
+            raise RuntimeError("SITL did not observe zero after Mac brain shutdown")
+        print("Mac brain shutdown fail-safe=verified.")
         if not exploratory:
             if max_north_velocity <= 0.02:
                 raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
