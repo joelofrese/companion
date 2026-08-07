@@ -18,7 +18,7 @@ from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.safety import LatestDistanceSensor
 from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
-from sim.fixed_brain import FixedLanguageModel
+from sim.fixed_brain import FixedLanguageModel, FixedVisualModel
 from sim.mavsdk_forwarder import MavsdkVelocityForwarder
 from sim.offboard_control import (
     DistanceMessage,
@@ -41,7 +41,6 @@ from sim.offboard_control import (
     demo_state,
 )
 from sim.video_loopback import image_sender_command
-from sim.yolo_vision import YoloVisualModel
 from vision.video_stream import (
     AsyncLatestFrameReader,
     GStreamerH264Receiver,
@@ -180,11 +179,7 @@ async def run(image_path: str, expect_person: bool = False):
 
         control = MindRuntime(
             MacMind(
-                YoloVisualModel(
-                    model_path="yolov8n.pt",
-                    frame_width_px=video_config.width,
-                    target_height_px=video_config.height * 0.75,
-                ),
+                FixedVisualModel(expect_person),
                 FixedLanguageModel(),
             )
         )
@@ -490,7 +485,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--expect-person",
         action="store_true",
-        help="require the image to produce visual following",
+        help="use the deterministic person fixture for the RTP check",
     )
     args = parser.parse_args()
     asyncio.run(run(args.image_path, args.expect_person))

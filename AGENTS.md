@@ -91,17 +91,18 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
-.venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/zidane.jpg --expect-person
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
+.venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg --expect-person
 ```
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The deterministic synthetic
 world checks motion, target loss, obstacles, invalid and stale sensors,
 command faults, recovery, hover, shutdown, landing, and disarm. The RTP image
-scenario checks decoded video, perception fixtures, Mac commands, CM5 safety,
-PX4, landing, and disarm. YOLO is only a repeatable image fixture, not the
-production brain. A person image needs `--expect-person`; a non-person image
-should remain stopped.
+scenario checks decoded video, deterministic person/non-person fixtures, Mac
+commands, CM5 safety, PX4, landing, and disarm. `--expect-person` selects the
+person fixture; without it the fixture stays stopped. The image still travels
+through the complete RTP path. Real visual perception is checked through the
+Gazebo camera with Ollama, not this deterministic fixture.
 
 `--camera` uses Gazebo's rendered camera as VLM input. Without `--ollama`, it
 checks camera transport and keeps the brain stopped. With `--ollama`, local
@@ -141,6 +142,8 @@ and `--memory` for editable experience memory.
 
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, safety, hover, landing, and disarm.
+- RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera
+  runs exercise the real VLM path.
 - Simulations start at zero yaw, hold it through takeoff and every setpoint,
   and leave the Gazebo camera user-controlled.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path

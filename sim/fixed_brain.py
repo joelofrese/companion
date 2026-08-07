@@ -1,6 +1,40 @@
-"""Keep the requested intent during a deterministic simulation."""
+"""Keep deterministic brain behavior for simulation fixtures."""
 
-from control.mind import ConsciousDecision
+from control.mind import ConsciousDecision, Telemetry, VisualObservation
+
+
+class FixedVisualModel:
+    """Return a fixed person or no-person observation for RTP checks."""
+
+    def __init__(self, person: bool):
+        self.person = person
+
+    def observe(
+        self,
+        image,
+        timestamp_s: float,
+        focus: str,
+        intent: str,
+        previous_movement: str,
+        previous_observation: str,
+        telemetry: Telemetry,
+    ) -> VisualObservation:
+        if self.person:
+            description = "a person is visible ahead"
+            movement = "forward" if intent == "following" else "stop"
+            confidence = 1.0
+        else:
+            description = "no person is visible"
+            movement = "stop"
+            confidence = 0.0
+        return VisualObservation(
+            timestamp_s=timestamp_s,
+            description=description,
+            focused_answer=description if focus else "",
+            movement=movement,
+            next_focus=focus or "person",
+            confidence=confidence,
+        )
 
 
 class FixedLanguageModel:

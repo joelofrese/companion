@@ -370,7 +370,7 @@ def main(argv=None):
     parser.add_argument(
         "--expect-person",
         action="store_true",
-        help="require the image to produce visual following",
+        help="use the deterministic person fixture for the RTP check",
     )
     parser.add_argument(
         "--explore",
