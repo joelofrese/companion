@@ -251,11 +251,11 @@ class MindRuntime:
                 pass
 
     def close(self):
-        """Finish background VLM work before closing."""
+        """Stop new work so later ticks return zero immediately."""
 
         if self._closed:
             return
         self._closed = True
         if self._future is not None:
             self._future.cancel()
-        self._executor.shutdown(wait=True, cancel_futures=True)
+        self._executor.shutdown(wait=False, cancel_futures=True)
