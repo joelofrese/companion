@@ -112,11 +112,12 @@ async def run(image_path: str, expect_person: bool = False):
         )
         print("RTP camera loopback started.")
 
-        await prepare(drone)
+        heading_deg = await prepare(drone)
         armed = True
 
         stack = SimulatedSafetyStack(
             drone,
+            heading_deg,
             obstacle_distance=cm5_obstacle_distance,
             velocity_provider=lambda: (
                 north_velocity_m_s,

@@ -227,12 +227,15 @@ worth checking next, or empty.
         if movement not in MOVEMENTS:
             movement = "stop"
         description = _text(data, "description") or "the scene is unclear"
+        next_focus = _text(data, "next_focus")
+        if next_focus.lower() == "stop":
+            next_focus = ""
         return VisualObservation(
             timestamp_s=timestamp_s,
             description=description,
             focused_answer=_text(data, "focused_answer"),
             movement=movement,
-            next_focus=_text(data, "next_focus"),
+            next_focus=next_focus,
             confidence=_confidence(data),
         )
 

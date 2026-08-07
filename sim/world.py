@@ -353,7 +353,7 @@ async def run(
             gazebo_depth = GazeboDepthRangefinder("/depth_camera")
             gazebo_depth.start()
 
-        await prepare(drone)
+        heading_deg = await prepare(drone)
         armed = True
 
         async def observe_heading():
@@ -379,6 +379,7 @@ async def run(
 
         stack = SimulatedSafetyStack(
             drone,
+            heading_deg,
             obstacle_distance=distance_sensor.read,
             velocity_provider=vehicle_velocity,
         )
