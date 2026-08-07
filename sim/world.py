@@ -77,6 +77,10 @@ LOW_CONFIDENCE_END_S = 12.8
 STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
+VISUAL_FAILURE_START_S = 12.2
+VISUAL_FAILURE_END_S = 12.6
+CONSCIOUS_FAILURE_START_S = 24.2
+CONSCIOUS_FAILURE_END_S = 24.6
 BRAIN_SHUTDOWN_START_S = 29.0
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
@@ -110,6 +114,12 @@ class SyntheticWorld:
         ):
             return 0.0
         return 1.0
+
+    def visual_failure(self, elapsed_s: float) -> bool:
+        return (
+            not self.exploratory
+            and VISUAL_FAILURE_START_S <= elapsed_s < VISUAL_FAILURE_END_S
+        )
 
     def step(
         self,
@@ -172,6 +182,8 @@ class WorldVisualModel:
                 next_focus=focus,
             )
         elapsed_s = max(0.0, timestamp_s - self.started_at_s)
+        if self.world.visual_failure(elapsed_s):
+            raise RuntimeError("simulated visual model failure")
         target_offset_east_m = self.world.target_offset_east(elapsed_s)
         if target_offset_east_m is None:
             description = "no person is visible"
@@ -215,6 +227,8 @@ class WorldLanguageModel:
                 dialogue = f"Intent changed to {self.intent}."
         if not self.exploratory:
             elapsed_s = max(0.0, time.monotonic() - self.started_at_s)
+            if CONSCIOUS_FAILURE_START_S <= elapsed_s < CONSCIOUS_FAILURE_END_S:
+                raise RuntimeError("simulated conscious model failure")
             following = (
                 elapsed_s < HOVER_START_S
                 or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
@@ -532,6 +546,10 @@ async def run(
                 return "invalid obstacle reading"
             if not step.transmit:
                 return "command link dropout"
+            if VISUAL_FAILURE_START_S <= elapsed_s < VISUAL_FAILURE_END_S:
+                return "visual model failure; holding zero"
+            if CONSCIOUS_FAILURE_START_S <= elapsed_s < CONSCIOUS_FAILURE_END_S:
+                return "conscious model failure; holding zero"
             if step.command_override is not None:
                 return "out-of-bounds command"
             if LOW_CONFIDENCE_START_S <= elapsed_s < LOW_CONFIDENCE_END_S:
@@ -820,6 +838,18 @@ async def run(
                 "following recovery after low-confidence vision",
             ),
             (
+                VISUAL_FAILURE_START_S,
+                VISUAL_FAILURE_END_S + 0.1,
+                lambda command: command == VelocityCommand(),
+                "visual model failure fail-safe",
+            ),
+            (
+                VISUAL_FAILURE_END_S + 0.1,
+                LOW_CONFIDENCE_END_S + 0.2,
+                lambda command: command.north_m_s > 0.0,
+                "visual model recovery",
+            ),
+            (
                 STALE_SENSOR_START_S + 0.2,
                 STALE_SENSOR_END_S,
                 lambda command: command == VelocityCommand(),
@@ -872,6 +902,18 @@ async def run(
                 THIRD_FOLLOW_END_S,
                 lambda command: command.north_m_s > 0.0,
                 "following after second hover",
+            ),
+            (
+                CONSCIOUS_FAILURE_START_S,
+                CONSCIOUS_FAILURE_END_S + 0.1,
+                lambda command: command == VelocityCommand(),
+                "conscious model failure fail-safe",
+            ),
+            (
+                CONSCIOUS_FAILURE_END_S + 0.1,
+                THIRD_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "conscious model recovery",
             ),
             (
                 THIRD_FOLLOW_END_S,

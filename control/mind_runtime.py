@@ -36,7 +36,7 @@ class MindRuntime:
         self._last_frame_at_s: Optional[float] = None
         self._observation_intent: Optional[str] = None
         self._decision: Optional[ConsciousDecision] = None
-        self._error: Optional[Exception] = None
+        self._thought_error: Optional[Exception] = None
         self._closed = False
         self._observation_count = 0
         self._decision_count = 0
@@ -94,10 +94,6 @@ class MindRuntime:
 
         if self._closed:
             return VelocityCommand()
-        if self._error is not None:
-            raise RuntimeError(
-                f"conscious brain failed: {self._error}"
-            ) from self._error
         if intent is not None:
             self.mind.set_intent(intent)
         self._collect()
@@ -115,7 +111,7 @@ class MindRuntime:
         if self._observation is not None:
             age_s = self.latest_observation_age_s
             frame_age_s = self.latest_frame_age_s
-            if (
+            if self._thought_error is None and (
                 self._observation_intent == self.mind.intent
                 and age_s is not None
                 and age_s <= MAX_MOVEMENT_AGE_S
@@ -136,7 +132,16 @@ class MindRuntime:
             return
         future = self._future
         self._future = None
-        self._observation = future.result()
+        try:
+            observation = future.result()
+        except Exception:
+            # A failed frame cannot justify movement. Retry the next frame.
+            self._observation = None
+            self._observation_ready_at_s = None
+            self._observation_intent = None
+            self._future_intent = None
+            return
+        self._observation = observation
         self._observation_ready_at_s = time.monotonic()
         self._observation_count += 1
         self._observation_intent = self._future_intent
@@ -209,10 +214,23 @@ class MindRuntime:
                     self._intent_override,
                 )
             except Exception as error:
-                self._error = error
-                return
+                if (
+                    self._thought_error is None
+                    or str(error) != str(self._thought_error)
+                ):
+                    print(
+                        f"Conscious thought failed; holding zero and retrying: {error}",
+                        flush=True,
+                    )
+                self._thought_error = error
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=period_s)
+                except asyncio.TimeoutError:
+                    pass
+                continue
             if decision is None:
                 return
+            self._thought_error = None
             self._decision = decision
             self._decision_count += 1
             if decision.dialogue:
