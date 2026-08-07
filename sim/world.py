@@ -33,7 +33,13 @@ from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService
 from onboard.safety import LatestDistanceSensor
-from sim.flight import RecordingForwarder, close_mavsdk, land, prepare, wait_for_offboard
+from sim.flight import (
+    RecordingForwarder,
+    close_mavsdk,
+    land,
+    prepare,
+    wait_for_offboard,
+)
 from sim.gazebo_camera import GazeboCamera
 from sim.gazebo_depth import GazeboDepthRangefinder
 from sim.mavsdk_forwarder import MavsdkVelocityForwarder
@@ -72,6 +78,7 @@ STALE_SENSOR_END_S = 15.5
 HOVER_START_S = 5.8
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
+ATTITUDE_TELEMETRY_RATE_HZ = 5.0
 DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
 
 
@@ -307,6 +314,7 @@ async def run(
             gazebo_depth.start()
 
         await prepare(drone)
+        await drone.telemetry.set_rate_attitude_euler(ATTITUDE_TELEMETRY_RATE_HZ)
         armed = True
 
         async def observe_heading():

@@ -10,6 +10,7 @@ from mavsdk.telemetry import LandedState
 TAKEOFF_ALTITUDE = 2.0
 PREPARE_TIMEOUT_S = 30.0
 FLIGHT_ACTION_TIMEOUT_S = 120.0
+VELOCITY_TELEMETRY_RATE_HZ = 10.0
 
 
 class RecordingForwarder:
@@ -88,6 +89,7 @@ async def prepare(drone):
             f"vehicle did not become ready to arm within {PREPARE_TIMEOUT_S:.0f}s"
         ) from error
     print("Ready.")
+    await drone.telemetry.set_rate_velocity_ned(VELOCITY_TELEMETRY_RATE_HZ)
 
     print("Arming...")
     try:
