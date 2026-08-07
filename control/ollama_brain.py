@@ -73,6 +73,30 @@ def _meaningful_text(data: Dict[str, Any], name: str) -> str:
     return "" if value.lower() in PLACEHOLDER_TEXT else value
 
 
+def _confirmed_focus(answer: str, focus: str) -> str:
+    """Keep an answer only when it confirms the requested focus."""
+
+    focus_text = " ".join(focus.lower().split())
+    answer_text = " ".join(answer.lower().split())
+    if not focus_text or not answer_text:
+        return "" if not focus_text else answer
+    if any(
+        phrase in answer_text
+        for phrase in (
+            "not visible",
+            "cannot see",
+            "can't see",
+            "don't see",
+            "do not see",
+        )
+    ) or f"no {focus_text}" in answer_text:
+        return ""
+    answer_words = {word.strip(".,!?;:") for word in answer_text.split()}
+    if all(word in answer_words for word in focus_text.split()):
+        return answer
+    return ""
+
+
 def _confidence(data: Dict[str, Any]) -> float:
     value = data.get("confidence", 0.0)
     if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
@@ -243,7 +267,10 @@ worth checking next, or empty.
             movement = "stop"
         description = _meaningful_text(data, "description")
         next_focus = _meaningful_text(data, "next_focus")
-        focused_answer = _meaningful_text(data, "focused_answer")
+        focused_answer = _confirmed_focus(
+            _meaningful_text(data, "focused_answer"),
+            focus,
+        )
         confidence = _confidence(data)
         description_key = description.lower().strip(" .!?")
         if (
