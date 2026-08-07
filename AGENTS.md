@@ -145,6 +145,8 @@ and `--memory` for editable experience memory.
 - Ollama VLM and LLM sessions support structured observations, intent,
   dialogue, focused vision, memory, and voice. Trace output shows their
   observable decisions and Mac/CM5 command reasons.
+- Scripted hover and follow requests are verified through the rendered-camera
+  path; hover stays still and follow remains bounded.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
   remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
