@@ -5,11 +5,11 @@ This is a short, living guide. Keep it accurate, simple, and editable.
 ## Goal
 
 Build an autonomous indoor companion drone that notices, decides, moves
-deliberately, and stays safe. Continuously develop its capabilities so it can
-learn over time.
+deliberately, and stays safe. Keep developing its capabilities so it can learn
+over time.
 
-Develop and test it autonomously in simulation whenever possible, so progress
-does not depend on hardware.
+Develop and test it in simulation whenever possible, so progress does not
+depend on hardware.
 
 ## Priorities
 
@@ -17,80 +17,70 @@ does not depend on hardware.
 2. Simple code and design.
 3. Minimal code and design.
 
-Keeping the code this simple makes it easy for anyone to understand, debug,
-develop, and maintain.
+This makes the system easy for anyone to understand, debug, develop, and
+maintain.
 
 Remove dead code, speculative configuration, and abstractions without present
-value. Refactor broadly when it makes the whole system cleaner. Continuously
-review the codebase, simplify it, and then develop aligned companion
-capabilities. Repeat that loop without waiting for confirmation.
+value. Refactor broadly when it makes the whole system simpler. Keep reviewing,
+simplifying, and developing aligned companion capabilities without waiting for
+confirmation.
 
 ## Git
 
 Work directly on `main` in this single-contributor repository. Push verified
-checkpoints there; use a temporary branch only for risky isolated work, then
+checkpoints there. Use a temporary branch only for risky isolated work, then
 merge and delete it.
 
 ## Control flow
 
-- The Mac brain uses a subconscious VLM to describe images and suggest cautious
-  movement.
-- The Mac conscious LLM uses those observations, dialogue, telemetry, and
-  memory to choose high-level intent.
-- Mac control turns the suggestion into slow velocity commands.
-- A changed intent invalidates older visual context and pending brain results.
-- A recognized dialogue intent stays active until a new open-ended dialogue
-  request releases it.
-- Low-confidence visual suggestions become zero motion.
-- CM5 safety rejects stale, malformed, or unsafe commands and applies local
-  obstacle protection.
-- CM5 returns fresh TOF and vehicle telemetry over the same UDP link; missing
-  or stale readings stop Mac motion while CM5 remains the final safety
-  authority.
+- The Mac runs a subconscious VLM and a conscious LLM in separate sessions.
+- The VLM describes images and suggests cautious movement.
+- The LLM uses observations, dialogue, telemetry, and memory to choose intent.
+- Mac control turns that intent and visual suggestion into slow velocity.
+- A changed intent invalidates old visual context and pending brain results.
+- A recognized dialogue intent stays active until a new open-ended request.
+- Low-confidence, stale, malformed, or missing input becomes zero motion.
+- CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
+  protects against obstacles, and is the final vehicle-side authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
-The brain never sends motor or attitude commands. The flight interface is
-velocity-only: no absolute position or motor commands. Stale or invalid input
-becomes zero motion, and a fresh obstacle reading may override normal intent.
+The brain sends velocity only: never motor, attitude, or absolute-position
+commands. A fresh obstacle reading may override normal intent. Keep movement
+slow, deliberate, and easy to stop.
 
-## Where code runs
+## Hardware boundary
 
 Heavy perception, cognition, and interaction run on the Mac. The CM5 relays
-video and sensor telemetry, performs the final safety check, and forwards
-approved velocity setpoints to PX4. Keep hardware-specific code on the CM5
-side so Mac behavior stays easy to simulate.
+video and telemetry, performs the final safety checks, and forwards approved
+velocity setpoints to PX4. Keep hardware-specific code on the CM5 so Mac
+behavior stays easy to simulate.
 
-The target hardware is the DroneBlocks DEXI 3: PX4, optical flow, a TOF
-distance sensor, a Raspberry Pi camera, and a Raspberry Pi CM5. It has no
-lidar. Keep simulation sensors clearly separate from this hardware boundary.
-
-Keep the VLM and conscious LLM as separate sessions with small structured data
-between them. Keep movement slow, deliberate, and easy to stop.
+The target is the DroneBlocks DEXI 3: PX4, optical flow, a TOF distance sensor,
+a Raspberry Pi camera, and a Raspberry Pi CM5. It has no lidar. Keep
+simulation-only sensors separate from this hardware boundary.
 
 ## Simulation and validation
 
 PX4 SITL with Gazebo is the primary development environment and the authority
-for software flight behavior. Build thorough scenarios that exercise the full
-control path, perception, varied worlds, faults, recovery, safety, long runs,
-landing, and disarm. Verify actual output or telemetry, including connection,
-readiness, arming, offboard setpoints, motion, safety intervention, landing,
-and disarm.
-Simulation readiness checks local position and magnetometer health, not global
-position or home health, so the flight path does not require GPS.
+for software flight behavior. Exercise the full control path, perception,
+varied worlds, faults, recovery, safety, long runs, landing, and disarm.
+Verify actual output or telemetry, including connection, readiness, arming,
+setpoints, motion, safety intervention, landing, and disarm. Readiness uses
+local position and magnetometer health, not global position or home health, so
+the flight path does not require GPS.
 
-Do not add unit tests. They add rigidity without helping the project’s
-simulation-first goal. Prefer small end-to-end checks and real simulator
-behavior.
+Do not add unit tests. Prefer small end-to-end checks and real simulator
+behavior so the code stays simple and flexible.
 
 Keep two simulation modes:
 
 - Deterministic missions prove flight, perception fixtures, transport, and
   safety behavior.
-- Exploratory worlds start with an open-ended goal and let the brain and
-  dialogue choose what happens next. They still verify bounded motion, safety,
-  landing, and disarm, but not exact decisions.
+- Exploratory worlds give the brain an open-ended goal and let it choose what
+  happens. Verify bounded motion, safety, landing, and disarm rather than exact
+  decisions.
 
-From `companion/`, use:
+From `companion/`:
 
 ```sh
 PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q control onboard sim vision voice
@@ -104,48 +94,28 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 ```
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The deterministic synthetic
-world exercises motion, target loss, obstacle handling, invalid and stale
-sensor data, command faults, recovery, hover, shutdown, landing, and disarm.
-The RTP image scenario exercises decoded video, perception, Mac commands,
-malformed and stale packets, CM5 safety, PX4, landing, and disarm. Add
-`--expect-person` for a person fixture; omit it to verify that a non-person
-image stays stopped. These scenarios do not prove physical sensors, radio, or
-hardware-specific transport.
+world checks motion, target loss, obstacles, invalid and stale sensors,
+command faults, recovery, hover, shutdown, landing, and disarm. The RTP image
+scenario checks decoded video, perception fixtures, Mac commands, CM5 safety,
+PX4, landing, and disarm. YOLO is only a repeatable image fixture, not the
+production brain. A person image needs `--expect-person`; a non-person image
+should remain stopped.
 
-Add `--camera` to an exploratory run to use Gazebo’s rendered camera topic as
-the VLM input. Without `--ollama`, the camera transport is verified but the
-brain stays stopped because no visual model is configured. Add `--ollama` to
-send those frames through local Ollama VLM and LLM sessions. This is slower
-and exploratory, so it checks safety, bounded motion, landing, and disarm
-rather than exact decisions. Type a request such as `follow me`, `hover`, or
-`stop` during an exploratory synthetic run to change the conscious intent.
-Use `--world walls`, `forest`, `windy`, or another PX4 Gazebo world, and
-`--duration` for a longer run.
-With `--ollama`, keep the default 32-second duration or use longer; local model
-startup can make a shorter run land safely before its first conscious thought.
-Use `--request` to inject one dialogue request without typing, which makes
-the conscious interaction path repeatable in unattended simulation.
-Use `--trace` to print each meaningful structured VLM observation, conscious decision,
-and the reason the Mac or CM5 held or changed the command. It shows decisions,
-not hidden model reasoning, and is useful when an exploratory run appears to
-hover.
-Use `--intent TEXT` to replace the default open-ended goal with any short
-high-level goal; explicit stop/hover goals remain stationary, while a clear
-follow goal drives the synthetic person fixture.
-Add `--memory PATH` to persist conscious experience across exploratory runs.
+`--camera` uses Gazebo's rendered camera as VLM input. Without `--ollama`, it
+checks camera transport and keeps the brain stopped. With `--ollama`, local
+VLM and LLM sessions make the run exploratory. Use `--trace` to print visual
+observations, conscious decisions, and command reasons. Use `--world`,
+`--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
+length, dialogue, goal, and persistent experience. Typed dialogue also works
+during an exploratory run.
 
-Add `--depth` to use PX4’s stock `x500_depth` model. Its rendered RGB frames
-feed the Mac brain and its depth readings feed CM5 safety. This is a
-simulation-only approximation of the DEXI 3’s forward TOF distance sensor,
-not a claim that DEXI 3 has a depth camera. Use `--intent following` and
-`--pose x,y,z,roll,pitch,yaw` to start near a world obstacle and observe the
-simulated sensor trigger local safety.
+`--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
+its depth readings feed CM5 safety. This is only a simulation approximation of
+DEXI 3's forward TOF sensor, not a claim that DEXI 3 has a depth camera. Use
+`--intent following` and `--pose x,y,z,roll,pitch,yaw` to start near an
+obstacle.
 
-The deterministic RTP scenario uses YOLO only as a repeatable person-image
-fixture. It is not the production brain. Production `control/` uses local
-Ollama models; simulation-only fixtures live under `sim/`.
-
-After installing Ollama and pulling a local vision-capable model:
+After installing Ollama and pulling local models:
 
 ```sh
 ollama pull moondream
@@ -154,53 +124,29 @@ ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip> --dialogue
 ```
 
-The production entry point uses separate VLM and LLM sessions. It defaults to
-the faster `moondream` for vision and `gemma3:4b` for conscious language so the
-two sessions can run independently; set `--vlm-model` or `--llm-model` when a
-different local model is preferred. `qwen3-vl:2b` remains an explicit option
-when broader visual reasoning is worth the added latency.
-The initial `--intent` may be any short plain-language goal. Add `--dialogue`
-to type natural requests for the conscious LLM while flight control continues;
-replies are printed only when the model provides one. It keeps a small,
-editable experience memory at `~/.companion/memory.txt`; change it with
-`--memory` when needed.
-Use `--voice-once` to route one spoken request through the same dialogue path;
-explicit movement intents remain safety-checked, while open-ended requests
-reach the conscious LLM.
+Production uses separate Ollama VLM and LLM sessions, defaulting to the faster
+`moondream` and `gemma3:4b`. Set `--vlm-model` or `--llm-model` to change
+them; `qwen3-vl:2b` is an explicit slower visual option. Use `--intent` for an
+initial goal, `--dialogue` for typed conversation, `--voice-once` for one
+spoken request, and `--memory` for editable experience memory.
 
 ## Current state
 
 - Deterministic Gazebo missions verify the full control path, perception
-  fixtures, faults, recovery, brain shutdown, safety, hover, landing, and
-  disarm.
-- The Gazebo runner aligns the vehicle's visual frame with PX4 and holds its
-  current heading during automatic takeoff; shared preparation verifies the
-  heading before and after takeoff to prevent the repeated visible turn.
-- Velocity commands contain only NED velocities; PX4 holds its heading, and
-  synthetic simulation checks that actual heading telemetry stays stable.
-- Exploratory camera and depth runs work across varied PX4 worlds with local
-  brains, bounded NED motion, simulated TOF safety, landing, and disarm. Camera
-  mode uses a clear max-range TOF fixture; a near-wall depth run observed
-  0.55m and forwarded CM5 backoff at -0.20m/s.
-- A completed VLM result has a 1.5-second movement lease from completion while
-  fresh camera frames continue; a stale result or camera gap over 0.5 seconds
-  becomes zero motion.
-- A 120-second moving-platform exploration completed 2,318 visual observations
-  and 240 conscious cycles with heading hold, landing, and disarm.
-- Simulation keeps 20Hz setpoints but limits MAVSDK velocity telemetry to 10Hz
-  and attitude telemetry to 5Hz, avoiding long-run callback backlog.
-- Ollama VLM and LLM sessions produce structured observations and intent; an
-  omitted intent keeps the current goal, while visual freshness still gates
-  movement. The conscious loop also supports dialogue, focused vision, memory,
-  and voice.
-- Trace output shows VLM observations, conscious decisions, and Mac/CM5 command
-  reasons without exposing hidden model reasoning.
-- Stale frames or sensors, malformed commands, low confidence, command loss,
-  obstacles, and model shutdown fail safely; CM5 remains the final authority.
-- The ROS 2 velocity seam exists, but DEXI 3 hardware and its optical-flow
-  quality remain unverified in SITL.
-- Continue prioritizing closed-loop autonomous world operation and simpler
-  code over narrow new behaviors.
+  fixtures, faults, recovery, safety, hover, landing, and disarm.
+- Automatic takeoff aligns the visual frame with PX4 and holds heading;
+  telemetry verifies that it does not make the repeated visible turn.
+- Exploratory camera and depth runs work in varied PX4 worlds with local
+  brains, bounded motion, simulated TOF safety, landing, and disarm.
+- Fresh visual results permit movement only briefly; stale results, camera
+  gaps, stale sensors, malformed commands, low confidence, command loss,
+  obstacles, and model shutdown stop safely.
+- Ollama VLM and LLM sessions support structured observations, intent,
+  dialogue, focused vision, memory, and voice. Trace output shows their
+  observable decisions and Mac/CM5 command reasons.
+- The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
+  remain unverified in SITL.
+- Keep prioritizing closed-loop autonomous world operation and simpler code.
 
 At the end of a meaningful session, update this section with only the current
-state or a concise new decision. Do not preserve a long historical log.
+state or a concise new decision. Do not keep a long historical log.
