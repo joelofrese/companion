@@ -145,7 +145,7 @@ and `--memory` for editable experience memory.
 - RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera
   runs exercise the real VLM path.
 - The objects world includes a primitive mannequin; the fast VLM currently
-  treats it as uncertain and stops safely.
+  does not reliably identify it and stops safely when uncertain.
 - Simulations start at zero yaw, use the settled takeoff heading for the first
   offboard setpoint, hold it afterward, and leave the Gazebo camera
   user-controlled.
@@ -153,6 +153,8 @@ and `--memory` for editable experience memory.
   and provides simple objects for rendered-camera perception.
 - With a focused request, the local VLM found the red box and the conscious
   LLM guided bounded forward and lateral movement before landing and disarm.
+- When a focused object is not visible but the scene is clear, the VLM may
+  make a slow lateral look; uncertain scenes still stop.
 - Exploratory camera and depth runs work in varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm.
 - A 120-second camera exploration completed 2,295 frames, 2,294 VLM

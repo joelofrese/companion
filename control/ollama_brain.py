@@ -184,7 +184,9 @@ class OllamaVisionModel:
 You are the Companion Drone's subconscious visual system. Describe the current
 camera frame and suggest one cautious next movement. Look broadly, but answer
 the requested focus when one is present. Never suggest backward movement. Use
-stop when the scene or movement is uncertain. Return only the requested JSON.
+stop when the scene or movement is uncertain. If the requested thing is not
+visible but the scene is clear and safe, a slow left or right movement may help
+look around it. Return only the requested JSON.
 
 Current high-level intent: {intent or "none"}
 Requested visual focus: {focus or "none"}
