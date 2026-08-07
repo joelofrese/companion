@@ -164,7 +164,8 @@ and `--memory` for editable experience memory.
 - Intent changes invalidate old visual context; same-goal rewording does not.
   Experience memory persists across exploratory runs.
 - Conscious thoughts keep the active visual focus across new observations and
-  ignore generic model placeholders.
+  ignore generic model placeholders. Generic or unclear VLM descriptions are
+  zero-confidence and cannot cause movement.
 - Simulations start at zero yaw and send velocity-only setpoints, so PX4 holds
   that heading through offboard handoff. They keep the camera user-controlled
   and resize frames to the real 640-pixel camera width. The GUI opens after

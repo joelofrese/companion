@@ -10,7 +10,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
-from control.mind import ConsciousDecision, ConsciousInput, Telemetry, VisualObservation
+from control.mind import (
+    PLACEHOLDER_TEXT,
+    ConsciousDecision,
+    ConsciousInput,
+    Telemetry,
+    VisualObservation,
+)
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
@@ -60,6 +66,11 @@ def _text(data: Dict[str, Any], name: str) -> str:
         return ""
     value = value.strip()
     return "" if value.lower() in {"", "{}", "[]", "null", "none", "empty", "n/a"} else value
+
+
+def _meaningful_text(data: Dict[str, Any], name: str) -> str:
+    value = _text(data, name)
+    return "" if value.lower() in PLACEHOLDER_TEXT else value
 
 
 def _confidence(data: Dict[str, Any]) -> float:
@@ -228,17 +239,20 @@ worth checking next, or empty.
         movement = _text(data, "movement").lower()
         if movement not in MOVEMENTS:
             movement = "stop"
-        description = _text(data, "description") or "the scene is unclear"
-        next_focus = _text(data, "next_focus")
-        if next_focus.lower() == "stop":
-            next_focus = ""
+        description = _meaningful_text(data, "description")
+        next_focus = _meaningful_text(data, "next_focus")
+        focused_answer = _meaningful_text(data, "focused_answer")
+        confidence = _confidence(data)
+        if not description or "unclear" in description.lower():
+            description = "the scene is unclear"
+            confidence = 0.0
         return VisualObservation(
             timestamp_s=timestamp_s,
             description=description,
-            focused_answer=_text(data, "focused_answer"),
+            focused_answer=focused_answer,
             movement=movement,
             next_focus=next_focus,
-            confidence=_confidence(data),
+            confidence=confidence,
         )
 
 
