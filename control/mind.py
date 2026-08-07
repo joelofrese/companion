@@ -137,6 +137,7 @@ class MindMemory:
     """The small shared memory between the two brain layers."""
 
     focus: str = ""
+    focus_requested: bool = False
     intent: str = "hover"
     summary: str = ""
     previous_movement: str = "stop"
@@ -199,6 +200,7 @@ class MacMind:
 
         self._intent_generation += 1
         self.memory.focus = ""
+        self.memory.focus_requested = False
         self.memory.summary = ""
         self.memory.previous_movement = "stop"
         self.memory.previous_observation = ""
@@ -236,6 +238,8 @@ class MacMind:
         )
         with self._lock:
             if not self._closed and self._intent_generation == intent_generation:
+                if observation.focused_answer:
+                    self.memory.focus_requested = False
                 self.memory.previous_movement = observation.movement
                 self.memory.previous_observation = observation.description
                 self._new_observations.append(observation)
@@ -261,6 +265,11 @@ class MacMind:
                 dialogue=dialogue,
                 telemetry=telemetry,
             )
+            focus_was_requested = self.memory.focus_requested
+            focus_answered = any(
+                observation.focused_answer
+                for observation in information.new_observations
+            )
             self._new_observations.clear()
         try:
             decision = self.language_model.think(information)
@@ -283,6 +292,8 @@ class MacMind:
             requested_focus = parse_focus(information.dialogue or "")
             if requested_focus:
                 focus = requested_focus
+            elif focus_was_requested and not focus_answered:
+                focus = information.focus
             if focus.lower() in FOCUS_PLACEHOLDER_TEXT:
                 focus = information.focus
             if not focus and information.new_observations:
@@ -345,6 +356,11 @@ class MacMind:
                 self.memory.intent = intent
                 self._invalidate_visual_context()
             self.memory.focus = decision.focus
+            self.memory.focus_requested = bool(requested_focus) or (
+                focus_was_requested
+                and not focus_answered
+                and not intent_changed
+            )
             self.memory.summary = decision.summary
         return decision
 

@@ -547,6 +547,7 @@ async def run(
         last_observation_signature = None
         last_decision_signature = None
         last_traced_command = None
+        requested_focus_answered = False
 
         async def observe_velocity():
             nonlocal max_forward_velocity, min_forward_velocity
@@ -733,6 +734,12 @@ async def run(
                     continue
                 command = send_packet(now, step)
                 trace_brain(elapsed, step, command)
+                if (
+                    dialogue_request is not None
+                    and control.latest_observation is not None
+                    and control.latest_observation.focused_answer
+                ):
+                    requested_focus_answered = True
                 await asyncio.sleep(SETPOINT_PERIOD_S)
             await asyncio.wait_for(offboard_task, timeout=5.0)
             print("Offboard telemetry=verified through synthetic world and CM5 safety.")
@@ -803,12 +810,15 @@ async def run(
             print("Scripted open-ended dialogue=delivered to the conscious mind.")
         requested_focus = parse_focus(dialogue_request or "")
         if requested_focus:
-            if decision.focus != requested_focus:
+            if decision.focus != requested_focus and not requested_focus_answered:
                 raise RuntimeError(
-                    "SITL did not preserve the scripted visual focus: "
+                    "SITL did not honor the scripted visual focus: "
                     f"expected {requested_focus}, got {decision.focus or 'none'}"
                 )
-            print(f"Scripted visual focus=verified: {requested_focus}.")
+            print(
+                "Scripted visual focus=verified: "
+                f"{requested_focus} ({'answered' if requested_focus_answered else 'active'})."
+            )
         print(
             "Conscious Mac decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."
