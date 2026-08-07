@@ -130,7 +130,11 @@ class SyntheticWorld:
             return WorldStep()
         if INVALID_COMMAND_START_S <= elapsed_s < INVALID_COMMAND_END_S:
             return WorldStep(
-                command_override=VelocityCommand(north_m_s=1.0, east_m_s=1.0)
+                command_override=VelocityCommand(
+                    north_m_s=1.0,
+                    east_m_s=1.0,
+                    down_m_s=1.0,
+                )
             )
         return WorldStep()
 
@@ -478,6 +482,8 @@ async def run(
         min_north_velocity = 0.0
         max_east_velocity = 0.0
         min_east_velocity = 0.0
+        max_down_velocity = 0.0
+        min_down_velocity = 0.0
         last_traced_observation = 0
         last_traced_decision = 0
         last_observation_signature = None
@@ -487,6 +493,7 @@ async def run(
         async def observe_velocity():
             nonlocal max_north_velocity, min_north_velocity
             nonlocal max_east_velocity, min_east_velocity
+            nonlocal max_down_velocity, min_down_velocity
             nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
             async for velocity in drone.telemetry.velocity_ned():
                 north_velocity_m_s = velocity.north_m_s
@@ -496,6 +503,8 @@ async def run(
                 min_north_velocity = min(min_north_velocity, velocity.north_m_s)
                 max_east_velocity = max(max_east_velocity, velocity.east_m_s)
                 min_east_velocity = min(min_east_velocity, velocity.east_m_s)
+                max_down_velocity = max(max_down_velocity, velocity.down_m_s)
+                min_down_velocity = min(min_down_velocity, velocity.down_m_s)
 
         telemetry_task = asyncio.create_task(observe_velocity())
         reported = set()
@@ -873,11 +882,14 @@ async def run(
             abs(min_north_velocity),
             abs(max_east_velocity),
             abs(min_east_velocity),
+            abs(max_down_velocity),
+            abs(min_down_velocity),
         ) > MAX_EXPLORATORY_SPEED_M_S:
             raise RuntimeError(
                 "exploratory flight exceeded its telemetry speed envelope: "
                 f"north={min_north_velocity:.2f}..{max_north_velocity:.2f}, "
-                f"east={min_east_velocity:.2f}..{max_east_velocity:.2f}"
+                f"east={min_east_velocity:.2f}..{max_east_velocity:.2f}, "
+                f"down={min_down_velocity:.2f}..{max_down_velocity:.2f}"
             )
         if camera or depth:
             if camera_frames == 0:
@@ -900,7 +912,14 @@ async def run(
         print(f"Max observed north velocity: {max_north_velocity:.2f}m/s")
         print(f"Max observed east velocity: {max_east_velocity:.2f}m/s")
         print(f"Min observed north velocity: {min_north_velocity:.2f}m/s")
-        print(f"Observed east velocity range: {min_east_velocity:.2f}..{max_east_velocity:.2f}m/s")
+        print(
+            "Observed east velocity range: "
+            f"{min_east_velocity:.2f}..{max_east_velocity:.2f}m/s"
+        )
+        print(
+            "Observed down velocity range: "
+            f"{min_down_velocity:.2f}..{max_down_velocity:.2f}m/s"
+        )
         await land(drone)
         landed = True
     finally:
