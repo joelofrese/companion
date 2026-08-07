@@ -107,9 +107,10 @@ through the complete RTP path. Real visual perception is checked through the
 Gazebo camera with Ollama, not this deterministic fixture.
 
 `--camera` uses Gazebo's rendered camera as VLM input. Without `--ollama`, it
-checks camera transport and keeps the brain stopped. With `--ollama`, local
-VLM and LLM sessions make the run exploratory. Use `--trace` to print visual
-observations, conscious decisions, and command reasons. Use `--world`,
+checks camera transport through a zero-confidence placeholder and keeps motion
+stopped. With `--ollama`, local VLM and LLM sessions make the run exploratory.
+Use `--trace` to print visual observations, conscious decisions, and command
+reasons. Use `--world`,
 `--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
 length, dialogue, goal, and persistent experience. Typed dialogue also works
 during an exploratory run. Add `--faults` to inject the normal obstacle,
