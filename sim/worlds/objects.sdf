@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version="1.9">
+  <world name="objects">
+    <physics type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>250</real_time_update_rate>
+    </physics>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type="adiabatic"/>
+    <scene>
+      <grid>false</grid>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="ground">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="objects">
+      <static>true</static>
+      <link name="red_box">
+        <pose>3 0 0.75 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.8 0.8 1.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.8 0.8 1.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.05 0.05 1</ambient>
+            <diffuse>0.9 0.08 0.08 1</diffuse>
+          </material>
+        </visual>
+      </link>
+
+      <link name="blue_cylinder">
+        <pose>4.5 -1.2 0.6 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <cylinder><radius>0.45</radius><length>1.2</length></cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder><radius>0.45</radius><length>1.2</length></cylinder>
+          </geometry>
+          <material>
+            <ambient>0.05 0.15 0.7 1</ambient>
+            <diffuse>0.08 0.2 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+
+      <link name="yellow_box">
+        <pose>4.5 1.2 0.4 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box><size>1.0 0.8 0.8</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>1.0 0.8 0.8</size></box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.65 0.03 1</ambient>
+            <diffuse>1.0 0.8 0.04 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <light name="sun" type="directional">
+      <pose>0 0 500 0 0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <intensity>1</intensity>
+      <direction>0.1 0.6 -0.8</direction>
+    </light>
+
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>47.3979710577</latitude_deg>
+      <longitude_deg>8.5461637398</longitude_deg>
+      <elevation>0</elevation>
+    </spherical_coordinates>
+  </world>
+</sdf>

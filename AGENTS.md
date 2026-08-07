@@ -87,6 +87,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.command_loopback
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world walls
+.venv/bin/python -m sim.run_world --explore --camera --world objects --trace
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image .venv/lib/python3.9/site-packages/ultralytics/assets/zidane.jpg --expect-person
@@ -108,6 +109,10 @@ observations, conscious decisions, and command reasons. Use `--world`,
 `--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
 length, dialogue, goal, and persistent experience. Typed dialogue also works
 during an exploratory run.
+
+The companion-owned `objects` world adds simple colored shapes for object-aware
+visual exploration. The runner leaves the Gazebo camera user-controlled and
+starts the vehicle at zero yaw.
 
 `--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
 its depth readings feed CM5 safety. This is only a simulation approximation of
@@ -135,8 +140,10 @@ and `--memory` for editable experience memory.
 
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, safety, hover, landing, and disarm.
-- Simulations start at zero yaw and hold that heading through takeoff, so the
-  model does not make a repeated visible turn.
+- Simulations start at zero yaw, hold that heading through takeoff, and leave
+  the Gazebo camera user-controlled.
+- The companion-owned `objects` world runs through the same PX4 and CM5 path
+  and provides simple objects for rendered-camera perception.
 - Exploratory camera and depth runs work in varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm.
 - A near-wall local-brain depth run observed 0.55 m and CM5 backoff at

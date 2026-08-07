@@ -17,7 +17,7 @@ BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
 BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
-# Start the model facing the Gazebo view instead of turning it left on takeoff.
+# Keep the PX4 and Gazebo starting headings aligned.
 DEFAULT_MODEL_POSE = "0,0,0,0,0,0"
 
 
@@ -62,6 +62,18 @@ def _stop_process_group(process, process_group_id):
         process.wait()
 
 
+def _stop_process(process):
+    """Stop one process that owns its own process group."""
+
+    if process is None:
+        return
+    try:
+        process_group_id = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+    _stop_process_group(process, process_group_id)
+
+
 def _validate_pose(pose: Optional[str]) -> Optional[str]:
     if pose is None:
         return None
@@ -101,6 +113,52 @@ def _run_once(
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
     environment["PX4_GZ_MODEL_POSE"] = model_pose or DEFAULT_MODEL_POSE
+    # Leave the Gazebo window user-controlled instead of reorienting it.
+    environment["PX4_GZ_NO_FOLLOW"] = "1"
+    local_worlds = companion_dir / "sim/worlds"
+    local_world_file = local_worlds / f"{world}.sdf"
+    world_processes = []
+    if local_world_file.is_file():
+        gz = shutil.which("gz")
+        if gz is None:
+            raise RuntimeError("gz is required for a local Gazebo world")
+        environment["PX4_GZ_STANDALONE"] = "1"
+        environment["GZ_IP"] = "127.0.0.1"
+        models = px4_dir / "Tools/simulation/gz/models"
+        plugins = px4_dir / "build/px4_sitl_default/src/modules/simulation/gz_plugins"
+        resource_path = environment.get("GZ_SIM_RESOURCE_PATH")
+        environment["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join(
+            path for path in (str(local_worlds), str(models), resource_path) if path
+        )
+        environment["GZ_SIM_SYSTEM_PLUGIN_PATH"] = os.pathsep.join(
+            path
+            for path in (str(plugins), environment.get("GZ_SIM_SYSTEM_PLUGIN_PATH"))
+            if path
+        )
+        environment["GZ_SIM_SERVER_CONFIG_PATH"] = str(
+            px4_dir / "src/modules/simulation/gz_bridge/server.config"
+        )
+        world_processes.append(
+            subprocess.Popen(
+                [gz, "sim", "-r", "-s", str(local_world_file)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env=environment,
+            )
+        )
+        if not environment.get("HEADLESS"):
+            world_processes.append(
+                subprocess.Popen(
+                    [gz, "sim", "-g"],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                    env=environment,
+                )
+            )
     model = "gz_x500"
     if depth:
         model = "gz_x500_depth"
@@ -180,6 +238,8 @@ def _run_once(
         return result.returncode
     finally:
         _stop_process_group(process, process_group_id)
+        for world_process in reversed(world_processes):
+            _stop_process(world_process)
 
 
 def run(
@@ -244,7 +304,9 @@ def run(
     if duration_s is not None and (duration_s <= 0.0 or not math.isfinite(duration_s)):
         raise RuntimeError("simulation duration must be positive")
     model_pose = _validate_pose(model_pose)
-    world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
+    world_file = companion_dir / "sim/worlds" / f"{world}.sdf"
+    if not world_file.is_file():
+        world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
     if not world_file.is_file():
         raise RuntimeError(f"Gazebo world does not exist: {world_file}")
 
@@ -345,7 +407,11 @@ def main(argv=None):
         type=float,
         help="world simulation duration in seconds (default: 32)",
     )
-    parser.add_argument("--world", default="default", help="Gazebo world name from PX4")
+    parser.add_argument(
+        "--world",
+        default="default",
+        help="PX4 or companion Gazebo world name",
+    )
     args = parser.parse_args(argv)
     try:
         return run(
