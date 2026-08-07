@@ -167,7 +167,9 @@ async def prepare(drone):
             "PX4 takeoff heading hold=verified: "
             f"change {heading_change_deg:.1f} degrees."
         )
-        return initial_heading_deg
+        # Use the settled heading for the first offboard setpoint. This avoids
+        # asking PX4 to correct back to the pre-takeoff sample.
+        return takeoff_heading_deg
     except Exception:
         try:
             await asyncio.wait_for(

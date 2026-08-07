@@ -2,7 +2,6 @@
 
 import json
 import os
-import queue
 import shutil
 import subprocess
 import threading
@@ -18,7 +17,8 @@ class GazeboTopicReader:
         self.topic = topic
         self._decode = decode
         self._name = name
-        self._messages = queue.Queue(maxsize=1)
+        self._message = None
+        self._message_lock = threading.Lock()
         self._process = None
         self._closed = False
         self._failed = False
@@ -49,11 +49,8 @@ class GazeboTopicReader:
                 message = self._decode(json.loads(line))
             except (KeyError, TypeError, ValueError):
                 continue
-            try:
-                self._messages.put_nowait(message)
-            except queue.Full:
-                self._messages.get_nowait()
-                self._messages.put_nowait(message)
+            with self._message_lock:
+                self._message = message
         if not self._closed:
             self._failed = True
 
@@ -62,10 +59,10 @@ class GazeboTopicReader:
 
         if self._failed:
             raise RuntimeError(f"Gazebo {self._name} stream ended")
-        try:
-            return self._messages.get_nowait()
-        except queue.Empty:
-            return None
+        with self._message_lock:
+            message = self._message
+            self._message = None
+        return message
 
     def close(self):
         if self._process is None:

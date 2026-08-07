@@ -112,9 +112,9 @@ observations, conscious decisions, and command reasons. Use `--world`,
 length, dialogue, goal, and persistent experience. Typed dialogue also works
 during an exploratory run.
 
-The companion-owned `objects` world adds simple colored shapes for object-aware
-visual exploration. The runner leaves the Gazebo camera user-controlled and
-starts the vehicle at zero yaw.
+The companion-owned `objects` world adds simple colored shapes and a primitive
+mannequin for visual exploration. The runner leaves the Gazebo camera
+user-controlled and starts the vehicle at zero yaw.
 
 `--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
 its depth readings feed CM5 safety. This is only a simulation approximation of
@@ -144,8 +144,11 @@ and `--memory` for editable experience memory.
   fixtures, faults, recovery, safety, hover, landing, and disarm.
 - RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera
   runs exercise the real VLM path.
-- Simulations start at zero yaw, hold it through takeoff and every setpoint,
-  and leave the Gazebo camera user-controlled.
+- The objects world includes a primitive mannequin; the fast VLM currently
+  treats it as uncertain and stops safely.
+- Simulations start at zero yaw, use the settled takeoff heading for the first
+  offboard setpoint, hold it afterward, and leave the Gazebo camera
+  user-controlled.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path
   and provides simple objects for rendered-camera perception.
 - With a focused request, the local VLM found the red box and the conscious
