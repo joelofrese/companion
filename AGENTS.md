@@ -196,8 +196,9 @@ and `--memory` for editable experience memory.
 - Brain and CM5 commands use forward, right, and down body-frame velocity;
   CM5 converts them to PX4's local NED frame and backs away from obstacles in
   the vehicle's forward direction.
-- Simulations start at zero yaw and hold the settled takeoff heading through
-  offboard handoff, while body-frame motion does not depend on North alignment.
+- Simulations hold their settled takeoff heading through offboard handoff,
+  including a non-zero spawn yaw; body-frame motion does not depend on North
+  alignment.
   They keep the camera user-controlled and resize frames to the real 640-pixel
   camera width. The GUI opens after PX4 spawns the model so it does not reframe
   during takeoff. Depth is only a TOF approximation; DEXI 3 has no lidar.
