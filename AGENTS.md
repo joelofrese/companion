@@ -168,8 +168,8 @@ and `--memory` for editable experience memory.
 - Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
   stops Mac motion. CM5 remains the final authority.
 - Intent changes invalidate old visual context; same-goal rewording does not.
-  Experience memory persists recent decisions and measured command outcomes
-  across exploratory runs.
+  Experience memory persists recent observations, decisions, and measured
+  command outcomes across exploratory runs.
 - Conscious thoughts keep the active visual focus across new observations and
   ignore generic model placeholders. Generic or unclear VLM descriptions are
   zero-confidence and cannot cause movement.

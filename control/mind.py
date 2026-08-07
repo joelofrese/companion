@@ -323,6 +323,11 @@ class MacMind:
                     f"intent={intent}; focus={decision.focus or 'none'}; "
                     f"summary={summary}"
                 )
+                if information.new_observations:
+                    observation = information.new_observations[-1]
+                    entry += f"; observed={observation.description}"
+                    if observation.focused_answer:
+                        entry += f"; answer={observation.focused_answer}"
                 entry += _experience_outcome(information.telemetry)
                 if isinstance(decision.dialogue, str) and decision.dialogue.strip():
                     entry += f"; response={decision.dialogue}"
