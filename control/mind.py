@@ -273,13 +273,12 @@ class MacMind:
             self._new_observations.clear()
         try:
             decision = self.language_model.think(information)
-            intent_changed = decision.intent_changed is True
             if intent_override is not None:
                 if not isinstance(intent_override, str) or not intent_override.strip():
                     raise ValueError("intent override must be a non-empty string")
                 intent = intent_override.strip()
                 intent_changed = intent != information.intent
-            elif intent_changed:
+            elif decision.intent_changed is True:
                 if not isinstance(decision.intent, str) or not decision.intent.strip():
                     raise ValueError("language model returned an empty intent")
                 intent = decision.intent.strip()
