@@ -124,7 +124,10 @@ mannequin for visual exploration. The runner starts the vehicle at zero yaw
 and leaves the Gazebo camera user-controlled. Exploratory runs default to this
 world; pass `--world default` to use the empty stock world.
 Oversized simulation frames are reduced to the real 640-pixel camera width
-before the VLM sees them.
+before the VLM sees them. Because `objects` contains collidable objects, use
+`--depth` for moving goals such as following. Camera-only runs have no forward
+range reading, so they check visual behavior and bounded flight, not obstacle
+clearance.
 
 `--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
 its depth readings feed CM5 safety. This is only a simulation approximation of
@@ -183,6 +186,8 @@ and `--memory` for editable experience memory.
   They keep the camera user-controlled and resize frames to the real 640-pixel
   camera width. The GUI opens after PX4 spawns the model so it does not reframe
   during takeoff. Depth is only a TOF approximation; DEXI 3 has no lidar.
+- Moving through the collidable `objects` world is verified with `--depth`;
+  camera-only runs do not provide a range reading for obstacle clearance.
 - Offboard starts immediately after three CM5 priming setpoints, without an
   extra zero-command delay.
 - The ROS 2 CM5 seam converts body commands with fresh vehicle heading. DEXI 3
