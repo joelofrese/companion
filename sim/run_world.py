@@ -99,6 +99,7 @@ def _validate_pose(pose: Optional[str]) -> Optional[str]:
 def _run_once(
     px4_dir: Path,
     companion_dir: Path,
+    world_file: Path,
     image_path: Optional[Path],
     expect_person: bool,
     world: str,
@@ -120,35 +121,47 @@ def _run_once(
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
     environment["PX4_GZ_MODEL_POSE"] = model_pose or DEFAULT_MODEL_POSE
-    # Keep the Gazebo camera user-controlled instead of tracking the vehicle.
+    # Start Gazebo here so every run uses the same user-controlled camera.
+    environment["PX4_GZ_STANDALONE"] = "1"
     environment["PX4_GZ_NO_FOLLOW"] = "1"
+    environment["GZ_IP"] = "127.0.0.1"
     local_worlds = companion_dir / "sim/worlds"
-    local_world_file = local_worlds / f"{world}.sdf"
     world_processes = []
-    if local_world_file.is_file():
-        gz = shutil.which("gz")
-        if gz is None:
-            raise RuntimeError("gz is required for a local Gazebo world")
-        environment["PX4_GZ_STANDALONE"] = "1"
-        environment["GZ_IP"] = "127.0.0.1"
-        models = px4_dir / "Tools/simulation/gz/models"
-        plugins = px4_dir / "build/px4_sitl_default/src/modules/simulation/gz_plugins"
-        resource_path = environment.get("GZ_SIM_RESOURCE_PATH")
-        environment["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join(
-            path for path in (str(local_worlds), str(models), resource_path) if path
+    gz = shutil.which("gz")
+    if gz is None:
+        raise RuntimeError("gz is required for Gazebo simulation")
+    models = px4_dir / "Tools/simulation/gz/models"
+    stock_worlds = px4_dir / "Tools/simulation/gz/worlds"
+    plugins = px4_dir / "build/px4_sitl_default/src/modules/simulation/gz_plugins"
+    resource_path = environment.get("GZ_SIM_RESOURCE_PATH")
+    environment["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join(
+        path for path in (str(local_worlds), str(models), str(stock_worlds), resource_path)
+        if path
+    )
+    environment["GZ_SIM_SYSTEM_PLUGIN_PATH"] = os.pathsep.join(
+        path
+        for path in (str(plugins), environment.get("GZ_SIM_SYSTEM_PLUGIN_PATH"))
+        if path
+    )
+    environment["GZ_SIM_SERVER_CONFIG_PATH"] = str(
+        px4_dir / "src/modules/simulation/gz_bridge/server.config"
+    )
+    gui_config = companion_dir / "sim/gazebo_gui.config"
+    try:
+        world_processes.append(
+            subprocess.Popen(
+                [gz, "sim", "-r", "-s", str(world_file)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env=environment,
+            )
         )
-        environment["GZ_SIM_SYSTEM_PLUGIN_PATH"] = os.pathsep.join(
-            path
-            for path in (str(plugins), environment.get("GZ_SIM_SYSTEM_PLUGIN_PATH"))
-            if path
-        )
-        environment["GZ_SIM_SERVER_CONFIG_PATH"] = str(
-            px4_dir / "src/modules/simulation/gz_bridge/server.config"
-        )
-        try:
+        if not environment.get("HEADLESS"):
             world_processes.append(
                 subprocess.Popen(
-                    [gz, "sim", "-r", "-s", str(local_world_file)],
+                    [gz, "sim", "-g", "--gui-config", str(gui_config)],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -156,20 +169,9 @@ def _run_once(
                     env=environment,
                 )
             )
-            if not environment.get("HEADLESS"):
-                world_processes.append(
-                    subprocess.Popen(
-                        [gz, "sim", "-g"],
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        start_new_session=True,
-                        env=environment,
-                    )
-                )
-        except BaseException:
-            _stop_processes(world_processes)
-            raise
+    except BaseException:
+        _stop_processes(world_processes)
+        raise
     model = "gz_x500"
     if depth:
         model = "gz_x500_depth"
@@ -331,6 +333,7 @@ def run(
             return _run_once(
                 px4_dir=px4_dir,
                 companion_dir=companion_dir,
+                world_file=world_file,
                 image_path=image_path,
                 expect_person=expect_person,
                 world=world,

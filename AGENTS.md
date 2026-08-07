@@ -155,7 +155,8 @@ and `--memory` for editable experience memory.
   does not reliably identify it and stops safely when uncertain.
 - Simulations start at zero yaw, verify takeoff heading stability, and use
   velocity-only offboard setpoints that leave the current heading unchanged;
-  the Gazebo camera does not automatically follow the vehicle.
+  the runner disables Gazebo camera following while keeping the view
+  interactive.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path
   and provides simple objects for rendered-camera perception.
 - With a focused request, the local VLM found the red box and the conscious
