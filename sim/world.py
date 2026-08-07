@@ -72,6 +72,8 @@ LOW_CONFIDENCE_START_S = 12.4
 LOW_CONFIDENCE_END_S = 12.8
 STALE_SENSOR_START_S = 15.0
 STALE_SENSOR_END_S = 15.5
+VELOCITY_TELEMETRY_START_S = 13.1
+VELOCITY_TELEMETRY_END_S = 13.6
 HOVER_START_S = 5.8
 VISUAL_FAILURE_START_S = 12.2
 VISUAL_FAILURE_END_S = 12.6
@@ -89,6 +91,7 @@ DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
 class WorldStep:
     obstacle_distance_m: Optional[float] = 10.0
     distance_fresh: bool = True
+    velocity_fresh: bool = True
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
     brain_shutdown: bool = False
@@ -129,6 +132,8 @@ class SyntheticWorld:
             return WorldStep(brain_shutdown=True)
         if STALE_SENSOR_START_S <= elapsed_s < STALE_SENSOR_END_S:
             return WorldStep(distance_fresh=False)
+        if VELOCITY_TELEMETRY_START_S <= elapsed_s < VELOCITY_TELEMETRY_END_S:
+            return WorldStep(velocity_fresh=False)
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
             return WorldStep(obstacle_distance_m=0.3)
         if OBSTACLE_END_S <= elapsed_s < RECOVERY_END_S:
@@ -327,6 +332,7 @@ async def run(
     east_velocity_m_s = None
     down_velocity_m_s = None
     velocity_telemetry_seen = False
+    vehicle_velocity_fresh = True
     initial_yaw_deg = None
     max_heading_change_deg = 0.0
     try:
@@ -366,9 +372,9 @@ async def run(
             drone,
             obstacle_distance=distance_sensor.read,
             velocity_provider=lambda: (
-                north_velocity_m_s,
-                east_velocity_m_s,
-                down_velocity_m_s,
+                (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
+                if vehicle_velocity_fresh
+                else (None, None, None)
             ),
         )
         sender = stack.start()
@@ -410,7 +416,9 @@ async def run(
 
         def read_step(elapsed_s: float):
             nonlocal depth_samples, valid_depth_samples, minimum_depth_distance
+            nonlocal vehicle_velocity_fresh
             step = world.step(elapsed_s)
+            vehicle_velocity_fresh = step.velocity_fresh
             if gazebo_depth is not None:
                 sample = gazebo_depth.latest()
                 if sample is not None:
@@ -546,6 +554,8 @@ async def run(
                 return "invalid obstacle reading"
             if not step.transmit:
                 return "command link dropout"
+            if not step.velocity_fresh:
+                return "vehicle velocity telemetry dropout"
             if VISUAL_FAILURE_START_S <= elapsed_s < VISUAL_FAILURE_END_S:
                 return "visual model failure; holding zero"
             if CONSCIOUS_FAILURE_START_S <= elapsed_s < CONSCIOUS_FAILURE_END_S:
@@ -617,6 +627,8 @@ async def run(
             distance = step.obstacle_distance_m
             if not step.transmit:
                 reason = "command link dropout"
+            elif not step.velocity_fresh:
+                reason = "CM5 has no fresh vehicle velocity"
             elif not step.distance_fresh or distance is None or not math.isfinite(distance):
                 reason = "CM5 has no fresh distance reading"
             elif distance < OBSTACLE_STOP_M:
@@ -853,6 +865,18 @@ async def run(
                 STALE_SENSOR_END_S,
                 lambda command: command == VelocityCommand(),
                 "stale obstacle fail-safe",
+            ),
+            (
+                VELOCITY_TELEMETRY_START_S,
+                VELOCITY_TELEMETRY_END_S,
+                lambda command: command == VelocityCommand(),
+                "missing vehicle velocity telemetry fail-safe",
+            ),
+            (
+                VELOCITY_TELEMETRY_END_S + 0.1,
+                SECOND_FOLLOW_END_S,
+                lambda command: command.north_m_s > 0.0,
+                "following recovery after missing vehicle velocity telemetry",
             ),
             (
                 STALE_SENSOR_END_S + 0.1,

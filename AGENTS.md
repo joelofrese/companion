@@ -177,6 +177,7 @@ and `--memory` for editable experience memory.
 - Fresh visual results permit movement only briefly; stale results, camera
   gaps, stale sensors, malformed commands, low confidence, command loss,
   obstacles, and model shutdown stop safely.
+- Missing CM5/PX4 velocity telemetry also stops Mac motion until it returns.
 - Ollama VLM and LLM sessions support structured observations, intent,
   dialogue, focused vision, memory, and voice. Trace output shows their
   observable decisions and Mac/CM5 command reasons.

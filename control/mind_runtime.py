@@ -120,6 +120,15 @@ class MindRuntime:
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
             ):
                 movement = self._observation.movement
+        if any(
+            value is None
+            for value in (
+                telemetry.north_velocity_m_s,
+                telemetry.east_velocity_m_s,
+                telemetry.down_velocity_m_s,
+            )
+        ):
+            movement = "stop"
         if parse_intent(self.mind.intent) == "hover":
             movement = "stop"
         desired = movement_command(movement, telemetry.obstacle_distance_m)
