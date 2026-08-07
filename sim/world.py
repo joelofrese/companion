@@ -561,6 +561,7 @@ async def run(
                 if observation is not None:
                     signature = (
                         clean(observation.description),
+                        clean(observation.focused_answer),
                         clean(observation.next_focus),
                         observation.movement,
                         round(observation.confidence, 2),
@@ -568,9 +569,9 @@ async def run(
                     if signature != last_observation_signature:
                         print(
                             f"[VLM {elapsed_s:5.1f}s] "
-                            f"{signature[0]}; focus={signature[1]}; "
-                            f"movement={signature[2]}; "
-                            f"confidence={signature[3]:.2f}",
+                            f"{signature[0]}; answer={signature[1]}; "
+                            f"focus={signature[2]}; movement={signature[3]}; "
+                            f"confidence={signature[4]:.2f}",
                             flush=True,
                         )
                         last_observation_signature = signature
