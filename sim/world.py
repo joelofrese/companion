@@ -248,7 +248,12 @@ class WorldLanguageModel:
         if information.dialogue:
             intent = parse_intent(information.dialogue)
             if intent is None:
-                dialogue = "I did not understand that request."
+                focus = parse_focus(information.dialogue)
+                dialogue = (
+                    f"Looking for {focus}."
+                    if focus
+                    else "I did not understand that request."
+                )
             else:
                 self.intent = intent
                 dialogue = f"Intent changed to {self.intent}."

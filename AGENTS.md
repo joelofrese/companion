@@ -186,6 +186,8 @@ and `--memory` for editable experience memory.
   descriptions are zero-confidence and cannot cause movement.
 - Direct find, look, search, inspect, and locate requests set their subject
   as the visual focus even when the conscious model omits it.
+- Exploratory simulation acknowledges those visual requests while keeping the
+  open-ended goal active.
 - A focused VLM answer must confirm the requested object or remain empty; it
   must not substitute another visible object.
 - Brain and CM5 commands use forward, right, and down body-frame velocity;
