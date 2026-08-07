@@ -85,7 +85,7 @@ DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
 
 @dataclass(frozen=True)
 class WorldStep:
-    obstacle_distance_m: Optional[float] = 2.0
+    obstacle_distance_m: Optional[float] = 10.0
     distance_fresh: bool = True
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None

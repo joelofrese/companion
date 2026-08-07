@@ -175,9 +175,9 @@ reach the conscious LLM.
 - Velocity commands contain only NED velocities; PX4 holds its heading, and
   synthetic simulation checks actual heading telemetry for rotation.
 - Exploratory camera and depth runs work across varied PX4 worlds with local
-  brains, bounded motion, simulated TOF safety, landing, and disarm. A real
-  moondream/gemma3 camera run produced bounded movement, and a near-wall depth
-  run observed 0.55m and forwarded CM5 backoff at -0.20m/s.
+  brains, bounded motion, simulated TOF safety, landing, and disarm. Camera
+  mode uses a clear max-range TOF fixture; a near-wall depth run observed
+  0.55m and forwarded CM5 backoff at -0.20m/s.
 - A completed VLM result has a 1.5-second movement lease from completion while
   fresh camera frames continue; a stale result or camera gap over 0.5 seconds
   becomes zero motion.

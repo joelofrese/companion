@@ -195,7 +195,7 @@ Measured NED velocity:
 north={telemetry.north_velocity_m_s}
 east={telemetry.east_velocity_m_s}
 down={telemetry.down_velocity_m_s}
-Forward obstacle distance: {telemetry.obstacle_distance_m}
+Forward TOF distance: {telemetry.obstacle_distance_m}
 
 The movement must be one of: forward, left, right, up, down, stop, hover.
 Use measured velocity to distinguish the requested movement from what the
@@ -260,7 +260,7 @@ Measured NED velocity:
 north={information.telemetry.north_velocity_m_s}
 east={information.telemetry.east_velocity_m_s}
 down={information.telemetry.down_velocity_m_s}
-Forward obstacle distance: {information.telemetry.obstacle_distance_m}
+Forward TOF distance: {information.telemetry.obstacle_distance_m}
 
 Treat measured velocity as what actually happened. Compare it with the last
 requested command and adapt the next intent when the vehicle did not respond
