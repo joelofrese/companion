@@ -390,4 +390,7 @@ def _same_goal(first: str, second: str) -> bool:
     if first == second:
         return True
     first_kind = parse_intent(first)
-    return first_kind is not None and first_kind == parse_intent(second)
+    if first_kind is not None:
+        return first_kind == parse_intent(second)
+    first_focus = parse_focus(first)
+    return bool(first_focus and first_focus == parse_focus(second))
