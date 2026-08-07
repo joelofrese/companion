@@ -628,12 +628,16 @@ async def run(
                     reason = "Mac timing or intent refresh held zero"
             else:
                 reason = "Mac suggested movement"
-            forwarded = safe_commands.commands[-1][1] if safe_commands.commands else None
-            command_state = (mac_command, forwarded, reason)
+            last_forwarded = (
+                safe_commands.commands[-1][1]
+                if safe_commands.commands
+                else None
+            )
+            command_state = (mac_command, last_forwarded, reason)
             if command_state != last_traced_command:
                 print(
                     f"[CMD {elapsed_s:5.1f}s] mac={mac_command}; "
-                    f"cm5={forwarded or 'pending'}; reason={reason}",
+                    f"cm5-last={last_forwarded or 'pending'}; reason={reason}",
                     flush=True,
                 )
                 last_traced_command = command_state
