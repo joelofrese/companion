@@ -144,6 +144,9 @@ async def prepare(drone):
             raise RuntimeError(
                 f"vehicle did not take off within {FLIGHT_ACTION_TIMEOUT_S:.0f}s"
             ) from error
+        # Keep the same heading policy when automatic takeoff hands control
+        # to offboard mode.
+        await drone.param.set_param_int("MPC_YAW_MODE", TAKEOFF_YAW_MODE)
         try:
             takeoff_heading_deg = await asyncio.wait_for(
                 _read_heading(drone),

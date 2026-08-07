@@ -146,9 +146,9 @@ and `--memory` for editable experience memory.
   runs exercise the real VLM path.
 - The objects world includes a primitive mannequin; the fast VLM currently
   does not reliably identify it and stops safely when uncertain.
-- Simulations start at zero yaw, use the settled takeoff heading for the first
-  offboard setpoint, hold it afterward, and leave the Gazebo camera
-  user-controlled.
+- Simulations start at zero yaw, reassert fixed yaw when takeoff hands control
+  to offboard, use the settled heading for every setpoint, and leave the
+  Gazebo camera user-controlled.
 - The companion-owned `objects` world runs through the same PX4 and CM5 path
   and provides simple objects for rendered-camera perception.
 - With a focused request, the local VLM found the red box and the conscious
