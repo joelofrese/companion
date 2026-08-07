@@ -91,7 +91,10 @@ async def run():
         while not forwarder.commands.empty():
             commands.append(forwarder.commands.get_nowait())
         if VelocityCommand(north_m_s=0.25) not in commands:
-            raise RuntimeError(f"Mac control service did not produce a fresh follow command: {commands}")
+            raise RuntimeError(
+                "Mac control service did not produce a fresh follow command: "
+                f"{commands}"
+            )
         if VelocityCommand() not in commands:
             raise RuntimeError("CM5 did not stop when obstacle data was missing")
         if VelocityCommand(north_m_s=-0.2) not in commands:

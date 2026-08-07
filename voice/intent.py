@@ -7,7 +7,10 @@ from typing import Optional
 def _contains_phrase(words: list[str], phrase: str) -> bool:
     phrase_words = phrase.split()
     width = len(phrase_words)
-    return any(words[index:index + width] == phrase_words for index in range(len(words) - width + 1))
+    return any(
+        words[index:index + width] == phrase_words
+        for index in range(len(words) - width + 1)
+    )
 
 
 def parse_intent(transcript: str) -> Optional[str]:

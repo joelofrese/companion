@@ -36,7 +36,10 @@ class H264StreamConfig:
     framerate: int = 30
 
     def __post_init__(self):
-        if not all(_positive_int(value) for value in (self.port, self.width, self.height, self.framerate)):
+        if not all(
+            _positive_int(value)
+            for value in (self.port, self.width, self.height, self.framerate)
+        ):
             raise ValueError("stream dimensions, port, and framerate must be positive")
         if self.port > 65535:
             raise ValueError("stream port must be between 1 and 65535")
@@ -129,7 +132,10 @@ class GStreamerH264Receiver:
         """Return a timestamp and frame, or none at end of stream."""
 
         self.start()
-        frame_bytes = self._read_exact(self._process.stdout, self.config.width * self.config.height * 3)
+        frame_bytes = self._read_exact(
+            self._process.stdout,
+            self.config.width * self.config.height * 3,
+        )
         if frame_bytes is None:
             return None
 

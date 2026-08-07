@@ -270,8 +270,10 @@ class OllamaLanguageModel:
 
     def think(self, information: ConsciousInput) -> ConsciousDecision:
         observations = "\n".join(
-            f"- {observation.description}; focused answer={observation.focused_answer or 'none'}; "
-            f"suggested movement={observation.movement}; focus next={observation.next_focus or 'none'}; "
+            f"- {observation.description}; "
+            f"focused answer={observation.focused_answer or 'none'}; "
+            f"suggested movement={observation.movement}; "
+            f"focus next={observation.next_focus or 'none'}; "
             f"confidence={observation.confidence}"
             for observation in information.new_observations
         ) or "(no new visual observations)"

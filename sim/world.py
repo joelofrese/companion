@@ -886,8 +886,18 @@ async def run(
                 lambda command: command.east_m_s > 0.0,
                 "Mac heartbeat recovery",
             ),
-            (2.1, TARGET_LOST_END_S, lambda command: command == VelocityCommand(), "hold after target loss"),
-            (OBSTACLE_START_S, OBSTACLE_END_S, lambda command: command.north_m_s < 0.0, "obstacle backoff"),
+            (
+                2.1,
+                TARGET_LOST_END_S,
+                lambda command: command == VelocityCommand(),
+                "hold after target loss",
+            ),
+            (
+                OBSTACLE_START_S,
+                OBSTACLE_END_S,
+                lambda command: command.north_m_s < 0.0,
+                "obstacle backoff",
+            ),
             (
                 OBSTACLE_END_S,
                 RECOVERY_END_S,
@@ -1027,11 +1037,20 @@ async def run(
                 raise RuntimeError("SITL did not observe zero after Mac brain shutdown")
             print("Mac brain shutdown fail-safe=verified.")
             if max_north_velocity <= 0.02:
-                raise RuntimeError(f"SITL did not observe forward following: {max_north_velocity:.2f}m/s")
+                raise RuntimeError(
+                    "SITL did not observe forward following: "
+                    f"{max_north_velocity:.2f}m/s"
+                )
             if min_north_velocity >= -0.05:
-                raise RuntimeError(f"SITL did not observe obstacle backoff: {min_north_velocity:.2f}m/s")
+                raise RuntimeError(
+                    "SITL did not observe obstacle backoff: "
+                    f"{min_north_velocity:.2f}m/s"
+                )
             if max_east_velocity <= 0.02:
-                raise RuntimeError(f"SITL did not observe lateral following: {max_east_velocity:.2f}m/s")
+                raise RuntimeError(
+                    "SITL did not observe lateral following: "
+                    f"{max_east_velocity:.2f}m/s"
+                )
         if exploratory and max(
             abs(max_north_velocity),
             abs(min_north_velocity),

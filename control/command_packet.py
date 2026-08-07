@@ -26,7 +26,11 @@ class CommandPacket:
             self.command.east_m_s,
             self.command.down_m_s,
         )
-        if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 0:
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence < 0
+        ):
             raise ValueError("sequence must be non-negative")
         if any(not _finite(value) for value in values):
             raise ValueError("command velocity must be finite")
@@ -89,7 +93,11 @@ class TelemetryPacket:
     down_velocity_m_s: Optional[float] = None
 
     def encode(self) -> bytes:
-        if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 0:
+        if (
+            isinstance(self.sequence, bool)
+            or not isinstance(self.sequence, int)
+            or self.sequence < 0
+        ):
             raise ValueError("sequence must be non-negative")
         if self.obstacle_distance_m is not None and not _distance(self.obstacle_distance_m):
             raise ValueError("obstacle distance must be finite or none")
