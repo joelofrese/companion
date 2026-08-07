@@ -144,51 +144,22 @@ and `--memory` for editable experience memory.
 ## Current state
 
 - Deterministic Gazebo missions verify the full control path, perception
-  fixtures, faults, recovery, transient brain failures, safety, hover, landing,
-  and disarm.
-- A failed conscious thought holds zero, retries, and retains pending visual
-  context for the recovery.
-- Conscious intent rewording no longer discards a fresh VLM result; only an
-  explicitly reported goal change resets visual context.
-- Malformed conscious decisions preserve pending visual context for the next
-  thought as well.
-- RTP checks use a small fixed person/no-person fixture; rendered Gazebo camera
-  runs exercise the real VLM path.
-- The objects world includes a primitive mannequin; the fast VLM currently
-  does not reliably identify it and stops safely when uncertain.
-- Simulations start at zero yaw, verify takeoff heading stability, and use
-  velocity-only offboard setpoints that leave the current heading unchanged;
-  the runner disables Gazebo camera following while keeping the view
-  interactive.
-- The companion-owned `objects` world runs through the same PX4 and CM5 path
-  and provides simple objects for rendered-camera perception.
-- With a focused request, the local VLM found the red box and the conscious
-  LLM guided bounded forward and lateral movement before landing and disarm.
-- When a focused object is not visible but the scene is clear, the VLM may
-  make a slow lateral look; uncertain scenes still stop.
-- Exploratory camera and depth runs work in varied PX4 worlds with local
-  brains, bounded motion, simulated TOF safety, landing, and disarm.
-- A 120-second camera exploration completed 2,295 frames, 2,294 VLM
-  observations, and 240 conscious thoughts before landing and disarm.
-- A near-wall local-brain depth run observed 0.55 m and CM5 backoff at
-  -0.20 m/s before landing and disarm.
-- Gazebo's 1280x960 camera frames are reduced to 640 pixels before local VLM
-  inference, matching the real camera path and reducing visual latency.
-- Fresh visual results permit movement only briefly; stale results, camera
-  gaps, stale sensors, malformed commands, low confidence, command loss,
-  obstacles, and model shutdown stop safely.
-- Missing CM5/PX4 velocity telemetry also stops Mac motion until it returns.
-- Ollama VLM and LLM sessions support structured observations, intent,
-  dialogue, focused vision, memory, and voice. Trace output shows their
-  observable decisions and Mac/CM5 command reasons.
-- Scripted hover and follow requests are verified through the rendered-camera
-  path; hover stays still and follow remains bounded.
-- The synthetic and RTP runners share one small simulated CM5 safety-stack
-  lifecycle while keeping their scenarios separate.
-- Experience memory persists across exploratory runs and is available to the
-  next conscious decision.
-- Saved experience stays compact; live command and velocity telemetry stays in
-  the current thought instead of filling long-term memory.
+  fixtures, faults, recovery, brain failures, safety, hover, landing, and
+  disarm.
+- Exploratory camera and depth worlds run local VLM/LLM brains with dialogue,
+  visual focus, memory, bounded motion, simulated TOF safety, landing, and
+  disarm.
+- RTP person/no-person fixtures verify the video, Mac, CM5, and PX4 path;
+  rendered Gazebo frames verify the real local VLM path.
+- Focused Qwen runs identify simple objects and make bounded movement;
+  faster Moondream remains conservative when the scene is unclear.
+- Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
+  stops Mac motion. CM5 remains the final authority.
+- Intent changes invalidate old visual context; same-goal rewording does not.
+  Experience memory persists across exploratory runs.
+- Simulations start at zero yaw, keep the camera user-controlled, and resize
+  frames to the real 640-pixel camera width. Depth is only a TOF approximation;
+  DEXI 3 has no lidar.
 - The ROS 2 velocity seam exists. DEXI 3 hardware and optical-flow quality
   remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.

@@ -120,6 +120,7 @@ class MindRuntime:
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
             ):
                 movement = self._observation.movement
+        # A visual suggestion is unsafe without fresh vehicle state.
         if any(
             value is None
             for value in (

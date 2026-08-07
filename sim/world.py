@@ -368,14 +368,15 @@ async def run(
 
         attitude_task = asyncio.create_task(observe_heading())
 
+        def vehicle_velocity():
+            if not vehicle_velocity_fresh:
+                return (None, None, None)
+            return north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
+
         stack = SimulatedSafetyStack(
             drone,
             obstacle_distance=distance_sensor.read,
-            velocity_provider=lambda: (
-                (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
-                if vehicle_velocity_fresh
-                else (None, None, None)
-            ),
+            velocity_provider=vehicle_velocity,
         )
         sender = stack.start()
         safe_commands = stack.forwarder
