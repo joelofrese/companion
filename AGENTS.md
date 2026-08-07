@@ -149,6 +149,8 @@ and `--memory` for editable experience memory.
   LLM guided bounded forward and lateral movement before landing and disarm.
 - Exploratory camera and depth runs work in varied PX4 worlds with local
   brains, bounded motion, simulated TOF safety, landing, and disarm.
+- A 120-second camera exploration completed 2,295 frames, 2,294 VLM
+  observations, and 240 conscious thoughts before landing and disarm.
 - A near-wall local-brain depth run observed 0.55 m and CM5 backoff at
   -0.20 m/s before landing and disarm.
 - Fresh visual results permit movement only briefly; stale results, camera
