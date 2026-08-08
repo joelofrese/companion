@@ -85,11 +85,12 @@ BRAIN_SHUTDOWN_START_S = 29.0
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
 DEFAULT_EXPLORATORY_INTENT = "explore the surroundings"
+NO_OBSTACLE_DISTANCE_M = 10.0
 
 
 @dataclass(frozen=True)
 class WorldStep:
-    obstacle_distance_m: Optional[float] = 10.0
+    obstacle_distance_m: Optional[float] = NO_OBSTACLE_DISTANCE_M
     distance_fresh: bool = True
     velocity_fresh: bool = True
     transmit: bool = True
@@ -475,18 +476,19 @@ async def run(
             vehicle_velocity_fresh = step.velocity_fresh
             if gazebo_depth is not None:
                 distance = math.nan
+                sample = None
                 if step.distance_fresh:
                     sample = gazebo_depth.latest()
                     if sample is not None:
                         distance_sensor.update(sample)
                         depth_samples += 1
-                        distance = distance_sensor.read()
-                        if math.isfinite(distance):
-                            valid_depth_samples += 1
-                            minimum_depth_distance = min(
-                                minimum_depth_distance,
-                                distance,
-                            )
+                    distance = distance_sensor.read()
+                    if sample is not None and math.isfinite(distance):
+                        valid_depth_samples += 1
+                        minimum_depth_distance = min(
+                            minimum_depth_distance,
+                            distance,
+                        )
                     if math.isfinite(distance):
                         if step.obstacle_distance_m is None or not math.isfinite(
                             step.obstacle_distance_m
@@ -494,6 +496,14 @@ async def run(
                             distance = math.nan
                         else:
                             distance = min(distance, step.obstacle_distance_m)
+                distance_override = (
+                    not step.distance_fresh
+                    or step.obstacle_distance_m != NO_OBSTACLE_DISTANCE_M
+                )
+                if sample is not None or distance_override:
+                    distance_sensor.update(
+                        DistanceMessage(distance, 0.0, 19.1)
+                    )
                 return replace(
                     step,
                     obstacle_distance_m=distance,
@@ -954,7 +964,7 @@ async def run(
                 ),
             )
             for start_s, end_s, predicate, behavior in fault_checks:
-                if depth or duration_s < end_s:
+                if duration_s < end_s:
                     continue
                 if not observed(start_s, end_s, predicate):
                     raise RuntimeError(
