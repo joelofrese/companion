@@ -216,10 +216,17 @@ class OllamaClient:
         response = self._request("/api/chat", payload)
         try:
             message = response["message"]
-            content = message.get("content") or message.get("thinking")
-            return json.loads(content)
-        except (AttributeError, KeyError, TypeError, json.JSONDecodeError) as error:
+            contents = (message.get("content"), message.get("thinking"))
+            for content in contents:
+                if not isinstance(content, str) or not content.strip():
+                    continue
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError:
+                    continue
+        except (AttributeError, KeyError, TypeError) as error:
             raise RuntimeError("Ollama returned invalid structured output") from error
+        raise RuntimeError("Ollama returned invalid structured output")
 
 
 class OllamaVisionModel:
