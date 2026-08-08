@@ -92,13 +92,12 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         telemetry.right_velocity_m_s,
         telemetry.down_velocity_m_s,
     )
-    return (
-        "obstacle="
-        + value(telemetry.obstacle_distance_m)
-        + "; command="
-        + ",".join(value(number) for number in command_values)
-        + "; velocity="
-        + ",".join(value(number) for number in velocity_values)
+    return "; ".join(
+        (
+            f"obstacle={value(telemetry.obstacle_distance_m)}",
+            f"command={','.join(value(number) for number in command_values)}",
+            f"velocity={','.join(value(number) for number in velocity_values)}",
+        )
     )
 
 
