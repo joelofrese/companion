@@ -30,6 +30,7 @@ DESCRIPTION_PLACEHOLDERS = PLACEHOLDER_TEXT | frozenset(
         "last requested command",
         "measured body velocity",
         "forward tof distance",
+        "the scene is clear",
     )
 )
 MAX_OUTPUT_TOKENS = 64
