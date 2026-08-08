@@ -176,9 +176,9 @@ and `--memory` for editable experience memory.
   Moondream may remain uncertain, and uncertainty still stops safely.
 - Traces report each completed VLM and LLM latency so local model choices can
   be compared in the real control loop.
-- Exploratory `--faults` runs reuse the deterministic safety schedule without
-  requiring exact brain decisions, while checking the observed CM5 safe
-  outputs for each reached fault.
+- Exploratory `--faults` runs apply the safety schedule to synthetic sensors
+  and live Gazebo depth without requiring exact brain decisions, while
+  checking the observed CM5-safe output for each reached fault.
 - Mac brain shutdown stops new work immediately, so zero motion does not wait
   for a model request to finish.
 - Visual or vehicle telemetry that is stale, missing, malformed, or unsafe

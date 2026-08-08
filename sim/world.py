@@ -474,15 +474,26 @@ async def run(
             step = world.step(elapsed_s)
             vehicle_velocity_fresh = step.velocity_fresh
             if gazebo_depth is not None:
-                sample = gazebo_depth.latest()
-                if sample is not None:
-                    distance_sensor.update(sample)
-                    depth_samples += 1
-                    distance = distance_sensor.read()
+                distance = math.nan
+                if step.distance_fresh:
+                    sample = gazebo_depth.latest()
+                    if sample is not None:
+                        distance_sensor.update(sample)
+                        depth_samples += 1
+                        distance = distance_sensor.read()
+                        if math.isfinite(distance):
+                            valid_depth_samples += 1
+                            minimum_depth_distance = min(
+                                minimum_depth_distance,
+                                distance,
+                            )
                     if math.isfinite(distance):
-                        valid_depth_samples += 1
-                        minimum_depth_distance = min(minimum_depth_distance, distance)
-                distance = distance_sensor.read()
+                        if step.obstacle_distance_m is None or not math.isfinite(
+                            step.obstacle_distance_m
+                        ):
+                            distance = math.nan
+                        else:
+                            distance = min(distance, step.obstacle_distance_m)
                 return replace(
                     step,
                     obstacle_distance_m=distance,
