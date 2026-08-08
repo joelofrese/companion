@@ -21,17 +21,18 @@ class MavsdkVelocityForwarder:
         heading_deg = self.heading_provider()
         if heading_deg is None or not math.isfinite(heading_deg):
             north_m_s = east_m_s = down_m_s = 0.0
-            heading_deg = 0.0
+            yaw_deg = math.nan
         else:
             north_m_s, east_m_s, down_m_s = body_to_ned(
                 command,
                 math.radians(heading_deg),
             )
+            yaw_deg = heading_deg
         await self.drone.offboard.set_velocity_ned(
             VelocityNedYaw(
                 north_m_s,
                 east_m_s,
                 down_m_s,
-                heading_deg,
+                yaw_deg,
             )
         )
