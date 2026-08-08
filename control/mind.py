@@ -304,6 +304,8 @@ class MacMind:
             requested_focus = parse_focus(information.dialogue or "")
             if requested_focus:
                 focus = requested_focus
+            elif intent_changed and not focus:
+                focus = parse_focus(intent) or ""
             elif focus_was_requested and not focus_answered:
                 focus = information.focus
             if focus.lower() in FOCUS_PLACEHOLDER_TEXT:
