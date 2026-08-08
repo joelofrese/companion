@@ -93,7 +93,7 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         telemetry.down_velocity_m_s,
     )
     return (
-        "; obstacle="
+        "obstacle="
         + value(telemetry.obstacle_distance_m)
         + "; command="
         + ",".join(value(number) for number in command_values)
@@ -358,20 +358,20 @@ class MacMind:
             if self.memory_store is not None and (
                 information.new_observations or information.dialogue
             ):
-                entry = (
-                    f"intent={intent}; focus={decision.focus or 'none'}; "
-                    f"summary={summary}"
-                )
+                outcome = _experience_outcome(information.telemetry)
+                entry = f"intent={intent}; focus={decision.focus or 'none'}"
+                if outcome:
+                    entry += f"; {outcome}"
+                entry += f"; summary={summary}"
                 if information.new_observations:
                     observation = information.new_observations[-1]
                     entry += f"; observed={observation.description}"
                     if observation.focused_answer:
                         entry += f"; answer={observation.focused_answer}"
-                entry += _experience_outcome(information.telemetry)
                 if isinstance(decision.dialogue, str) and decision.dialogue.strip():
                     entry += f"; response={decision.dialogue}"
                 if information.dialogue:
-                    entry = f"user={information.dialogue}; {entry}"
+                    entry += f"; user={information.dialogue}"
                 self.memory_store.remember(entry)
             if intent != self.memory.intent:
                 self.memory.intent = intent
