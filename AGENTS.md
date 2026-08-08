@@ -214,8 +214,8 @@ and `--memory` for editable experience memory.
   camera-only runs observe safely but do not provide a range reading.
 - Offboard starts immediately after three CM5 priming setpoints, without an
   extra zero-command delay.
-- The ROS 2 CM5 seam converts body commands with fresh vehicle heading. DEXI 3
-  hardware and optical-flow quality remain unverified in SITL.
+- The simulated CM5 and ROS 2 seam convert body commands with fresh vehicle
+  heading. DEXI 3 hardware and optical-flow quality remain unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
 
 At the end of a meaningful session, update this section with only the current

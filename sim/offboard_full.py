@@ -90,6 +90,7 @@ async def run(image_path: str, expect_person: bool = False):
     north_velocity_m_s = None
     east_velocity_m_s = None
     down_velocity_m_s = None
+    current_heading_deg = None
     velocity_telemetry_seen = False
     frames_received = 0
     video_fault_reported = False
@@ -120,12 +121,14 @@ async def run(image_path: str, expect_person: bool = False):
 
         heading_deg = await prepare(drone)
         armed = True
+        current_heading_deg = heading_deg
 
         async def observe_heading():
-            nonlocal max_heading_change_deg
+            nonlocal current_heading_deg, max_heading_change_deg
             async for attitude in drone.telemetry.attitude_euler():
                 if not math.isfinite(attitude.yaw_deg):
                     continue
+                current_heading_deg = attitude.yaw_deg
                 change_deg = (
                     attitude.yaw_deg - heading_deg + 180.0
                 ) % 360.0 - 180.0
@@ -140,11 +143,14 @@ async def run(image_path: str, expect_person: bool = False):
             values = (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
             if any(value is None for value in values):
                 return (None, None, None)
-            return ned_to_body(*values, math.radians(heading_deg))
+            return ned_to_body(*values, math.radians(current_heading_deg))
+
+        def current_heading():
+            return current_heading_deg
 
         stack = SimulatedSafetyStack(
             drone,
-            heading_deg,
+            heading_provider=current_heading,
             obstacle_distance=cm5_obstacle_distance,
             velocity_provider=body_velocity,
         )
@@ -276,7 +282,7 @@ async def run(image_path: str, expect_person: bool = False):
                     velocity.north_m_s,
                     velocity.east_m_s,
                     velocity.down_m_s,
-                    math.radians(heading_deg),
+                    math.radians(current_heading_deg),
                 )
                 max_forward_velocity = max(max_forward_velocity, forward)
                 min_forward_velocity = min(min_forward_velocity, forward)

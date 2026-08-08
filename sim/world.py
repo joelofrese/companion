@@ -375,6 +375,7 @@ async def run(
     down_velocity_m_s = None
     velocity_telemetry_seen = False
     vehicle_velocity_fresh = True
+    current_heading_deg = None
     initial_yaw_deg = None
     max_heading_change_deg = 0.0
     try:
@@ -393,13 +394,15 @@ async def run(
 
         heading_deg = await prepare(drone)
         armed = True
+        current_heading_deg = heading_deg
 
         async def observe_heading():
-            nonlocal initial_yaw_deg, max_heading_change_deg
+            nonlocal current_heading_deg, initial_yaw_deg, max_heading_change_deg
             async for attitude in drone.telemetry.attitude_euler():
                 yaw_deg = attitude.yaw_deg
                 if not math.isfinite(yaw_deg):
                     continue
+                current_heading_deg = yaw_deg
                 if initial_yaw_deg is None:
                     initial_yaw_deg = yaw_deg
                 change_deg = (yaw_deg - initial_yaw_deg + 180.0) % 360.0 - 180.0
@@ -423,12 +426,15 @@ async def run(
                 north_velocity_m_s,
                 east_velocity_m_s,
                 down_velocity_m_s,
-                math.radians(heading_deg),
+                math.radians(current_heading_deg),
             )
+
+        def current_heading():
+            return current_heading_deg
 
         stack = SimulatedSafetyStack(
             drone,
-            heading_deg,
+            heading_provider=current_heading,
             obstacle_distance=distance_sensor.read,
             velocity_provider=vehicle_velocity,
         )
@@ -614,7 +620,7 @@ async def run(
                     velocity.north_m_s,
                     velocity.east_m_s,
                     velocity.down_m_s,
-                    math.radians(heading_deg),
+                    math.radians(current_heading_deg),
                 )
                 max_forward_velocity = max(max_forward_velocity, forward)
                 min_forward_velocity = min(min_forward_velocity, forward)
