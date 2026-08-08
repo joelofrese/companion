@@ -118,6 +118,7 @@ def _run_once(
     memory_path: Optional[Path],
     dialogue_request: Optional[str],
     trace: bool,
+    headless: bool,
 ) -> int:
     environment = os.environ.copy()
     environment["PX4_GZ_WORLD"] = world
@@ -209,7 +210,7 @@ def _run_once(
                 )
             if time.monotonic() >= deadline:
                 raise _BootError("PX4 did not reach pxh> before the boot timeout")
-        if not environment.get("HEADLESS"):
+        if not headless:
             # Open the GUI after PX4 has spawned the model. This keeps Gazebo
             # from reframing or tracking the vehicle as it appears.
             world_processes.append(
@@ -285,6 +286,7 @@ def run(
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
+    headless: bool = False,
 ) -> int:
     if world is None:
         world = "objects" if exploratory and (camera or depth) else "default"
@@ -368,6 +370,7 @@ def run(
                 memory_path=memory_path,
                 dialogue_request=dialogue_request,
                 trace=trace,
+                headless=headless,
             )
         except _BootError:
             if attempt == BOOT_RETRIES:
@@ -444,6 +447,11 @@ def main(argv=None):
         help="print meaningful VLM observations, conscious decisions, and command reasons",
     )
     parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="run without opening the Gazebo GUI",
+    )
+    parser.add_argument(
         "--duration",
         type=float,
         help="world simulation duration in seconds (default: 32)",
@@ -474,6 +482,7 @@ def main(argv=None):
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
             dialogue_request=args.request,
             trace=args.trace,
+            headless=args.headless,
         )
     except KeyboardInterrupt:
         return 130

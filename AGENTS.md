@@ -120,7 +120,7 @@ latencies, and command reasons. Use `--world`,
 length, dialogue, goal, and persistent experience. Typed dialogue also works
 during an exploratory run. Add `--faults` to inject the normal obstacle,
 sensor, link, invalid-command, and brain-shutdown schedule into an exploratory
-run.
+run. Add `--headless` for unattended runs without the Gazebo GUI.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
@@ -158,64 +158,29 @@ and `--memory` for editable experience memory.
 ## Current state
 
 - Deterministic Gazebo missions verify the full control path, perception
-  fixtures, faults, recovery, brain failures, safety, hover, landing, and
-  disarm.
-- Exploratory camera and depth worlds run local VLM/LLM brains with dialogue,
-  visual focus, and memory. Camera mode holds zero without TOF; depth mode
-  verifies simulated TOF safety, bounded motion, landing, and disarm.
-- A 120-second synthetic exploratory run completed 2,331 VLM observations and
-  240 conscious thoughts, then landed and disarmed.
-- Non-default exploratory worlds require rendered camera or simulated depth;
-  blind synthetic exploration is limited to the empty default world.
-- The default exploratory goal and explicit "look around" or "wander"
-  dialogue use an open-ended exploring intent that can move through clear
-  simulated space.
-- RTP person/no-person fixtures verify the video, Mac, CM5, and PX4 path;
-  rendered Gazebo frames verify the real local VLM path.
-- Focused Qwen runs identify simple objects but are much slower; faster
-  Moondream may remain uncertain, and uncertainty still stops safely.
-- Traces report each completed VLM and LLM latency so local model choices can
-  be compared in the real control loop.
-- Exploratory `--faults` runs apply the safety schedule to synthetic sensors
-  and live Gazebo depth without requiring exact brain decisions, while
-  checking the observed CM5-safe output for each reached fault.
-- Mac brain shutdown stops new work immediately, so zero motion does not wait
-  for a model request to finish.
-- Visual or vehicle telemetry that is stale, missing, malformed, or unsafe
-  stops Mac motion. CM5 remains the final authority.
-- Local VLM prompt boilerplate becomes unclear zero-confidence input and cannot
-  cause movement.
-- A confirmed one-shot visual focus stops motion; open-ended goals keep going.
-- Intent changes invalidate old visual context; same-goal rewording does not.
-  Experience memory persists recent observations, decisions, and measured
-  command outcomes across exploratory runs.
-- Conscious thoughts keep the active visual focus across new observations and
-  ignore generic placeholders and movement words. Generic or unclear VLM
-  descriptions are zero-confidence and cannot cause movement.
-- Direct find, look, search, inspect, and locate requests set their subject
-  as the visual focus even when the conscious model omits it.
-- Combined requests preserve both parts, such as a visual focus in
-  "look for the person and follow me."
-- "Stay with me" is treated as following, not hovering.
-- Exploratory simulation acknowledges those visual requests while keeping the
-  open-ended goal active.
-- A focused VLM answer must confirm the requested object or remain empty; it
-  must not substitute another visible object.
-- Brain and CM5 commands use forward, right, and down body-frame velocity;
-  CM5 converts them to PX4's local NED frame and backs away from obstacles in
-  the vehicle's forward direction.
-- Simulations hold their settled takeoff heading through offboard handoff,
-  including a non-zero spawn yaw; body-frame motion does not depend on North
-  alignment.
-  They keep the camera user-controlled and resize frames to the real 640-pixel
-  camera width. The GUI opens after PX4 spawns the model so it does not reframe
-  during takeoff. Depth is only a TOF approximation; DEXI 3 has no lidar.
-- Moving through the collidable `objects` world is verified with `--depth`;
-  camera-only runs observe safely but do not provide a range reading.
-- Offboard starts immediately after three CM5 priming setpoints, without an
-  extra zero-command delay.
-- The simulated CM5 and ROS 2 seam convert body commands with fresh vehicle
-  heading. DEXI 3 hardware and optical-flow quality remain unverified in SITL.
+  fixtures, faults, recovery, safety, hover, landing, and disarm.
+- Exploratory camera and depth worlds run the Mac VLM/LLM path with dialogue,
+  visual focus, memory, bounded motion, and simulated TOF safety. Camera-only
+  motion stays stopped because DEXI 3 has no forward range reading in that
+  mode.
+- The `objects` world provides simple colored objects and a mannequin;
+  non-default worlds require rendered camera or simulated depth so motion is
+  never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
+- Open-ended goals can move through clear simulated space. Dialogue can change
+  intent or visual focus, and editable experience memory persists across runs.
+- Stale, missing, malformed, low-confidence, or failed brain and sensor input
+  stops Mac motion. CM5 still rejects unsafe or stale commands and remains the
+  final authority.
+- `--trace` shows observations, decisions, latencies, and command reasons;
+  `--faults` checks the same safety schedule through synthetic sensors and
+  live Gazebo depth without requiring exact brain decisions.
+- Brain and CM5 use slow forward, right, and down body-frame velocity. Both
+  simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
+- A 120-second synthetic exploratory run completed 2,331 observations and 240
+  thoughts, then landed and disarmed. RTP fixtures and rendered Gazebo camera
+  runs also verify the video, Mac, CM5, and PX4 paths.
+- The target remains the DEXI 3: no lidar, DEXI hardware is unverified, and
+  PX4's GPS-denied optical-flow quality is still unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
 
 At the end of a meaningful session, update this section with only the current
