@@ -163,8 +163,8 @@ and `--memory` for editable experience memory.
 - Exploratory camera and depth worlds run local VLM/LLM brains with dialogue,
   visual focus, and memory. Camera mode holds zero without TOF; depth mode
   verifies simulated TOF safety, bounded motion, landing, and disarm.
-- A 120-second exploratory run completed 2,331 VLM observations and 240
-  conscious thoughts within the speed envelope, then landed and disarmed.
+- A 120-second synthetic exploratory run completed 2,331 VLM observations and
+  240 conscious thoughts, then landed and disarmed.
 - Non-default exploratory worlds require rendered camera or simulated depth;
   blind synthetic exploration is limited to the empty default world.
 - The default exploratory goal and explicit "look around" or "wander"
