@@ -2,6 +2,7 @@
 
 from collections import deque
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import threading
 from typing import Any, Optional, Protocol
@@ -75,7 +76,11 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         return ""
 
     def value(number):
-        return "?" if number is None else f"{number:.2f}"
+        return (
+            "?"
+            if number is None or not math.isfinite(number)
+            else f"{number:.2f}"
+        )
 
     command_values = (
         command.forward_m_s,
@@ -88,7 +93,9 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         telemetry.down_velocity_m_s,
     )
     return (
-        "; command="
+        "; obstacle="
+        + value(telemetry.obstacle_distance_m)
+        + "; command="
         + ",".join(value(number) for number in command_values)
         + "; velocity="
         + ",".join(value(number) for number in velocity_values)
