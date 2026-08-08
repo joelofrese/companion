@@ -210,7 +210,7 @@ def _run_once(
                 )
             if time.monotonic() >= deadline:
                 raise _BootError("PX4 did not reach pxh> before the boot timeout")
-        if not headless:
+        if not headless and not environment.get("HEADLESS"):
             # Open the GUI after PX4 has spawned the model. This keeps Gazebo
             # from reframing or tracking the vehicle as it appears.
             world_processes.append(
