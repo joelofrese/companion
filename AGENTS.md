@@ -170,7 +170,7 @@ and `--memory` for editable experience memory.
   intent or visual focus; an intent such as "inspect the red box" can also
   provide focus when the LLM leaves that field empty. Experience memory is
   editable, persists across runs, and records command, velocity, and obstacle
-  outcomes.
+  outcomes; exploratory simulation reloads and verifies those records.
 - Stale, missing, malformed, low-confidence, or failed brain and sensor input
   stops Mac motion. CM5 still rejects unsafe or stale commands and remains the
   final authority.

@@ -906,8 +906,21 @@ async def run(
                 f"VLM={vlm_model}, LLM={llm_model}."
             )
         if memory_store is not None:
-            if memory_store.context():
-                print("Conscious experience memory=verified.")
+            persisted_memory = CompanionMemory(memory_store.path).context()
+            required_memory = (
+                "intent=",
+                "summary=",
+                "obstacle=",
+                "command=",
+                "velocity=",
+            )
+            if not persisted_memory or any(
+                field not in persisted_memory for field in required_memory
+            ):
+                raise RuntimeError(
+                    "SITL did not persist a complete conscious experience"
+                )
+            print("Conscious experience memory=verified and reloadable.")
 
         def forward_count(start_s, end_s):
             return sum(
