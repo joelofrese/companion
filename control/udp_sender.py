@@ -31,7 +31,8 @@ class UdpCommandSender:
             raise ValueError("destination port must be between 1 and 65535")
         self.destination = (destination_host, destination_port)
         self._socket = None
-        self._sequence = 0
+        # A restarted Mac must be newer than packets the CM5 already accepted.
+        self._sequence = time.time_ns()
         self._telemetry_sequence = None
         self._obstacle_distance_m = None
         self._forward_velocity_m_s = None

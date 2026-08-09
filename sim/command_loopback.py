@@ -43,8 +43,11 @@ async def run():
     mac_stop_event = asyncio.Event()
     frame_count = 0
     cm5_started_at = None
+    obstacle_cleared = False
 
     def cm5_obstacle_distance():
+        if obstacle_cleared:
+            return 2.0
         elapsed_s = time.monotonic() - cm5_started_at
         if elapsed_s < 0.08:
             return None
@@ -124,6 +127,25 @@ async def run():
             or telemetry.down_velocity_m_s != 0.03
         ):
             raise RuntimeError(f"Mac did not receive CM5 velocity telemetry: {telemetry}")
+        obstacle_cleared = True
+        await asyncio.sleep(0.2)
+        while not forwarder.commands.empty():
+            forwarder.commands.get_nowait()
+        reconnect_sender = UdpCommandSender("127.0.0.1", receiver.port)
+        try:
+            reconnect_sender.send(VelocityCommand(forward_m_s=0.25))
+            await asyncio.sleep(0.1)
+        finally:
+            reconnect_sender.close()
+        reconnect_commands = []
+        while not forwarder.commands.empty():
+            reconnect_commands.append(forwarder.commands.get_nowait())
+        if VelocityCommand(forward_m_s=0.25) not in reconnect_commands:
+            raise RuntimeError(
+                "a restarted Mac sender did not reconnect through CM5 safety: "
+                f"{reconnect_commands}"
+            )
+        print("Mac sender restart=verified.")
         cm5_stop_event.set()
         await cm5_task
         shutdown_command = await _next_command(forwarder)
