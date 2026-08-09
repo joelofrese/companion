@@ -214,6 +214,12 @@ class MacMind:
         intent = intent.strip()
         with self._lock:
             if _same_goal(intent, self.memory.intent):
+                focus = parse_focus(intent) or ""
+                if focus != self.memory.focus:
+                    self.memory.intent = intent
+                    self._invalidate_visual_context()
+                    self.memory.focus = focus
+                    self.memory.focus_requested = bool(focus)
                 return
             self.memory.intent = intent
             self._invalidate_visual_context()
@@ -239,6 +245,13 @@ class MacMind:
 
         with self._lock:
             return self.memory.intent
+
+    @property
+    def visual_focus(self) -> str:
+        """Return the subject the next visual result must answer."""
+
+        with self._lock:
+            return self.memory.focus
 
     def see(
         self,
@@ -389,8 +402,12 @@ class MacMind:
                 if information.dialogue:
                     entry += f"; user={information.dialogue}"
                 self.memory_store.remember(entry)
-            if intent != self.memory.intent:
-                self.memory.intent = intent
+            if (
+                intent != self.memory.intent
+                or decision.focus != self.memory.focus
+            ):
+                if intent != self.memory.intent:
+                    self.memory.intent = intent
                 self._invalidate_visual_context()
             self.memory.focus = decision.focus
             self.memory.focus_requested = bool(requested_focus) or (

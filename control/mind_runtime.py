@@ -29,12 +29,14 @@ class MindRuntime:
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._future: Optional[Future] = None
         self._future_intent: Optional[str] = None
+        self._future_focus: Optional[str] = None
         self._future_started_at_s: Optional[float] = None
         self._observation = None
         self._observation_ready_at_s: Optional[float] = None
         self._observation_duration_s: Optional[float] = None
         self._last_frame_at_s: Optional[float] = None
         self._observation_intent: Optional[str] = None
+        self._observation_focus: Optional[str] = None
         self._decision: Optional[ConsciousDecision] = None
         self._decision_duration_s: Optional[float] = None
         self._thought_error: Optional[Exception] = None
@@ -114,6 +116,7 @@ class MindRuntime:
             self._last_frame_at_s = time.monotonic()
         if frame is not None and self._future is None and not self._closed:
             self._future_intent = self.mind.intent
+            self._future_focus = self.mind.visual_focus
             self._future_started_at_s = time.monotonic()
             self._future = self._executor.submit(
                 self.mind.see,
@@ -127,6 +130,7 @@ class MindRuntime:
             frame_age_s = self.latest_frame_age_s
             if self._thought_error is None and (
                 self._observation_intent == self.mind.intent
+                and self._observation_focus == self.mind.visual_focus
                 and age_s is not None
                 and age_s <= MAX_MOVEMENT_AGE_S
                 and frame_age_s is not None
@@ -171,13 +175,17 @@ class MindRuntime:
             self._observation = None
             self._observation_ready_at_s = None
             self._observation_intent = None
+            self._observation_focus = None
             self._future_intent = None
+            self._future_focus = None
             return
         self._observation = observation
         self._observation_ready_at_s = time.monotonic()
         self._observation_count += 1
         self._observation_intent = self._future_intent
+        self._observation_focus = self._future_focus
         self._future_intent = None
+        self._future_focus = None
 
     async def _think_or_stop(
         self,
