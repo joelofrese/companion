@@ -40,7 +40,7 @@ class UdpSafetyReceiver:
         self.safety = safety or OnboardSafetyEnvelope()
         self._socket = None
         self._client_address = None
-        self._telemetry_sequence = 0
+        self._telemetry_sequence = time.time_ns()
 
     def start(self):
         """Bind the UDP socket."""
@@ -57,7 +57,7 @@ class UdpSafetyReceiver:
         self._socket = receiver_socket
         self.port = receiver_socket.getsockname()[1]
         self._client_address = None
-        self._telemetry_sequence = 0
+        self._telemetry_sequence = time.time_ns()
 
     def poll(self, obstacle_distance_m: Optional[float] = None) -> VelocityCommand:
         """Read available packets and return the safe command."""
