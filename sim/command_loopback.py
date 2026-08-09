@@ -73,6 +73,7 @@ async def run():
     cm5_task = None
     mac_task = None
     sender = None
+    reconnect_sender = None
     control = FixedCommandControl()
     try:
         cm5_service.start()
@@ -132,11 +133,8 @@ async def run():
         while not forwarder.commands.empty():
             forwarder.commands.get_nowait()
         reconnect_sender = UdpCommandSender("127.0.0.1", receiver.port)
-        try:
-            reconnect_sender.send(VelocityCommand(forward_m_s=0.25))
-            await asyncio.sleep(0.1)
-        finally:
-            reconnect_sender.close()
+        reconnect_sender.send(VelocityCommand(forward_m_s=0.25))
+        await asyncio.sleep(0.1)
         reconnect_commands = []
         while not forwarder.commands.empty():
             reconnect_commands.append(forwarder.commands.get_nowait())
@@ -146,6 +144,34 @@ async def run():
                 f"{reconnect_commands}"
             )
         print("Mac sender restart=verified.")
+        while not forwarder.commands.empty():
+            forwarder.commands.get_nowait()
+        cm5_stop_event.set()
+        await cm5_task
+        cm5_stop_event = asyncio.Event()
+        cm5_service.start()
+        cm5_task = asyncio.create_task(cm5_service.run(cm5_stop_event))
+        reconnect_sender.send(VelocityCommand(forward_m_s=0.25))
+        restarted_telemetry = None
+        for _ in range(20):
+            await asyncio.sleep(0.02)
+            restarted_telemetry = reconnect_sender.telemetry()
+            if restarted_telemetry.obstacle_distance_m == 2.0:
+                break
+        if (
+            restarted_telemetry is None
+            or restarted_telemetry.obstacle_distance_m != 2.0
+            or restarted_telemetry.forward_velocity_m_s != 0.12
+            or restarted_telemetry.right_velocity_m_s != -0.04
+            or restarted_telemetry.down_velocity_m_s != 0.03
+        ):
+            raise RuntimeError(
+                "Mac did not receive fresh telemetry after CM5 restart: "
+                f"{restarted_telemetry}"
+            )
+        print("CM5 restart=verified.")
+        while not forwarder.commands.empty():
+            forwarder.commands.get_nowait()
         cm5_stop_event.set()
         await cm5_task
         shutdown_command = await _next_command(forwarder)
@@ -159,6 +185,8 @@ async def run():
     finally:
         if sender is not None:
             sender.close()
+        if reconnect_sender is not None:
+            reconnect_sender.close()
         if mac_task is not None and not mac_task.done():
             mac_stop_event.set()
             await mac_task
