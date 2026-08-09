@@ -224,7 +224,7 @@ class MindRuntime:
             if dialogue:
                 self._intent_override = explicit_intent
                 if explicit_intent is not None:
-                    self.mind.set_intent(explicit_intent)
+                    self.mind.set_intent(dialogue)
             if (
                 self._decision_count == 0
                 and self._observation_intent != self.mind.intent
