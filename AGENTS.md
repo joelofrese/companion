@@ -95,6 +95,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
 .venv/bin/python -m sim.run_world --explore --faults --world default --duration 32
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
+.venv/bin/python -m sim.run_world --explore --depth --moving-person --world objects --intent "follow the person" --duration 20
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg --expect-person
@@ -138,6 +139,9 @@ its depth readings feed CM5 safety. This is only a simulation approximation of
 DEXI 3's forward TOF sensor, not a claim that DEXI 3 has a depth camera. Use
 `--intent following` and `--pose x,y,z,roll,pitch,yaw` to start near an
 obstacle.
+Add `--moving-person` in the `objects` world to move its visible mannequin
+between fixed poses through Gazebo's native pose service. This is a visual
+interaction fixture, not a DEXI 3 hardware claim.
 
 After installing Ollama and pulling local models:
 
@@ -164,7 +168,9 @@ and `--memory` for editable experience memory.
   motion stays stopped because DEXI 3 has no forward range reading in that
   mode.
 - The `objects` world provides simple colored objects and a mannequin in the
-  forward camera view;
+  forward camera view; `--moving-person` moves that mannequin between fixed
+  poses and exercises changing visual scenes. The local brain safely holds
+  zero when it cannot recognize the scene confidently.
   non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Open-ended goals can move through clear simulated space. Dialogue can change

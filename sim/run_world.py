@@ -118,6 +118,7 @@ def _run_once(
     memory_path: Optional[Path],
     dialogue_request: Optional[str],
     trace: bool,
+    moving_person: bool,
     headless: bool,
 ) -> int:
     environment = os.environ.copy()
@@ -238,6 +239,8 @@ def _run_once(
                 scenario.append("--camera")
             if depth:
                 scenario.append("--depth")
+            if moving_person:
+                scenario.append("--moving-person")
             if exploratory:
                 scenario += ["--intent", initial_intent]
             if ollama:
@@ -286,6 +289,7 @@ def run(
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
+    moving_person: bool = False,
     headless: bool = False,
 ) -> int:
     if world is None:
@@ -316,6 +320,12 @@ def run(
     if exploratory and world != "default" and not (camera or depth):
         raise RuntimeError(
             "a non-default exploratory world requires --camera or --depth"
+        )
+    if moving_person and not (
+        exploratory and world == "objects" and (camera or depth)
+    ):
+        raise RuntimeError(
+            "moving-person simulation requires exploratory objects camera or depth mode"
         )
     if faults and camera:
         raise RuntimeError("fault injection requires synthetic safety or depth mode")
@@ -370,6 +380,7 @@ def run(
                 memory_path=memory_path,
                 dialogue_request=dialogue_request,
                 trace=trace,
+                moving_person=moving_person,
                 headless=headless,
             )
         except _BootError:
@@ -414,6 +425,11 @@ def main(argv=None):
         "--depth",
         action="store_true",
         help="use Gazebo's x500_depth camera and feed its depth readings to CM5 safety",
+    )
+    parser.add_argument(
+        "--moving-person",
+        action="store_true",
+        help="move the visual mannequin through the objects world",
     )
     parser.add_argument(
         "--intent",
@@ -482,6 +498,7 @@ def main(argv=None):
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
             dialogue_request=args.request,
             trace=args.trace,
+            moving_person=args.moving_person,
             headless=args.headless,
         )
     except KeyboardInterrupt:

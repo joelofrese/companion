@@ -39,6 +39,7 @@ from sim.flight import (
 )
 from sim.gazebo_camera import GazeboCamera
 from sim.gazebo_depth import GazeboDepthRangefinder
+from sim.gazebo_topic import GazeboPoseAnimator
 from sim.offboard_control import (
     DistanceMessage,
     PROFILE_DURATION_S,
@@ -312,6 +313,7 @@ async def run(
     memory_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
+    moving_person: bool = False,
 ):
     """Run one complete Gazebo world simulation."""
 
@@ -333,6 +335,12 @@ async def run(
     if exploratory and world_name != "default" and not (camera or depth):
         raise ValueError(
             "a non-default exploratory world requires --camera or --depth"
+        )
+    if moving_person and not (
+        exploratory and world_name == "objects" and (camera or depth)
+    ):
+        raise ValueError(
+            "moving-person simulation requires exploratory objects camera or depth mode"
         )
     if faults and camera:
         raise ValueError("fault injection requires synthetic safety or depth mode")
@@ -370,6 +378,7 @@ async def run(
     dialogue_input = DialogueInput(dialogue_request) if exploratory else None
     gazebo_camera = None
     gazebo_depth = None
+    person_motion = None
     control = None
     applied_dialogue_intent = None
     brain_shutdown = False
@@ -402,6 +411,13 @@ async def run(
         heading_deg = await prepare(drone)
         armed = True
         current_heading_deg = heading_deg
+        if moving_person:
+            person_motion = GazeboPoseAnimator(
+                world_name,
+                "person",
+                ((3.2, -0.8, 0.0), (3.8, -0.8, 0.0)),
+            )
+            person_motion.start()
 
         async def observe_heading():
             nonlocal current_heading_deg, initial_yaw_deg, max_heading_change_deg
@@ -794,6 +810,8 @@ async def run(
 
         try:
             while (elapsed := time.monotonic() - started_at) < duration_s:
+                if person_motion is not None:
+                    person_motion.check()
                 now = time.monotonic()
                 step = read_step(elapsed)
                 event = None if exploratory else event_for(elapsed, step)
@@ -837,6 +855,8 @@ async def run(
                 except OffboardError:
                     pass
                 offboard_started = False
+            if person_motion is not None:
+                person_motion.close()
 
         commands = safe_commands.commands
         if not commands or commands[-1][1] != VelocityCommand():
@@ -1271,6 +1291,8 @@ async def run(
             gazebo_camera.close()
         if gazebo_depth is not None:
             gazebo_depth.close()
+        if person_motion is not None:
+            person_motion.close()
         if stack is not None:
             await stack.stop()
         mind_stop.set()
@@ -1307,6 +1329,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("--camera", action="store_true")
     parser.add_argument("--depth", action="store_true")
+    parser.add_argument(
+        "--moving-person",
+        action="store_true",
+        help="move the visual mannequin through the objects world",
+    )
     parser.add_argument("--ollama", action="store_true")
     parser.add_argument("--vlm-model", default="moondream")
     parser.add_argument("--llm-model", default="gemma3:4b")
@@ -1349,6 +1376,7 @@ if __name__ == "__main__":
                 memory_path=args.memory,
                 dialogue_request=args.request,
                 trace=args.trace,
+                moving_person=args.moving_person,
             )
         )
     except (RuntimeError, ValueError) as error:
