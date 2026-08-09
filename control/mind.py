@@ -50,11 +50,28 @@ class CompanionMemory:
         """Save one new memory and keep the file bounded."""
 
         entry = " ".join(entry.split())[:MAX_MEMORY_CHARS]
-        if not entry or (self._lines and self._lines[-1] == entry):
+        if not entry:
             return
-        self._lines = (self._lines + [entry])[-MAX_MEMORY_LINES:]
+        if self._lines and _memory_key(self._lines[-1]) == _memory_key(entry):
+            if self._lines[-1] == entry:
+                return
+            self._lines[-1] = entry
+        else:
+            self._lines = (self._lines + [entry])[-MAX_MEMORY_LINES:]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text("\n".join(self._lines) + "\n", encoding="utf-8")
+
+
+def _memory_key(entry: str) -> str:
+    """Ignore changing telemetry when grouping one repeated experience."""
+
+    before, separator, after = entry.partition("; obstacle=")
+    if not separator:
+        return entry
+    summary = after.partition("; summary=")
+    if not summary[1]:
+        return before
+    return before + summary[1] + summary[2]
 
 
 @dataclass(frozen=True)
