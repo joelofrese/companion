@@ -36,6 +36,7 @@ merge and delete it.
 - The Mac runs a subconscious VLM and a conscious LLM in separate sessions.
 - The VLM describes images and suggests cautious movement.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
+- A follow goal passes its subject to the VLM as visual focus.
 - Mac control turns that intent and visual suggestion into slow body-frame
   velocity.
 - A real intent change invalidates old visual context and pending brain
@@ -171,7 +172,7 @@ and `--memory` for editable experience memory.
   forward camera view; `--moving-person` moves that mannequin between fixed
   poses and exercises changing visual scenes. The local brain safely holds
   zero when it cannot recognize the scene confidently.
-  non-default worlds require rendered camera or simulated depth so motion is
+- Non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Open-ended goals can move through clear simulated space. Dialogue can change
   intent or visual focus; an intent such as "inspect the red box" can also

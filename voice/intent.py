@@ -5,6 +5,7 @@ from typing import Optional
 
 
 FOCUS_PHRASES = (
+    "follow",
     "look for",
     "look at",
     "search for",

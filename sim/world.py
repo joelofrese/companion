@@ -415,7 +415,7 @@ async def run(
             person_motion = GazeboPoseAnimator(
                 world_name,
                 "person",
-                ((3.2, -0.8, 0.0), (3.8, -0.8, 0.0)),
+                ((3.2, -0.8, 0.0), (3.2, -1.6, 0.0)),
             )
             person_motion.start()
 
