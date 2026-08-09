@@ -1273,6 +1273,15 @@ async def run(
                 f"{valid_depth_samples} valid of {depth_samples}."
             )
             print(f"Minimum Gazebo depth distance: {minimum_depth_distance:.2f}m")
+            if minimum_depth_distance < OBSTACLE_STOP_M:
+                if not any(
+                    command.forward_m_s <= -BACKOFF_SPEED_M_S
+                    for _, command in commands
+                ):
+                    raise RuntimeError(
+                        "CM5 did not back off after Gazebo depth reached the obstacle limit"
+                    )
+                print("CM5 Gazebo-depth obstacle backoff=verified.")
         print(f"Max observed forward velocity: {max_forward_velocity:.2f}m/s")
         print(f"Max observed right velocity: {max_right_velocity:.2f}m/s")
         print(f"Min observed forward velocity: {min_forward_velocity:.2f}m/s")

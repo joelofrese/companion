@@ -143,6 +143,9 @@ obstacle.
 Add `--moving-person` in the `objects` world to move its visible mannequin
 between fixed poses through Gazebo's native pose service. This is a visual
 interaction fixture, not a DEXI 3 hardware claim.
+When Gazebo depth reaches the obstacle limit, the run also requires observed
+CM5 backoff; runs that never reach it remain exploratory and only check bounded
+behavior.
 
 After installing Ollama and pulling local models:
 
