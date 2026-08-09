@@ -44,7 +44,6 @@ class MindRuntime:
         self._observation_count = 0
         self._decision_count = 0
         self._last_command: Optional[VelocityCommand] = None
-        self._intent_override: Optional[str] = None
 
     @property
     def latest_decision(self) -> Optional[ConsciousDecision]:
@@ -230,7 +229,6 @@ class MindRuntime:
             dialogue = dialogue_provider() if dialogue_provider is not None else None
             explicit_intent = parse_intent(dialogue) if dialogue else None
             if dialogue:
-                self._intent_override = explicit_intent
                 if explicit_intent is not None:
                     self.mind.set_intent(dialogue)
             if (
@@ -253,7 +251,7 @@ class MindRuntime:
                     stop_event,
                     telemetry,
                     dialogue,
-                    self._intent_override,
+                    explicit_intent,
                 )
             except Exception as error:
                 if (
