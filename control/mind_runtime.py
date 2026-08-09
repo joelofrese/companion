@@ -45,6 +45,7 @@ class MindRuntime:
         self._decision_count = 0
         self._last_command: Optional[VelocityCommand] = None
         self._dialogue_intent: Optional[str] = None
+        self._pending_dialogue: Optional[str] = None
 
     @property
     def latest_decision(self) -> Optional[ConsciousDecision]:
@@ -227,12 +228,15 @@ class MindRuntime:
         if period_s <= 0.0:
             raise ValueError("thinking period must be positive")
         while not stop_event.is_set():
-            dialogue = dialogue_provider() if dialogue_provider is not None else None
-            explicit_intent = parse_intent(dialogue) if dialogue else None
-            if dialogue:
-                self._dialogue_intent = explicit_intent
-                if explicit_intent is not None:
-                    self.mind.set_intent(dialogue)
+            new_dialogue = (
+                dialogue_provider() if dialogue_provider is not None else None
+            )
+            if new_dialogue:
+                self._pending_dialogue = new_dialogue
+                self._dialogue_intent = parse_intent(new_dialogue)
+            dialogue = self._pending_dialogue
+            if dialogue and self._dialogue_intent is not None:
+                self.mind.set_intent(dialogue)
             if (
                 self._decision_count == 0
                 and self._observation_intent != self.mind.intent
@@ -272,6 +276,7 @@ class MindRuntime:
                 continue
             if decision is None:
                 return
+            self._pending_dialogue = None
             self._thought_error = None
             self._decision_duration_s = max(0.0, time.monotonic() - started_at_s)
             self._decision = decision
