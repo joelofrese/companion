@@ -81,6 +81,8 @@ CONSCIOUS_FAILURE_START_S = 24.2
 # Leave time for the independent conscious loop to observe the fault and make
 # the Mac command go to zero before recovery is allowed.
 CONSCIOUS_FAILURE_END_S = 25.0
+MALFORMED_CONSCIOUS_START_S = 26.0
+MALFORMED_CONSCIOUS_END_S = 26.6
 BRAIN_SHUTDOWN_START_S = 29.0
 MAX_EXPLORATORY_SPEED_M_S = 1.0
 MAX_HEADING_CHANGE_DEG = 15.0
@@ -244,6 +246,7 @@ class WorldLanguageModel:
         self.intent = None
         self._conscious_failure_seen = False
         self.recovered_with_observation = False
+        self.malformed_conscious_seen = False
 
     def think(self, information) -> ConsciousDecision:
         if self.intent is None:
@@ -273,6 +276,9 @@ class WorldLanguageModel:
                         "simulated conscious recovery lost visual context"
                     )
                 self.recovered_with_observation = True
+            if MALFORMED_CONSCIOUS_START_S <= elapsed_s < MALFORMED_CONSCIOUS_END_S:
+                self.malformed_conscious_seen = True
+                return ConsciousDecision(intent="", intent_changed=True)
             following = (
                 elapsed_s < HOVER_START_S
                 or SECOND_FOLLOW_START_S <= elapsed_s < SECOND_FOLLOW_END_S
@@ -655,6 +661,12 @@ async def run(
                 return "visual model failure; holding zero"
             if CONSCIOUS_FAILURE_START_S <= elapsed_s < CONSCIOUS_FAILURE_END_S:
                 return "conscious model failure; holding zero"
+            if (
+                MALFORMED_CONSCIOUS_START_S
+                <= elapsed_s
+                < MALFORMED_CONSCIOUS_END_S
+            ):
+                return "malformed conscious decision; holding zero"
             if step.command_override is not None:
                 return "out-of-bounds command"
             if LOW_CONFIDENCE_START_S <= elapsed_s < LOW_CONFIDENCE_END_S:
@@ -1154,6 +1166,18 @@ async def run(
                 "conscious model recovery",
             ),
             (
+                MALFORMED_CONSCIOUS_START_S,
+                MALFORMED_CONSCIOUS_END_S + 0.1,
+                lambda command: command == VelocityCommand(),
+                "malformed conscious decision fail-safe",
+            ),
+            (
+                MALFORMED_CONSCIOUS_END_S + 0.1,
+                THIRD_FOLLOW_END_S,
+                lambda command: command.forward_m_s > 0.0,
+                "malformed conscious decision recovery",
+            ),
+            (
                 THIRD_FOLLOW_END_S,
                 PROFILE_DURATION_S,
                 lambda command: command == VelocityCommand(),
@@ -1170,6 +1194,11 @@ async def run(
                     "SITL conscious recovery did not retain visual context"
                 )
             print("Conscious recovery retained visual context=verified.")
+            if not language_model.malformed_conscious_seen:
+                raise RuntimeError(
+                    "SITL did not exercise malformed conscious decision handling"
+                )
+            print("Malformed conscious decision handling=verified.")
             if not brain_shutdown or not observed(
                 BRAIN_SHUTDOWN_START_S,
                 PROFILE_DURATION_S,
