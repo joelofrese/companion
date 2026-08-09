@@ -351,6 +351,7 @@ async def run(
         await asyncio.to_thread(ollama_client.preload, vlm_model)
         await asyncio.to_thread(ollama_client.preload, llm_model)
     memory_store = CompanionMemory(memory_path) if memory_path is not None else None
+    memory_before = memory_store.context() if memory_store is not None else ""
 
     sender = None
     drone = System()
@@ -920,6 +921,8 @@ async def run(
                 raise RuntimeError(
                     "SITL did not persist a complete conscious experience"
                 )
+            if persisted_memory == memory_before:
+                raise RuntimeError("SITL did not add a new conscious experience")
             print("Conscious experience memory=verified and reloadable.")
 
         def forward_count(start_s, end_s):
