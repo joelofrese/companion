@@ -163,7 +163,8 @@ and `--memory` for editable experience memory.
   visual focus, memory, bounded motion, and simulated TOF safety. Camera-only
   motion stays stopped because DEXI 3 has no forward range reading in that
   mode.
-- The `objects` world provides simple colored objects and a mannequin;
+- The `objects` world provides simple colored objects and a mannequin in the
+  forward camera view;
   non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Open-ended goals can move through clear simulated space. Dialogue can change
