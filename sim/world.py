@@ -705,7 +705,7 @@ async def run(
                         print(
                             f"[VLM {elapsed_s:5.1f}s] "
                             f"{signature[0]}; answer={signature[1]}; "
-                            f"focus={signature[2]}; movement={signature[3]}; "
+                            f"next-focus={signature[2]}; movement={signature[3]}; "
                             f"confidence={signature[4]:.2f}; "
                             f"latency={control.latest_observation_duration_s:.2f}s",
                             flush=True,

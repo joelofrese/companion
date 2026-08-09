@@ -180,11 +180,9 @@ and `--memory` for editable experience memory.
   live Gazebo depth without requiring exact brain decisions.
 - Brain and CM5 use slow forward, right, and down body-frame velocity. Both
   simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
-- A 120-second synthetic run and a 60-second real Ollama/depth run completed
-  with bounded motion, valid depth, landing, and disarm. The real run processed
-  1,009 camera frames, 24 VLM observations, and 13 conscious thoughts. RTP
-  fixtures and rendered Gazebo camera runs also verify the video, Mac, CM5,
-  and PX4 paths.
+- Long synthetic and real Ollama/depth runs complete with bounded motion, valid
+  depth, landing, and disarm. RTP fixtures and rendered Gazebo camera runs also
+  verify the video, Mac, CM5, and PX4 paths.
 - The target remains the DEXI 3: no lidar, DEXI hardware is unverified, and
   PX4's GPS-denied optical-flow quality is still unverified in SITL.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
