@@ -908,6 +908,9 @@ async def run(
             )
         if memory_store is not None:
             persisted_memory = CompanionMemory(memory_store.path).context()
+            latest_memory = (
+                persisted_memory.splitlines()[-1] if persisted_memory else ""
+            )
             required_memory = (
                 "intent=",
                 "summary=",
@@ -915,8 +918,8 @@ async def run(
                 "command=",
                 "velocity=",
             )
-            if not persisted_memory or any(
-                field not in persisted_memory for field in required_memory
+            if not latest_memory or any(
+                field not in latest_memory for field in required_memory
             ):
                 raise RuntimeError(
                     "SITL did not persist a complete conscious experience"
