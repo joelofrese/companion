@@ -285,7 +285,7 @@ def run(
     duration_s: Optional[float] = None,
     ollama: bool = False,
     vlm_model: str = "moondream",
-    llm_model: str = "gemma3:4b",
+    llm_model: str = "moondream",
     ollama_timeout: float = 60.0,
     initial_intent: str = "explore the surroundings",
     model_pose: Optional[str] = None,
@@ -455,7 +455,7 @@ def main(argv=None):
         help="use local Ollama VLM and LLM for an exploratory camera or depth run",
     )
     parser.add_argument("--vlm-model", default="moondream")
-    parser.add_argument("--llm-model", default="gemma3:4b")
+    parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
         "--memory",

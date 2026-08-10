@@ -95,7 +95,7 @@ async def run(
     duration_s: float = PROFILE_DURATION_S,
     ollama: bool = False,
     vlm_model: str = "moondream",
-    llm_model: str = "gemma3:4b",
+    llm_model: str = "moondream",
     ollama_timeout: float = 60.0,
     initial_intent: str = DEFAULT_EXPLORATORY_INTENT,
     depth: bool = False,
@@ -1151,7 +1151,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ollama", action="store_true")
     parser.add_argument("--vlm-model", default="moondream")
-    parser.add_argument("--llm-model", default="gemma3:4b")
+    parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
     parser.add_argument(

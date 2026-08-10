@@ -39,7 +39,7 @@ def build_parser():
     parser.add_argument("--record-duration", type=float, default=3.0)
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     parser.add_argument("--vlm-model", default="moondream")
-    parser.add_argument("--llm-model", default="gemma3:4b")
+    parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
         "--memory",

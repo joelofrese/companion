@@ -164,9 +164,9 @@ ollama pull gemma3:4b
 ```
 
 Production uses separate Ollama VLM and LLM sessions, defaulting to the faster
-`moondream` and `gemma3:4b`. It starts with `explore the surroundings` unless
-`--intent` supplies another goal. Set `--vlm-model` or `--llm-model` to change
-the models; `qwen3-vl:2b` is an explicit slower visual option. Use
+`moondream` for both. It starts with `explore the surroundings` unless
+`--intent` supplies another goal. Set `--vlm-model` or `--llm-model` to use a
+different model; `gemma3:4b` and `qwen3-vl:2b` are slower alternatives. Use
 `--dialogue` for typed conversation, `--voice-once` for one spoken request,
 and `--memory` for editable experience memory.
 
@@ -174,73 +174,28 @@ and `--memory` for editable experience memory.
 
 - Deterministic Gazebo missions verify the full control path, perception
   fixtures, faults, recovery, safety, hover, landing, and disarm.
-- Exploratory camera and depth worlds run the Mac VLM/LLM path with dialogue,
+- Exploratory camera and depth worlds exercise the Mac VLM/LLM, dialogue,
   visual focus, memory, bounded motion, and simulated TOF safety. Camera-only
-  motion stays stopped because DEXI 3 has no forward range reading in that
-  mode.
-- The `objects` world provides simple colored objects and a mannequin in the
-  forward camera view; `--moving-person` moves that mannequin between fixed
-  poses on both sides and exercises changing visual scenes. The default
-  moondream model now describes concrete broad scenes with the shorter visual
-  prompt. A 20-second open-ended run produced six observations and two
-  conscious thoughts, then issued bounded left and forward movement; a current
-  focused red-box run produced four confirmed answers and retained focus while
-  holding zero.
-  A current 45-second moving-person follow run produced 13 person observations,
-  repeated bounded forward suggestions, 0.24m/s maximum telemetry, and CM5
-  backoff when the red box reached 0.49m; lateral position remains
-  model-limited. The slower Qwen and Gemma vision options produced no thought
-  in 20 seconds.
-- Non-default worlds require rendered camera or simulated depth so motion is
-  never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
-- Synthetic open-ended goals can move through clear simulated space. Real
-  open-ended VLM runs may hold zero when the model chooses stop; focused follow
-  can issue slow forward commands when the person is recognized. Dialogue can
-  change intent or visual focus; natural requests such as "follow me" focus the
-  person, and an intent such as "inspect the red box" can provide focus when
-  the LLM leaves that field empty. Experience memory is editable, persists
-  across runs, and records command, velocity, and obstacle outcomes;
-  exploratory simulation reloads and verifies those records. Its storage
-  boundary is `control/memory.py`, separate from Mac cognition.
-- If the conscious model omits a summary, Mac keeps the latest visual
-  observation as context.
-- Unanswered visual focus stays active; answered focus can be released or
-  replaced by the conscious model.
-- Stale, missing, malformed, low-confidence, or failed brain and sensor input
-  stops Mac motion. CM5 still rejects unsafe or stale commands and remains the
-  final authority.
+  motion stops because it has no forward range reading; depth is a simulation
+  approximation of the DEXI 3 TOF sensor.
+- The companion-owned `objects` world contains simple colored objects and a
+  mannequin. `--moving-person` moves the mannequin through fixed poses.
+  Non-default worlds require a rendered camera or simulated depth so motion is
+  never blind in a collidable world.
+- Separate local VLM and LLM sessions support open-ended goals, focused
+  requests, dialogue, and editable experience memory. `moondream` is the
+  quicker default for both; slower models remain selectable. The Ollama client
+  is in `control/ollama_client.py`; prompts and response cleanup are in
+  `control/ollama_brain.py`; memory storage is in `control/memory.py`.
 - `--trace` shows observations, decisions, latencies, and command reasons;
-  `--snapshot` saves a rendered frame for inspection; `--faults` checks the
-  same safety schedule through synthetic sensors and live Gazebo depth without
-  requiring exact brain decisions.
-- A fault-injected live-depth run verified 584/584 valid depth samples, CM5
-  backoff, stale and invalid depth, command dropout and rejection, missing
-  velocity, brain shutdown, landing, and disarm; forward motion stayed bounded.
-- A real Ollama fault-injected depth run also passed all seven exploratory
-  fault checks with 507/507 valid depth samples, bounded motion, landing, and
-  disarm.
-- Conscious prompts keep distinct visual changes and drop repeated descriptions
-  so local thinking stays responsive.
-- VLM prompt echoes and intent-only descriptions become unclear, zero-confidence
-  observations rather than movement suggestions.
-- Prompt-field echoes from local models are discarded at the Ollama boundary.
-  An opt-in moondream conscious run produced seven thoughts in 20 seconds,
-  honored follow and stop dialogue, and issued bounded follow motion; Gemma
-  remains the default conscious model until broader dialogue shows equal
-  reliability.
-- Exploration now asks the VLM to move slowly on a clear path and stop below
-  the shared obstacle limit. A live run reached 0.24m/s forward and -0.18m/s
-  right velocity; a near-wall run reached 0.50m and observed CM5's -0.20m/s
-  backoff before landing and disarm.
-- Brain and CM5 use slow forward, right, and down body-frame velocity. Both
-  simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
-- A 120-second synthetic exploratory run completed with 2,331 VLM observations
-  and 240 conscious thoughts, bounded motion, landing, and disarm. Near-wall
-  depth runs also observe CM5 backoff. RTP fixtures and rendered Gazebo camera
-  runs verify the video, Mac, CM5, and PX4 paths.
-- The target remains the DEXI 3: no lidar, DEXI hardware is unverified, and
-  current SITL's GPS-denied optical-flow topic publishes no messages, so no
-  flow-dependent behavior is claimed.
+  `--snapshot` saves a rendered frame; `--faults` exercises sensor, link,
+  command, and brain failures through the real simulated control path.
+- Missing, stale, malformed, low-confidence, or failed input stops Mac motion.
+  CM5 command limits, TOF protection, and PX4 forwarding remain the final
+  vehicle-side path.
+- RTP video, rendered Gazebo video, simulated depth, landing, and disarm are
+  verified. ROS 2 forwarding is implemented but hardware remains unverified;
+  DEXI 3 has no lidar, and current GPS-denied SITL optical flow is not used.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
 
 At the end of a meaningful session, update this section with only the current
