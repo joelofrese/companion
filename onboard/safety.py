@@ -203,7 +203,7 @@ class OnboardSafetyEnvelope:
             return VelocityCommand()
         if not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0:
             return VelocityCommand()
-        if obstacle_distance_m < OBSTACLE_STOP_M:
+        if obstacle_distance_m <= OBSTACLE_STOP_M:
             return VelocityCommand(forward_m_s=-BACKOFF_SPEED_M_S)
         if not self._command_is_safe(self._command):
             return VelocityCommand()
