@@ -205,6 +205,9 @@ and `--memory` for editable experience memory.
   `--snapshot` saves a rendered frame for inspection; `--faults` checks the
   same safety schedule through synthetic sensors and live Gazebo depth without
   requiring exact brain decisions.
+- A fault-injected live-depth run verified 584/584 valid depth samples, CM5
+  backoff, stale and invalid depth, command dropout and rejection, missing
+  velocity, brain shutdown, landing, and disarm; forward motion stayed bounded.
 - Conscious prompts keep distinct visual changes and drop repeated descriptions
   so local thinking stays responsive.
 - VLM prompt echoes and intent-only descriptions become unclear, zero-confidence
