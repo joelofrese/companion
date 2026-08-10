@@ -39,9 +39,9 @@ def build_parser():
     parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
-        "--gemini",
+        "--ollama",
         action="store_true",
-        help="use one Gemini Robotics ER 2 Streaming brain instead of local Ollama",
+        help="use separate local Ollama VLM and LLM sessions instead of Gemini",
     )
     parser.add_argument(
         "--gemini-model",
@@ -82,7 +82,8 @@ async def run(args):
     receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(receiver)
     memory = CompanionMemory(args.memory)
-    if args.gemini:
+    use_gemini = not args.ollama
+    if use_gemini:
         from control.gemini_brain import GeminiRuntime
 
         control = GeminiRuntime(
@@ -123,7 +124,7 @@ async def run(args):
         else None
     )
     mind_task = None
-    if args.gemini and dialogue_input is not None:
+    if use_gemini and dialogue_input is not None:
         async def route_dialogue():
             while not mind_stop.is_set():
                 message = dialogue_input.next()
@@ -135,7 +136,7 @@ async def run(args):
                     pass
 
         mind_task = asyncio.create_task(route_dialogue())
-    elif not args.gemini:
+    elif not use_gemini:
         mind_task = asyncio.create_task(
             control.think_loop(
                 mind_stop,
@@ -147,7 +148,7 @@ async def run(args):
         receiver.start()
         model_name = (
             f"Gemini={args.gemini_model}"
-            if args.gemini
+            if use_gemini
             else f"VLM={args.vlm_model}, LLM={args.llm_model}"
         )
         print(
@@ -164,7 +165,7 @@ async def run(args):
         if mind_task is not None:
             await mind_task
         control.close()
-        if args.gemini:
+        if use_gemini:
             await control.wait_closed()
 
 

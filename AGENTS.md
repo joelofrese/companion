@@ -173,22 +173,21 @@ ollama pull moondream
 ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip>
 .venv/bin/python -m control.companion <cm5-ip> --dialogue
-.venv/bin/python -m control.companion <cm5-ip> --gemini
+.venv/bin/python -m control.companion <cm5-ip> --ollama
 ```
 
-Production uses separate Ollama VLM and LLM sessions, defaulting to the faster
-`moondream` for both. It starts with `explore the surroundings` unless
-`--intent` supplies another goal. Set `--vlm-model` or `--llm-model` to use a
-different model; `gemma3:4b` and `qwen3-vl:2b` are slower alternatives. Use
-`--dialogue` for typed conversation, `--voice-once` for one spoken request,
-and `--memory` for editable experience memory.
+Production defaults to one Gemini Robotics ER 2 Streaming session. It starts
+with `explore the surroundings` unless `--intent` supplies another goal. Use
+`--ollama` for separate local VLM and LLM sessions, defaulting to the faster
+`moondream` for both. Set `--vlm-model` or `--llm-model` to use another local
+model. Use `--dialogue` for typed conversation, `--voice-once` for one spoken
+request, and `--memory` for editable experience memory.
 
-With `GEMINI_API_KEY`, `--gemini` makes exploratory simulation or the optional
-Mac runner use one persistent Gemini Robotics ER 2 Streaming session. It
+With `GEMINI_API_KEY`, the optional Mac runner uses one persistent Gemini
+Robotics ER 2 Streaming session. Exploratory simulation uses `--gemini`. It
 receives the newest 640-pixel JPEG and heartbeat after each completed model
 turn, never faster than once per second. It can only request a brief forward
-or lateral move, hover, or speech. Do not replace the local path until a live
-model run passes the same simulation checks.
+or lateral move, hover, or speech.
 
 ## Current state
 
@@ -196,13 +195,11 @@ model run passes the same simulation checks.
   command path, faults, recovery, safety, landing, and disarm.
 - Exploratory camera and depth worlds exercise open-ended goals, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
-- Local mode uses separate Ollama VLM and LLM sessions. It is the current
-  production path.
-- Gemini ER 2 Streaming is integrated as one persistent Mac brain for
-  exploratory camera/depth simulation and the optional Mac runner. Live
-  depth-world runs verified a focused red-box response, person following,
-  reloadable experience memory, bounded motion, the fault schedule, and a
-  two-minute 58-decision run with safety, landing, and disarm.
+- Gemini ER 2 Streaming is the current Mac production path and the persistent
+  brain for simulation. Local Ollama VLM and LLM sessions remain an explicit
+  fallback. Live depth-world runs verified a focused red-box response, person
+  following, reloadable experience memory, bounded motion, the fault schedule,
+  and a two-minute 58-decision run with safety, landing, and disarm.
 - The Mac sends only slow forward or lateral velocity. CM5 limits commands and
   uses TOF safety; PX4 stabilizes, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
