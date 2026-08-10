@@ -18,6 +18,7 @@ from control.mind import (
     Telemetry,
     VisualObservation,
 )
+from control.safety_limits import OBSTACLE_STOP_M
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
@@ -274,7 +275,11 @@ return only the requested JSON. Describe the most obvious visible object,
 person, wall, or open path in short plain English. If a visual focus is given,
 answer that subject exactly; never substitute another object. If it is not
 visible, say so. Suggest one cautious movement. Use stop when the image is
-unclear, unsafe, or blocked. Never move backward.
+unclear, unsafe, or blocked. For exploration, choose slow forward, left, or
+right movement when a clear path is visible. For following, move toward a
+visible focused subject when the path is clear. If forward TOF is below
+{OBSTACLE_STOP_M:.1f}m,
+choose stop. Never move backward.
 
 Intent: {intent or "none"}
 Visual focus: {focus or "none"}

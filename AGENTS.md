@@ -176,9 +176,10 @@ and `--memory` for editable experience memory.
   forward camera view; `--moving-person` moves that mannequin between fixed
   poses on both sides and exercises changing visual scenes. The default
   moondream model now describes concrete broad scenes with the shorter visual
-  prompt. A 20-second open-ended run produced six person observations and two
-  conscious thoughts but chose zero movement; a current focused red-box run
-  produced four confirmed answers and retained focus while also holding zero.
+  prompt. A 20-second open-ended run produced six observations and two
+  conscious thoughts, then issued bounded left and forward movement; a current
+  focused red-box run produced four confirmed answers and retained focus while
+  holding zero.
   A current 45-second moving-person follow run produced 13 person observations,
   repeated bounded forward suggestions, 0.24m/s maximum telemetry, and CM5
   backoff when the red box reached 0.49m; lateral position remains
@@ -217,6 +218,10 @@ and `--memory` for editable experience memory.
   honored follow and stop dialogue, and issued bounded follow motion; Gemma
   remains the default conscious model until broader dialogue shows equal
   reliability.
+- Exploration now asks the VLM to move slowly on a clear path and stop below
+  the shared obstacle limit. A live run reached 0.24m/s forward and -0.18m/s
+  right velocity; a near-wall run reached 0.50m and observed CM5's -0.20m/s
+  backoff before landing and disarm.
 - Brain and CM5 use slow forward, right, and down body-frame velocity. Both
   simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
 - A 120-second synthetic exploratory run completed with 2,331 VLM observations
