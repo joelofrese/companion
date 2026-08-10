@@ -194,6 +194,9 @@ and `--memory` for editable experience memory.
   quicker default for both; slower models remain selectable. The Ollama client
   is in `control/ollama_client.py`; prompts and response cleanup are in
   `control/ollama_brain.py`; memory storage is in `control/memory.py`.
+- In the same 45-second moving-person world, `moondream` completed 16 visual
+  observations and `qwen3-vl:2b` completed 7 without improving following, so
+  `moondream` remains the default.
 - Focused dialogue now receives one acknowledgement and one confirmed visual
   result when the model leaves its replies blank; local rendered-world focus
   and answers are verified.
