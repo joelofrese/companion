@@ -109,7 +109,6 @@ class MindMemory:
     previous_movement: str = "stop"
     previous_observation: str = ""
     requested_focus: str = ""
-    focus_reported: bool = False
 
 
 class VisualModel(Protocol):
@@ -179,7 +178,6 @@ class MacMind:
         self.memory.previous_movement = "stop"
         self.memory.previous_observation = ""
         self.memory.requested_focus = ""
-        self.memory.focus_reported = False
         self._new_observations.clear()
 
     @property
@@ -251,7 +249,6 @@ class MacMind:
                 for observation in information.new_observations
             )
             pending_focus = self.memory.requested_focus
-            focus_reported = self.memory.focus_reported
             self._new_observations.clear()
         try:
             decision = self.language_model.think(information)
@@ -316,7 +313,7 @@ class MacMind:
                 ),
                 "",
             )
-            if not dialogue_response and pending_focus and not focus_reported:
+            if not dialogue_response and pending_focus:
                 dialogue_response = _focused_reply(answered_focus)
             decision = ConsciousDecision(
                 intent=intent,
@@ -368,15 +365,13 @@ class MacMind:
             self.memory.summary = decision.summary
             if requested_focus:
                 self.memory.requested_focus = requested_focus
-                self.memory.focus_reported = False
             elif information.dialogue and parse_intent(information.dialogue):
                 self.memory.requested_focus = ""
-                self.memory.focus_reported = False
             elif (
                 self.memory.requested_focus == pending_focus
                 and answered_focus
             ):
-                self.memory.focus_reported = True
+                self.memory.requested_focus = ""
         return decision
 
     def close(self):
