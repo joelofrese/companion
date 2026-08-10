@@ -33,8 +33,12 @@ merge and delete it.
 
 ## Control flow
 
-- The Mac runs a subconscious VLM and a conscious LLM in separate sessions.
-- The VLM describes images and suggests cautious movement.
+- The Mac brain uses images, dialogue, telemetry, and memory to choose intent
+  and cautious movement.
+- Local mode runs a subconscious VLM and conscious LLM in separate sessions.
+- Gemini ER 2 Streaming is the simulation candidate for one persistent Mac
+  brain.
+- The visual model describes images and suggests cautious movement.
 - When forward is blocked, the VLM may suggest a visible lateral alternate;
   Mac uses it only after the TOF stop clears.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
@@ -65,8 +69,9 @@ body-frame velocity setpoints to PX4, converting them with fresh vehicle
 heading. Keep hardware-specific code on the CM5 so Mac behavior stays easy to
 simulate.
 
-The Ollama client handles local model transport; `control/ollama_brain.py`
-handles VLM and LLM prompts and response cleanup.
+The Ollama client handles local-model transport; `control/ollama_brain.py`
+handles its prompts and response cleanup. `control/gemini_brain.py` keeps the
+Gemini session and its small movement, hover, and speech tools on the Mac.
 
 The target is the DroneBlocks DEXI 3: PX4, optical flow, a TOF distance sensor,
 a Raspberry Pi camera, and a Raspberry Pi CM5. It has no lidar. Keep
@@ -100,6 +105,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.command_loopback
 .venv/bin/python -m sim.run_world
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world walls
+.venv/bin/python -m sim.run_world --explore --depth --gemini --trace --world objects --moving-person
 .venv/bin/python -m sim.run_world --explore --camera --world objects --trace
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
 .venv/bin/python -m sim.run_world --explore --faults --world default --duration 32
@@ -118,16 +124,16 @@ scenario checks decoded video, deterministic person/non-person fixtures, Mac
 commands, CM5 safety, PX4, landing, and disarm. `--expect-person` selects the
 person fixture; without it the fixture stays stopped. The image still travels
 through the complete RTP path. Real visual perception is checked through the
-Gazebo camera with Ollama, not this deterministic fixture.
+Gazebo camera with a brain model, not this deterministic fixture.
 The deterministic timing, fault, and brain fixtures live in
 `sim/world_fixture.py`; `sim/world.py` owns the PX4/Gazebo lifecycle and
 verification.
 
-`--camera` uses Gazebo's rendered camera as VLM input. Without `--ollama`, it
+`--camera` uses Gazebo's rendered camera as brain input. Without a model, it
 checks camera transport through a zero-confidence placeholder and keeps motion
-stopped. With `--ollama`, local VLM and LLM sessions make the run exploratory,
-but CM5 keeps motion stopped because this model has no TOF reading. Use
-`--depth` when the brain should be allowed to move.
+stopped. `--ollama` uses local VLM and LLM sessions; `--gemini` uses one
+streaming Gemini session. Camera-only runs still stop because they have no TOF
+reading. Use `--depth` when the brain should be allowed to move.
 Use `--trace` to print visual observations, conscious decisions, model
 latencies, and command reasons. Use `--snapshot PATH` to save the first
 rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
@@ -176,48 +182,28 @@ different model; `gemma3:4b` and `qwen3-vl:2b` are slower alternatives. Use
 `--dialogue` for typed conversation, `--voice-once` for one spoken request,
 and `--memory` for editable experience memory.
 
+With `GEMINI_API_KEY`, `--gemini` makes an exploratory camera or depth run use
+one persistent Gemini Robotics ER 2 Streaming session. It receives the newest
+640-pixel JPEG and a heartbeat once per second, then can only request a brief
+forward or lateral move, hover, or speech. It is integrated for simulation
+comparison; do not replace the local production path until a live model run
+passes the same simulation checks.
+
 ## Current state
 
-- Deterministic Gazebo missions verify the full control path, perception
-  fixtures, faults, recovery, safety, hover, landing, and disarm.
-- Exploratory camera and depth worlds exercise the Mac VLM/LLM, dialogue,
-  visual focus, memory, bounded motion, and simulated TOF safety. Camera-only
-  motion stops because it has no forward range reading; depth is a simulation
-  approximation of the DEXI 3 TOF sensor.
-- A 120-second local-model depth run passed long-running perception, memory
-  reload, landing, and disarm.
-- The companion-owned `objects` world contains simple colored objects and a
-  mannequin. `--moving-person` moves the mannequin through fixed poses.
-  Non-default worlds require a rendered camera or simulated depth so motion is
-  never blind in a collidable world. The red box and mannequin are visually
-  separate so focused inspection and following exercise distinct targets.
-- Separate local VLM and LLM sessions support open-ended goals, focused
-  requests, dialogue, and editable experience memory. `moondream` is the
-  quicker default for both; slower models remain selectable. The Ollama client
-  is in `control/ollama_client.py`; prompts and response cleanup are in
-  `control/ollama_brain.py`; memory storage is in `control/memory.py`.
-- An `--ollama` simulation starts its own local Ollama service when needed,
-  then releases its models and stops only the service it started.
-- In the same 45-second moving-person world, `moondream` completed 16 visual
-  observations and `qwen3-vl:2b` completed 7 without improving following, so
-  `moondream` remains the default.
-- One-shot visual dialogue receives one acknowledgement and one confirmed
-  result when the model leaves its replies blank, holding motion until that
-  result is reported; local rendered-world focus and answers are verified.
-- The Mac brain uses slow forward or lateral movement only; takeoff and landing
-  own altitude.
-- `--trace` shows observations, decisions, latencies, and command reasons;
-  `--snapshot` saves a rendered frame; `--faults` exercises sensor, link,
-  command, and brain failures through the real simulated control path.
-- Missing, stale, malformed, low-confidence, or failed input stops Mac motion.
-  CM5 command limits, TOF protection, and PX4 forwarding remain the final
-  vehicle-side path.
-- Generic prompt labels are not valid visual focus; the brain keeps only real
-  subjects such as a person or red box.
-- RTP video, rendered Gazebo video, simulated depth, landing, and disarm are
-  verified. ROS 2 forwarding is implemented but hardware remains unverified;
-  DEXI 3 has no lidar, and current GPS-denied SITL optical flow is not used.
-- Keep prioritizing closed-loop autonomous world operation and simpler code.
+- The deterministic PX4/Gazebo mission and local UDP loopback verify the full
+  command path, faults, recovery, safety, landing, and disarm.
+- Exploratory camera and depth worlds exercise open-ended goals, dialogue,
+  memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
+- Local mode uses separate Ollama VLM and LLM sessions. It is the current
+  production path.
+- Gemini ER 2 Streaming is integrated as one persistent Mac brain for
+  exploratory camera/depth simulation. It needs a configured key and a live
+  simulation run before it can replace the local path.
+- The Mac sends only slow forward or lateral velocity. CM5 limits commands and
+  uses TOF safety; PX4 stabilizes, lands, and disarms.
+- Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
+  hardware remains unverified. DEXI 3 has no lidar.
 
 At the end of a meaningful session, update this section with only the current
 state or a concise new decision. Do not keep a long historical log.

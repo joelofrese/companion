@@ -164,6 +164,8 @@ def _run_once(
     vlm_model: str,
     llm_model: str,
     ollama_timeout: float,
+    gemini: bool,
+    gemini_model: str,
     initial_intent: str,
     model_pose: Optional[str],
     memory_path: Optional[Path],
@@ -305,6 +307,8 @@ def _run_once(
                     "--ollama-timeout",
                     str(ollama_timeout),
                 ]
+            if gemini:
+                scenario += ["--gemini", "--gemini-model", gemini_model]
             if memory_path is not None:
                 scenario += ["--memory", str(memory_path)]
             if snapshot_path is not None:
@@ -338,6 +342,8 @@ def run(
     vlm_model: str = "moondream",
     llm_model: str = "moondream",
     ollama_timeout: float = 60.0,
+    gemini: bool = False,
+    gemini_model: str = "gemini-robotics-er-2-streaming-preview",
     initial_intent: str = "explore the surroundings",
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
@@ -402,6 +408,10 @@ def run(
         raise RuntimeError("dialogue request must not be empty")
     if ollama and not (exploratory and (camera or depth)):
         raise RuntimeError("Ollama simulation requires exploratory camera or depth mode")
+    if gemini and not (exploratory and (camera or depth)):
+        raise RuntimeError("Gemini simulation requires exploratory camera or depth mode")
+    if ollama and gemini:
+        raise RuntimeError("choose either Ollama or Gemini for one simulation")
     if duration_s is not None and image_path is not None:
         raise RuntimeError("simulation duration cannot use an RTP image scenario")
     if expect_person and image_path is None:
@@ -436,6 +446,8 @@ def run(
                     vlm_model=vlm_model,
                     llm_model=llm_model,
                     ollama_timeout=ollama_timeout,
+                    gemini=gemini,
+                    gemini_model=gemini_model,
                     initial_intent=initial_intent,
                     model_pose=model_pose,
                     memory_path=memory_path,
@@ -513,6 +525,15 @@ def main(argv=None):
     parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
+        "--gemini",
+        action="store_true",
+        help="use Gemini Robotics ER 2 Streaming for an exploratory camera or depth run",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default="gemini-robotics-er-2-streaming-preview",
+    )
+    parser.add_argument(
         "--memory",
         type=Path,
         help="persist conscious experience across exploratory runs",
@@ -562,6 +583,8 @@ def main(argv=None):
             vlm_model=args.vlm_model,
             llm_model=args.llm_model,
             ollama_timeout=args.ollama_timeout,
+            gemini=args.gemini,
+            gemini_model=args.gemini_model,
             initial_intent=args.intent,
             model_pose=args.pose,
             memory_path=args.memory.expanduser().resolve() if args.memory else None,

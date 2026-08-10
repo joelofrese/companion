@@ -97,6 +97,8 @@ async def run(
     vlm_model: str = "moondream",
     llm_model: str = "moondream",
     ollama_timeout: float = 60.0,
+    gemini: bool = False,
+    gemini_model: str = "gemini-robotics-er-2-streaming-preview",
     initial_intent: str = DEFAULT_EXPLORATORY_INTENT,
     depth: bool = False,
     memory_path: Optional[Path] = None,
@@ -136,6 +138,10 @@ async def run(
         raise ValueError("fault injection requires synthetic safety or depth mode")
     if ollama and not (exploratory and (camera or depth)):
         raise ValueError("Ollama simulation requires exploratory camera or depth mode")
+    if gemini and not (exploratory and (camera or depth)):
+        raise ValueError("Gemini simulation requires exploratory camera or depth mode")
+    if ollama and gemini:
+        raise ValueError("choose either Ollama or Gemini for one simulation")
     if memory_path is not None and not exploratory:
         raise ValueError("experience memory requires exploratory simulation")
     if snapshot_path is not None and not exploratory:
@@ -202,6 +208,15 @@ async def run(
         if depth:
             gazebo_depth = GazeboDepthRangefinder("/depth_camera")
             gazebo_depth.start()
+        if gemini:
+            from control.gemini_brain import GeminiRuntime
+
+            control = GeminiRuntime(
+                initial_intent,
+                model=gemini_model,
+                memory=memory_store,
+            )
+            await control.start()
 
         heading_deg = await prepare(drone)
         armed = True
@@ -259,20 +274,21 @@ async def run(
         sender = stack.start()
         safe_commands = stack.forwarder
         started_at = time.monotonic()
-        if ollama_client is None:
-            visual_model = WorldVisualModel(
-                world,
-                started_at,
-                synthetic_scene=not (camera or depth),
+        if control is None:
+            if ollama_client is None:
+                visual_model = WorldVisualModel(
+                    world,
+                    started_at,
+                    synthetic_scene=not (camera or depth),
+                )
+                language_model = WorldLanguageModel(exploratory)
+                language_model.started_at_s = started_at
+            else:
+                visual_model = OllamaVisionModel(ollama_client, vlm_model)
+                language_model = OllamaLanguageModel(ollama_client, llm_model)
+            control = MindRuntime(
+                MacMind(visual_model, language_model, memory=memory_store)
             )
-            language_model = WorldLanguageModel(exploratory)
-            language_model.started_at_s = started_at
-        else:
-            visual_model = OllamaVisionModel(ollama_client, vlm_model)
-            language_model = OllamaLanguageModel(ollama_client, llm_model)
-        control = MindRuntime(
-            MacMind(visual_model, language_model, memory=memory_store)
-        )
 
         camera_frames = 0
         snapshot_saved = False
@@ -352,6 +368,7 @@ async def run(
 
         def send_packet(timestamp_s: float, step, intent=None):
             nonlocal brain_shutdown, camera_frames, snapshot_saved
+            nonlocal applied_dialogue_intent
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
@@ -365,6 +382,11 @@ async def run(
                 control.close()
                 mind_stop.set()
                 brain_shutdown = True
+            if gemini and dialogue_input is not None:
+                message = dialogue_input.next()
+                if message:
+                    applied_dialogue_intent = parse_intent(message)
+                    control.add_dialogue(message)
             telemetry = brain_telemetry()
             command = control.tick(
                 frame=frame,
@@ -392,11 +414,11 @@ async def run(
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
         started_at = time.monotonic()
-        if ollama_client is None:
+        if not gemini and ollama_client is None:
             visual_model.started_at_s = started_at
             language_model.started_at_s = started_at
         dialogue_provider = None
-        if dialogue_input is not None:
+        if dialogue_input is not None and not gemini:
             def read_dialogue():
                 nonlocal applied_dialogue_intent
                 message = dialogue_input.next()
@@ -406,13 +428,14 @@ async def run(
 
             dialogue_provider = read_dialogue
 
-        mind_task = asyncio.create_task(
-            control.think_loop(
-                mind_stop,
-                telemetry_provider=brain_telemetry,
-                dialogue_provider=dialogue_provider,
+        if not gemini:
+            mind_task = asyncio.create_task(
+                control.think_loop(
+                    mind_stop,
+                    telemetry_provider=brain_telemetry,
+                    dialogue_provider=dialogue_provider,
+                )
             )
-        )
         if dialogue_input:
             dialogue_input.start()
             print("Exploratory mission: observe the brain, then land and disarm.")
@@ -522,7 +545,7 @@ async def run(
                     )
                     if signature != last_observation_signature:
                         print(
-                            f"[VLM {elapsed_s:5.1f}s] "
+                            f"[{'Gemini' if gemini else 'VLM'} {elapsed_s:5.1f}s] "
                             f"{signature[0]}; answer={signature[1]}; "
                             f"alternate={signature[2] or 'none'}; "
                             f"next-focus={signature[3]}; movement={signature[4]}; "
@@ -544,7 +567,7 @@ async def run(
                     )
                     if signature != last_decision_signature:
                         print(
-                            f"[LLM {elapsed_s:5.1f}s] "
+                            f"[{'Gemini' if gemini else 'LLM'} {elapsed_s:5.1f}s] "
                             f"intent={signature[0]}; changed={signature[1]}; "
                             f"focus={signature[2]}; summary={signature[3]}; "
                             f"latency={control.latest_decision_duration_s:.2f}s",
@@ -575,19 +598,19 @@ async def run(
                         if control.observation_count == 0
                         else "latest VLM observation failed"
                     )
-                elif (
+                elif not gemini and (
                     control.latest_observation_age_s is None
                     or control.latest_observation_age_s > MAX_MOVEMENT_AGE_S
                 ):
                     reason = "VLM movement lease expired"
-                elif (
+                elif not gemini and (
                     control.latest_frame_age_s is None
                     or control.latest_frame_age_s > MAX_FRAME_GAP_S
                 ):
                     reason = "camera frame lease expired"
-                elif observation.confidence < MIN_MOVEMENT_CONFIDENCE:
+                elif not gemini and observation.confidence < MIN_MOVEMENT_CONFIDENCE:
                     reason = "VLM confidence is below the movement threshold"
-                elif (
+                elif not gemini and (
                     observation.focused_answer
                     and (
                         control.mind.awaiting_focus_answer
@@ -595,6 +618,8 @@ async def run(
                     )
                 ):
                     reason = "visual focus confirmed"
+                elif gemini:
+                    reason = "Gemini chose to hover or its short action expired"
                 elif observation.movement in ("stop", "hover"):
                     reason = f"VLM suggested {observation.movement}"
                 else:
@@ -652,6 +677,8 @@ async def run(
             if mind_task is not None:
                 await mind_task
             control.close()
+            if gemini:
+                await control.wait_closed()
             telemetry_task.cancel()
             await asyncio.gather(telemetry_task, return_exceptions=True)
             attitude_task.cancel()
@@ -715,14 +742,16 @@ async def run(
             print("Scripted open-ended dialogue=delivered to the conscious mind.")
         initial_focus = parse_focus(initial_intent)
         requested_focus = parse_focus(dialogue_request or "")
-        if initial_focus and not requested_focus:
+        if initial_focus and not requested_focus and not gemini:
             if decision.focus != initial_focus:
                 raise RuntimeError(
                     "SITL did not honor the initial visual focus: "
                     f"expected {initial_focus}, got {decision.focus or 'none'}"
                 )
             print(f"Initial visual focus=verified: {initial_focus}.")
-        if requested_focus:
+        if requested_focus and gemini:
+            print(f"Scripted visual request=delivered: {requested_focus}.")
+        elif requested_focus:
             if decision.focus != requested_focus and not requested_focus_answered:
                 raise RuntimeError(
                     "SITL did not honor the scripted visual focus: "
@@ -745,6 +774,8 @@ async def run(
                 "Local Ollama brain=verified: "
                 f"VLM={vlm_model}, LLM={llm_model}."
             )
+        if gemini:
+            print(f"Gemini ER 2 brain=verified: model={gemini_model}.")
         if memory_store is not None:
             persisted_memory = CompanionMemory(memory_store.path).context()
             latest_memory = (
@@ -1120,6 +1151,8 @@ async def run(
             await mind_task
         if control is not None:
             control.close()
+            if gemini:
+                await control.wait_closed()
         if offboard_task is not None and not offboard_task.done():
             offboard_task.cancel()
             await asyncio.gather(offboard_task, return_exceptions=True)
@@ -1158,6 +1191,15 @@ if __name__ == "__main__":
     parser.add_argument("--vlm-model", default="moondream")
     parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
+    parser.add_argument(
+        "--gemini",
+        action="store_true",
+        help="use Gemini Robotics ER 2 Streaming for an exploratory camera or depth run",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default="gemini-robotics-er-2-streaming-preview",
+    )
     parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
     parser.add_argument(
         "--snapshot",
@@ -1197,6 +1239,8 @@ if __name__ == "__main__":
                 vlm_model=args.vlm_model,
                 llm_model=args.llm_model,
                 ollama_timeout=args.ollama_timeout,
+                gemini=args.gemini,
+                gemini_model=args.gemini_model,
                 initial_intent=args.intent,
                 memory_path=args.memory,
                 snapshot_path=args.snapshot,
