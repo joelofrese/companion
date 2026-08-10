@@ -9,7 +9,7 @@ from typing import Optional
 from control.velocity import VelocityCommand
 
 
-PROTOCOL_VERSION = 4
+PROTOCOL_VERSION = 5
 MAX_PACKET_BYTES = 512
 
 
@@ -92,13 +92,14 @@ class CommandPacket:
 
 @dataclass(frozen=True)
 class TelemetryPacket:
-    """Return the newest CM5 sensor and body velocity readings to the brain."""
+    """Return the newest CM5 sensor, velocity, and heading readings to the brain."""
 
     sequence: int
     obstacle_distance_m: Optional[float]
     forward_velocity_m_s: Optional[float] = None
     right_velocity_m_s: Optional[float] = None
     down_velocity_m_s: Optional[float] = None
+    heading_rad: Optional[float] = None
 
     def encode(self) -> bytes:
         if (
@@ -116,6 +117,8 @@ class TelemetryPacket:
         )
         if any(value is not None and not _finite(value) for value in velocities):
             raise ValueError("velocity telemetry must be finite or none")
+        if self.heading_rad is not None and not _finite(self.heading_rad):
+            raise ValueError("heading telemetry must be finite or none")
         payload = {
             "type": "telemetry",
             "version": PROTOCOL_VERSION,
@@ -125,6 +128,7 @@ class TelemetryPacket:
                 "forward_velocity_m_s": self.forward_velocity_m_s,
                 "right_velocity_m_s": self.right_velocity_m_s,
                 "down_velocity_m_s": self.down_velocity_m_s,
+                "heading_rad": self.heading_rad,
             },
         }
         encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -151,6 +155,7 @@ class TelemetryPacket:
                     "down_velocity_m_s",
                 )
             )
+            heading_rad = telemetry.get("heading_rad")
         except (
             AttributeError,
             KeyError,
@@ -173,7 +178,9 @@ class TelemetryPacket:
             raise ValueError("invalid obstacle distance")
         if any(value is not None and not _finite(value) for value in velocities):
             raise ValueError("invalid velocity telemetry")
-        return cls(sequence, distance, *velocities)
+        if heading_rad is not None and not _finite(heading_rad):
+            raise ValueError("invalid heading telemetry")
+        return cls(sequence, distance, *velocities, heading_rad)
 
 
 def _finite(value: object) -> bool:

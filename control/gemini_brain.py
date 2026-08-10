@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import deque
+from dataclasses import dataclass
 from io import BytesIO
 import math
 import os
@@ -30,6 +31,25 @@ MIN_TURN_DEG = 15.0
 MAX_TURN_DEG = 90.0
 TURN_RATE_DEG_S = MAX_YAW_RATE_DEG_S
 MAX_IMAGE_WIDTH = 640
+ACTION_GRACE_S = 1.0
+ACTION_SETTLE_S = 1.0
+ACTION_STABLE_S = 0.3
+HEADING_STABILITY_RAD = math.radians(2.0)
+HEADING_TOLERANCE_RAD = math.radians(5.0)
+
+
+@dataclass
+class ActiveAction:
+    """One physical action that must finish before another can start."""
+
+    kind: str
+    direction: str
+    amount: float
+    deadline_s: float
+    start_heading_rad: Optional[float] = None
+    phase: str = "running"
+    stable_since_s: Optional[float] = None
+    last_heading_rad: Optional[float] = None
 
 
 class GeminiRuntime:
@@ -54,10 +74,9 @@ class GeminiRuntime:
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._movement = "stop"
-        self._movement_until_s = 0.0
         self._turn_direction = "stop"
-        self._turn_until_s = 0.0
-        self._movement_blocked = False
+        self._active_action: Optional[ActiveAction] = None
+        self._last_action_result = ""
         self.latest_observation: Optional[VisualObservation] = None
         self.latest_decision: Optional[ConsciousDecision] = None
         self.latest_thought = ""
@@ -128,11 +147,7 @@ class GeminiRuntime:
             self._latest_frame = frame
             self._frame_ready.set()
         self._telemetry = telemetry
-        now = time.monotonic()
-        if now >= self._movement_until_s:
-            self._movement = "stop"
-        if now >= self._turn_until_s:
-            self._turn_direction = "stop"
+        self._refresh_action()
         if any(
             value is None or not math.isfinite(value)
             for value in (
@@ -142,7 +157,7 @@ class GeminiRuntime:
             )
         ):
             command = VelocityCommand()
-        else:
+        elif self._active_action is not None:
             movement = movement_command(self._movement, telemetry.obstacle_distance_m)
             yaw_rate = 0.0
             if (
@@ -160,17 +175,16 @@ class GeminiRuntime:
                 movement.down_m_s,
                 yaw_rate,
             )
-        if self._movement != "stop" and command == VelocityCommand():
-            self._movement_blocked = True
+        else:
+            command = VelocityCommand()
         return command
 
     def close(self):
         """Stop movement and end the streaming session."""
 
+        self._cancel_action("brain closed")
         self._movement = "stop"
-        self._movement_until_s = 0.0
         self._turn_direction = "stop"
-        self._turn_until_s = 0.0
         self._closed.set()
         self._frame_ready.set()
 
@@ -313,6 +327,7 @@ class GeminiRuntime:
         state = (
             f"{start}[STATE]\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
+            f"Action: {self._action_state_text()}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
             "to move, turn, hover, speak, or do nothing. Never infer that a move or "
             "turn is safe from the image alone. A heartbeat does not require a tool "
@@ -369,9 +384,7 @@ class GeminiRuntime:
                 async with self._send_lock:
                     await session.send_tool_response(function_responses=responses)
             if message.tool_call_cancellation is not None:
-                self._movement = "stop"
-                self._movement_until_s = 0.0
-                self._record_action("cancelled the current action")
+                self._cancel_action("Gemini cancelled it")
 
             if self._reconnect_requested:
                 self._response_parts.clear()
@@ -385,19 +398,23 @@ class GeminiRuntime:
         if name == "turn":
             return await self._turn(args)
         if name == "hover":
+            cancelled = self._cancel_action("hover")
             self._movement = "stop"
-            self._movement_until_s = 0.0
             self._turn_direction = "stop"
-            self._turn_until_s = 0.0
             self._record_action("hover")
-            return {"status": "hovering", "telemetry": _telemetry_text(self._telemetry)}
+            return {
+                "status": "hovering",
+                "cancelled_action": cancelled or "none",
+                "telemetry": _telemetry_text(self._telemetry),
+                "scheduling": "INTERRUPT",
+            }
         if name == "speak":
             message = str(args.get("message", "")).strip()
             if not message:
                 return {"status": "rejected", "reason": "message is required"}
             self._record_action(f"speak: {message}")
             print(f"Companion: {message}", flush=True)
-            return {"status": "spoken"}
+            return {"status": "spoken", "scheduling": "SILENT"}
         return {"status": "rejected", "reason": "unknown tool"}
 
     async def _move(self, args: dict) -> dict:
@@ -418,14 +435,27 @@ class GeminiRuntime:
                 "status": "rejected",
                 "reason": f"duration_s must be {MIN_MOVE_S} to {MAX_MOVE_S}",
             }
+        busy = self._busy_response()
+        if busy is not None:
+            return busy
+        now = time.monotonic()
+        action = ActiveAction(
+            "move",
+            direction,
+            float(duration_s),
+            now + float(duration_s),
+        )
+        self._active_action = action
+        self._last_action_result = ""
         self._movement = direction
-        self._movement_until_s = time.monotonic() + duration_s
-        self._movement_blocked = False
-        self._record_action(f"move {direction} for {duration_s:.1f}s")
+        self._turn_direction = "stop"
+        self._record_action(f"started {self._action_label(action)}")
         return {
-            "status": "accepted",
-            "expires_in_s": duration_s,
+            "status": "started",
+            "action": self._action_label(action),
+            "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
+            "scheduling": "SILENT",
         }
 
     async def _turn(self, args: dict) -> dict:
@@ -446,14 +476,162 @@ class GeminiRuntime:
                 "status": "rejected",
                 "reason": f"angle_deg must be {MIN_TURN_DEG} to {MAX_TURN_DEG}",
             }
+        busy = self._busy_response()
+        if busy is not None:
+            return busy
+        now = time.monotonic()
+        angle_deg = float(angle_deg)
+        action = ActiveAction(
+            "turn",
+            direction,
+            angle_deg,
+            now + angle_deg / TURN_RATE_DEG_S + ACTION_GRACE_S,
+            self._telemetry.heading_rad
+            if _finite(self._telemetry.heading_rad)
+            else None,
+        )
+        self._active_action = action
+        self._last_action_result = ""
+        self._movement = "stop"
         self._turn_direction = direction
-        self._turn_until_s = time.monotonic() + angle_deg / TURN_RATE_DEG_S
-        self._record_action(f"turn {direction} {angle_deg:.0f} degrees")
+        self._record_action(f"started {self._action_label(action)}")
         return {
-            "status": "accepted",
-            "expires_in_s": angle_deg / TURN_RATE_DEG_S,
+            "status": "started",
+            "action": self._action_label(action),
+            "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
+            "scheduling": "SILENT",
         }
+
+    def _busy_response(self):
+        self._refresh_action()
+        action = self._active_action
+        if action is None:
+            return None
+        return {
+            "status": "unavailable",
+            "reason": "a physical movement action is still in progress",
+            "active_action": self._action_label(action),
+            "phase": action.phase,
+            "remaining_s": max(0.0, action.deadline_s - time.monotonic()),
+            "movement_tools": "unavailable until the active action completes",
+            "telemetry": _telemetry_text(self._telemetry),
+            "scheduling": "SILENT",
+        }
+
+    def _action_label(self, action: Optional[ActiveAction] = None) -> str:
+        action = action or self._active_action
+        if action is None:
+            return "none"
+        if action.kind == "move":
+            return f"move {action.direction} for {action.amount:.1f}s"
+        return f"turn {action.direction} {action.amount:.0f} degrees"
+
+    def _action_state_text(self) -> str:
+        self._refresh_action()
+        action = self._active_action
+        if action is None:
+            if self._last_action_result:
+                return f"{self._last_action_result}; movement tools available"
+            return "none; movement tools available"
+        details = [
+            f"{self._action_label(action)}; {action.phase}",
+            f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
+        ]
+        actual = self._heading_change_deg(action)
+        if actual is not None:
+            details.append(f"observed heading change={actual:+.1f} degrees")
+        details.append("move and turn tools unavailable until completion")
+        details.append("hover may interrupt")
+        return "; ".join(details)
+
+    def _refresh_action(self):
+        action = self._active_action
+        if action is None:
+            return
+        now = time.monotonic()
+        if action.kind == "turn":
+            if action.start_heading_rad is None and _finite(self._telemetry.heading_rad):
+                action.start_heading_rad = self._telemetry.heading_rad
+            actual = self._heading_change_deg(action)
+            if action.phase == "running" and actual is not None:
+                requested_rad = math.radians(action.amount)
+                progress_rad = math.radians(actual)
+                if progress_rad >= requested_rad - HEADING_TOLERANCE_RAD:
+                    action.phase = "settling"
+                    action.stable_since_s = now
+                    action.last_heading_rad = self._telemetry.heading_rad
+                    action.deadline_s = max(
+                        action.deadline_s,
+                        now + ACTION_SETTLE_S,
+                    )
+                    self._movement = "stop"
+                    self._turn_direction = "stop"
+                    return
+            if action.phase == "settling":
+                heading = self._telemetry.heading_rad
+                if _finite(heading) and action.last_heading_rad is not None:
+                    change_rad = abs(_angle_delta_rad(action.last_heading_rad, heading))
+                    if change_rad > HEADING_STABILITY_RAD:
+                        action.stable_since_s = now
+                    action.last_heading_rad = heading
+                    if (
+                        action.stable_since_s is not None
+                        and now - action.stable_since_s >= ACTION_STABLE_S
+                    ):
+                        self._complete_action("completed", actual)
+                        return
+        if now >= action.deadline_s:
+            actual = self._heading_change_deg(action)
+            if action.kind == "turn" and actual is not None:
+                requested = action.amount - math.degrees(HEADING_TOLERANCE_RAD)
+                status = (
+                    "completed"
+                    if actual >= requested
+                    else "timed out before target"
+                )
+                self._complete_action(status, actual)
+            else:
+                self._complete_action("completed")
+
+    def _heading_change_deg(self, action: ActiveAction) -> Optional[float]:
+        if action.start_heading_rad is None or not _finite(self._telemetry.heading_rad):
+            return None
+        change_rad = _angle_delta_rad(
+            action.start_heading_rad,
+            self._telemetry.heading_rad,
+        )
+        if action.direction == "left":
+            change_rad = -change_rad
+        return math.degrees(change_rad)
+
+    def _complete_action(self, status: str, actual_heading_deg: Optional[float] = None):
+        action = self._active_action
+        if action is None:
+            return
+        result = f"{self._action_label(action)} {status}"
+        if actual_heading_deg is not None:
+            result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
+        self._last_action_result = result
+        self._record_action(result)
+        self._active_action = None
+        self._movement = "stop"
+        self._turn_direction = "stop"
+
+    def _cancel_action(self, reason: str) -> str:
+        action = self._active_action
+        if action is None:
+            return ""
+        result = f"{self._action_label(action)} cancelled by {reason}"
+        actual = self._heading_change_deg(action)
+        if actual is not None:
+            result += f"; observed heading change {actual:+.1f} degrees"
+        self._last_action_result = result
+        self._record_action(result)
+        self._active_action = None
+        self._movement = "stop"
+        self._turn_direction = "stop"
+        return self._action_label(action)
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
@@ -581,6 +759,10 @@ def _system_instruction() -> str:
         "whether to use one, use several, or use none; a heartbeat is not a "
         "requirement to act or speak. The CM5 checks every physical action and "
         "may stop it. "
+        "Physical movement is serialized: when the current state says a move or "
+        "turn is in progress, do not call move or turn again. Keep observing and "
+        "thinking until the state says the action completed. Hover may interrupt "
+        "the current action. "
         "Never request altitude, motors, attitude, position, or a long translation. "
         "Turn only through the turn tool. Use hover when stopping is appropriate "
         "or the scene or telemetry is unclear."
@@ -622,6 +804,7 @@ def _telemetry_text(telemetry: Telemetry) -> str:
                     telemetry.down_velocity_m_s,
                 )
             ),
+            f"heading_deg={_heading_number(telemetry.heading_rad)}",
         )
     )
 
@@ -632,3 +815,25 @@ def _number(value) -> str:
     if isinstance(value, (int, float)) and math.isfinite(value):
         return f"{value:.2f}"
     return "?"
+
+
+def _heading_number(value) -> str:
+    """Format one heading in degrees without hiding missing telemetry."""
+
+    if _finite(value):
+        return f"{math.degrees(value):.1f}"
+    return "?"
+
+
+def _finite(value) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
+
+
+def _angle_delta_rad(start: float, end: float) -> float:
+    """Return the signed shortest heading change from start to end."""
+
+    return (end - start + math.pi) % (2.0 * math.pi) - math.pi

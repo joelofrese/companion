@@ -19,7 +19,15 @@ class SafetyCommandService:
         tick_period_s: float = 0.02,
         obstacle_distance: Optional[Callable[[], Optional[float]]] = None,
         velocity_provider: Optional[
-            Callable[[], tuple[Optional[float], Optional[float], Optional[float]]]
+            Callable[
+                [],
+                tuple[
+                    Optional[float],
+                    Optional[float],
+                    Optional[float],
+                    Optional[float],
+                ],
+            ]
         ] = None,
     ):
         if (
@@ -33,7 +41,9 @@ class SafetyCommandService:
         self.forwarder = forwarder
         self.tick_period_s = tick_period_s
         self.obstacle_distance = obstacle_distance or (lambda: None)
-        self.velocity_provider = velocity_provider or (lambda: (None, None, None))
+        self.velocity_provider = velocity_provider or (
+            lambda: (None, None, None, None)
+        )
 
     def start(self):
         """Start the receiver."""

@@ -83,6 +83,7 @@ class UdpSafetyReceiver:
         forward_velocity_m_s: Optional[float] = None,
         right_velocity_m_s: Optional[float] = None,
         down_velocity_m_s: Optional[float] = None,
+        heading_rad: Optional[float] = None,
     ):
         """Return the latest sensor and vehicle readings to the brain."""
 
@@ -104,6 +105,7 @@ class UdpSafetyReceiver:
             _finite_or_none(forward_velocity_m_s),
             _finite_or_none(right_velocity_m_s),
             _finite_or_none(down_velocity_m_s),
+            _finite_or_none(heading_rad),
         ).encode()
         self._socket.sendto(payload, self._client_address)
         self._telemetry_sequence += 1

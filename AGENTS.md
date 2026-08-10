@@ -48,6 +48,8 @@ merge and delete it.
   lateral, or yaw-rate body-frame commands; flight lifecycle owns altitude.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
+- Gemini may keep thinking while one physical move or turn completes; movement
+  tools stay unavailable until its action state reports completion.
 - A real intent change invalidates old local visual context; rewording the same
   goal does not.
 - A recognized local dialogue intent stays active until a new open-ended
@@ -59,7 +61,7 @@ merge and delete it.
 - Negative movement requests become hover before local model interpretation;
   Gemini receives dialogue directly.
 - Low-confidence, stale, malformed, or missing input becomes zero motion.
-- CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
+- CM5 returns fresh TOF, velocity, and heading telemetry, rejects unsafe commands,
   protects against obstacles, and is the final vehicle-side authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
@@ -206,10 +208,12 @@ latest resumable handle when a connection ends. The editable memory file is
 only prior experience across runs. The session receives the newest 640-pixel
 JPEG once per second while model turns run. Movement and speech tools return
 without waiting for their duration, so the brain can continue receiving video,
-telemetry, and dialogue. The CM5 still expires, limits, and overrides every
-physical command. The trace reads Gemini's native `thought` parts separately
-from visible responses and tool calls; ER 2 may emit no thought summaries even
-when it reasons internally.
+telemetry, and dialogue. One physical move or turn stays active until its
+duration or observed heading settles; the action state reports the command,
+phase, remaining time, and heading. Hover may interrupt it. The CM5 still
+expires, limits, and overrides every physical command. The trace reads
+Gemini's native `thought` parts separately from visible responses and tool
+calls; ER 2 may emit no thought summaries even when it reasons internally.
 
 ## Current state
 
@@ -222,9 +226,9 @@ when it reasons internally.
   native context compression and session resumption while continuously
   choosing non-blocking move, turn, hover, and speech actions. Native
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
-  actions remain separately visible. Local Ollama VLM and LLM sessions remain
-  an explicit fallback. A live 45-degree turn request produced 47.6 degrees
-  of observed yaw and landed and disarmed safely.
+  actions remain separately visible. Move and turn actions are serialized
+  while their live state, completion, and heading are reported. Local Ollama
+  VLM and LLM sessions remain an explicit fallback.
 - The brain sends only slow forward, lateral, and yaw-rate commands. CM5 limits
   commands and uses TOF safety; PX4 stabilizes, turns, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;

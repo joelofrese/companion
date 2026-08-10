@@ -157,7 +157,9 @@ async def run(
     if dialogue_request is not None and not dialogue_request.strip():
         raise ValueError("dialogue request must not be empty")
     requested_intent = (
-        parse_intent(dialogue_request) if dialogue_request is not None else None
+        parse_intent(dialogue_request)
+        if dialogue_request is not None and not gemini
+        else None
     )
 
     ollama_client = None
@@ -252,19 +254,21 @@ async def run(
 
         def vehicle_velocity():
             if not vehicle_velocity_fresh:
-                return (None, None, None)
+                return (None, None, None, None)
             if (
                 north_velocity_m_s is None
                 or east_velocity_m_s is None
                 or down_velocity_m_s is None
             ):
-                return (None, None, None)
-            return ned_to_body(
+                return (None, None, None, None)
+            heading_rad = math.radians(current_heading_deg)
+            forward, right, down = ned_to_body(
                 north_velocity_m_s,
                 east_velocity_m_s,
                 down_velocity_m_s,
-                math.radians(current_heading_deg),
+                heading_rad,
             )
+            return (forward, right, down, heading_rad)
 
         stack = SimulatedSafetyStack(
             drone,

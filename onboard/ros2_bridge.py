@@ -66,7 +66,7 @@ class Ros2SafetyBridge:
             self._forwarder,
             tick_period_s=tick_period_s,
             obstacle_distance=self._distance.read,
-            velocity_provider=self._velocity.read,
+            velocity_provider=self._velocity.read_telemetry,
         )
         self._stop = threading.Event()
         self._thread = None

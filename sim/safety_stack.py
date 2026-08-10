@@ -19,7 +19,13 @@ class SimulatedSafetyStack:
         drone,
         obstacle_distance: Callable[[], Optional[float]],
         velocity_provider: Callable[
-            [], tuple[Optional[float], Optional[float], Optional[float]]
+            [],
+            tuple[
+                Optional[float],
+                Optional[float],
+                Optional[float],
+                Optional[float],
+            ],
         ],
         tick_period_s: float = SETPOINT_PERIOD_S,
     ):

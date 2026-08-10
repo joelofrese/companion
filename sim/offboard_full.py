@@ -142,8 +142,10 @@ async def run(image_path: str, expect_person: bool = False):
         def body_velocity():
             values = (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
             if any(value is None for value in values):
-                return (None, None, None)
-            return ned_to_body(*values, math.radians(current_heading_deg))
+                return (None, None, None, None)
+            heading_rad = math.radians(current_heading_deg)
+            forward, right, down = ned_to_body(*values, heading_rad)
+            return (forward, right, down, heading_rad)
 
         stack = SimulatedSafetyStack(
             drone,

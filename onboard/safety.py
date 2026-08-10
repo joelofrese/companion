@@ -134,6 +134,16 @@ class LatestVelocity:
         north, east, down, heading = state
         return ned_to_body(north, east, down, heading)
 
+    def read_telemetry(self):
+        """Return fresh body velocity and heading telemetry."""
+
+        state = self._read()
+        if state is None:
+            return (None, None, None, None)
+        north, east, down, heading = state
+        forward, right, down = ned_to_body(north, east, down, heading)
+        return (forward, right, down, heading)
+
     def heading(self):
         """Return the fresh PX4 heading in radians."""
 

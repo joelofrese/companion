@@ -38,6 +38,7 @@ class Telemetry:
     forward_velocity_m_s: Optional[float] = None
     right_velocity_m_s: Optional[float] = None
     down_velocity_m_s: Optional[float] = None
+    heading_rad: Optional[float] = None
 
 
 def _experience_outcome(telemetry: Telemetry) -> str:
