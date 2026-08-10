@@ -18,7 +18,8 @@ from voice.intent import parse_intent
 
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
-HEARTBEAT_PERIOD_S = 1.0
+MIN_HEARTBEAT_PERIOD_S = 1.0
+RESPONSE_TIMEOUT_S = 10.0
 START_TIMEOUT_S = 20.0
 MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
@@ -58,6 +59,7 @@ class GeminiRuntime:
         self.decision_count = 0
         self._response_parts = []
         self._closed = asyncio.Event()
+        self._frame_ready = asyncio.Event()
         self._ready = asyncio.Event()
         self._task = None
         self._error: Optional[Exception] = None
@@ -116,6 +118,7 @@ class GeminiRuntime:
             self.set_intent(intent)
         if frame is not None:
             self._latest_frame = frame
+            self._frame_ready.set()
         self._telemetry = telemetry
         if time.monotonic() >= self._movement_until_s:
             self._movement = "stop"
@@ -140,6 +143,7 @@ class GeminiRuntime:
         self._movement = "stop"
         self._movement_until_s = 0.0
         self._closed.set()
+        self._frame_ready.set()
 
     async def wait_closed(self):
         """Wait for the session task after closing it."""
@@ -163,19 +167,28 @@ class GeminiRuntime:
                 config=config,
             ) as session:
                 self._ready.set()
-                receive_task = asyncio.create_task(self._receive(session, types))
-                try:
-                    while not self._closed.is_set():
-                        await self._heartbeat(session, types)
+                await self._frame_ready.wait()
+                if self._closed.is_set():
+                    return
+                while not self._closed.is_set():
+                    sent_at_s = time.monotonic()
+                    await self._heartbeat(session, types)
+                    try:
+                        await asyncio.wait_for(
+                            self._receive(session, types), timeout=RESPONSE_TIMEOUT_S
+                        )
+                    except asyncio.TimeoutError:
+                        pass
+                    remaining_s = MIN_HEARTBEAT_PERIOD_S - (
+                        time.monotonic() - sent_at_s
+                    )
+                    if remaining_s > 0.0:
                         try:
                             await asyncio.wait_for(
-                                self._closed.wait(), timeout=HEARTBEAT_PERIOD_S
+                                self._closed.wait(), timeout=remaining_s
                             )
                         except asyncio.TimeoutError:
                             pass
-                finally:
-                    receive_task.cancel()
-                    await asyncio.gather(receive_task, return_exceptions=True)
         except Exception as error:
             self._error = error
             self._ready.set()
@@ -197,7 +210,8 @@ class GeminiRuntime:
             f"[HEARTBEAT] Goal: {self.intent}\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             "Inspect the latest image. If uncertain, hover. Use a tool for every "
-            "physical action. Never infer that a move is safe from the image alone."
+            "physical action. Never infer that a move is safe from the image alone. "
+            "Reply to every heartbeat with one concise observation and decision."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -209,11 +223,15 @@ class GeminiRuntime:
         async for message in session.receive():
             content = message.server_content
             if content is not None:
-                turn = content.model_turn
-                if turn is not None and turn.parts:
-                    self._response_parts.extend(
-                        part.text for part in turn.parts if part.text
-                    )
+                transcript = content.output_transcription
+                if transcript is not None and transcript.text:
+                    self._response_parts.append(transcript.text)
+                else:
+                    turn = content.model_turn
+                    if turn is not None and turn.parts:
+                        self._response_parts.extend(
+                            part.text for part in turn.parts if part.text
+                        )
                 if content.turn_complete:
                     text = "".join(self._response_parts).strip()
                     self._response_parts.clear()

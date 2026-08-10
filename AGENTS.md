@@ -185,9 +185,10 @@ and `--memory` for editable experience memory.
 
 With `GEMINI_API_KEY`, `--gemini` makes exploratory simulation or the optional
 Mac runner use one persistent Gemini Robotics ER 2 Streaming session. It
-receives the newest 640-pixel JPEG and a heartbeat once per second, then can
-only request a brief forward or lateral move, hover, or speech. Do not replace
-the local path until a live model run passes the same simulation checks.
+receives the newest 640-pixel JPEG and heartbeat after each completed model
+turn, never faster than once per second. It can only request a brief forward
+or lateral move, hover, or speech. Do not replace the local path until a live
+model run passes the same simulation checks.
 
 ## Current state
 
@@ -198,9 +199,9 @@ the local path until a live model run passes the same simulation checks.
 - Local mode uses separate Ollama VLM and LLM sessions. It is the current
   production path.
 - Gemini ER 2 Streaming is integrated as one persistent Mac brain for
-  exploratory camera/depth simulation and the optional Mac runner. It needs a
-  configured key and a live simulation run before it can replace the local
-  path.
+  exploratory camera/depth simulation and the optional Mac runner. A live
+  depth-world run verified 11 visual decisions, bounded motion, safety,
+  landing, and disarm.
 - The Mac sends only slow forward or lateral velocity. CM5 limits commands and
   uses TOF safety; PX4 stabilizes, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
