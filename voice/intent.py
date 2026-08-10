@@ -40,7 +40,7 @@ FOCUS_ACTION_WORDS = frozenset(
 )
 NEGATION_WORDS = frozenset(("no", "not", "never", "dont", "don't"))
 MOTION_WORDS = frozenset(
-    ("move", "follow", "fly", "go", "explore", "wander", "search")
+    ("move", "follow", "fly", "go", "come", "explore", "wander", "search")
 )
 
 
