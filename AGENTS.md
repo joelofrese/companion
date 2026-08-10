@@ -204,9 +204,10 @@ still expires, limits, and overrides every physical command.
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It now uses native context compression and
-  non-blocking high-level actions. Local Ollama VLM and LLM sessions remain an
-  explicit fallback. The deterministic mission and local safety loopback pass;
-  the new ER 2 session configuration still needs a live-key Gazebo run.
+  non-blocking high-level actions. A live 20-second depth-world run accepted
+  that configuration, streamed 20 frames, completed 14 turns, and landed and
+  disarmed safely. Local Ollama VLM and LLM sessions remain an explicit
+  fallback.
 - The brain sends only slow forward or lateral velocity. CM5 limits commands
   and uses TOF safety; PX4 stabilizes, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
