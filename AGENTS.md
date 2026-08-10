@@ -50,6 +50,8 @@ merge and delete it.
   the CM5 still limits every physical command.
 - Gemini may keep thinking while one physical move or turn completes; movement
   tools stay unavailable until its action state reports completion.
+- The generic movement path is the baseline for a future learned drone action
+  policy; do not turn companion behaviors into a task-specific skill list.
 - A real intent change invalidates old local visual context; rewording the same
   goal does not.
 - A recognized local dialogue intent stays active until a new open-ended
@@ -122,6 +124,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --faults --world default --duration 32
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
 .venv/bin/python -m sim.run_world --explore --depth --ollama --moving-person --world objects --intent "follow the person" --duration 20
+.venv/bin/python -m sim.run_world --explore --depth --gemini --world objects --duration 60 --record /tmp/companion-episode
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg --expect-person
@@ -179,6 +182,11 @@ a visual interaction fixture, not a DEXI 3 hardware claim.
 When Gazebo depth reaches the obstacle limit, the run also requires observed
 CM5 backoff; runs that never reach it remain exploratory and only check bounded
 behavior.
+Use `--record PATH` with a camera or depth exploration to save a new episode
+directory containing downsampled frames and `trajectory.jsonl`. Each sample
+contains the image path, telemetry, brain command, CM5-forwarded command, and
+simulator state. It records visible actions, not private model reasoning, so
+the episodes can later train or evaluate a generic drone action policy.
 
 After installing Ollama and pulling local models:
 
@@ -221,6 +229,9 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   command path, faults, recovery, safety, landing, and disarm.
 - Exploratory camera and depth worlds exercise open-ended situations, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
+- Exploratory camera and depth runs can record compact image/action episodes;
+  the current generic controller is the baseline for a future learned drone
+  action policy rather than a task-specific skill library.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It starts with one situation prompt, then uses
   native context compression and session resumption while continuously
