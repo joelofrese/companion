@@ -296,9 +296,15 @@ worth checking next, or empty.
         )
         confidence = _confidence(data)
         description_key = " ".join(description.lower().split()).strip(" .!?")
+        intent_key = " ".join(intent.lower().split()).strip(" .!?")
         if (
             not description
             or description_key in DESCRIPTION_PLACEHOLDERS
+            or any(
+                description_key.startswith(f"{placeholder}:")
+                for placeholder in DESCRIPTION_PLACEHOLDERS
+            )
+            or description_key == intent_key
             or "unclear" in description_key
         ):
             description = "the scene is unclear"
