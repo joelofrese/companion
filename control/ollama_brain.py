@@ -323,14 +323,20 @@ class OllamaLanguageModel:
         self.model = model
 
     def think(self, information: ConsciousInput) -> ConsciousDecision:
-        observations = "\n".join(
-            f"- {observation.description}; "
-            f"focused answer={observation.focused_answer or 'none'}; "
-            f"suggested movement={observation.movement}; "
-            f"focus next={observation.next_focus or 'none'}; "
-            f"confidence={observation.confidence}"
-            for observation in information.new_observations
-        ) or "(no new visual observations)"
+        observation_lines = []
+        for observation in information.new_observations:
+            line = (
+                f"- {observation.description}; "
+                f"focused answer={observation.focused_answer or 'none'}; "
+                f"suggested movement={observation.movement}; "
+                f"focus next={observation.next_focus or 'none'}; "
+                f"confidence={observation.confidence}"
+            )
+            if not observation_lines or line != observation_lines[-1]:
+                observation_lines.append(line)
+        observations = "\n".join(observation_lines) or (
+            "(no new visual observations)"
+        )
         prompt = f"""
 You are the Companion Drone's conscious mind. Use the visual observations,
 memory, telemetry, and optional dialogue to choose the next high-level intent.

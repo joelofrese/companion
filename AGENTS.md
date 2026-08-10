@@ -188,6 +188,8 @@ and `--memory` for editable experience memory.
 - `--trace` shows observations, decisions, latencies, and command reasons;
   `--faults` checks the same safety schedule through synthetic sensors and
   live Gazebo depth without requiring exact brain decisions.
+- Conscious prompts keep distinct visual changes and drop repeated descriptions
+  so local thinking stays responsive.
 - Brain and CM5 use slow forward, right, and down body-frame velocity. Both
   simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
 - Long synthetic and real Ollama/depth runs complete with bounded motion, valid
