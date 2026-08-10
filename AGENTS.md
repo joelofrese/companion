@@ -136,8 +136,10 @@ checks camera transport through a zero-confidence placeholder and keeps motion
 stopped. `--ollama` uses local VLM and LLM sessions; `--gemini` uses one
 streaming Gemini session. Camera-only runs still stop because they have no TOF
 reading. Use `--depth` when the brain should be allowed to move.
-Use `--trace` to print visual observations, conscious decisions, model
-latencies, and command reasons. Use `--snapshot PATH` to save the first
+Use `--trace` to print visual observations, native Gemini thought summaries,
+responses, actions, model latencies, and command reasons. Native thought
+summaries are optional; raw private reasoning is not exposed. Use
+`--snapshot PATH` to save the first
 rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
 `--intent`, and `--memory` to vary the world, run length, dialogue, goal, and
 persistent experience. Typed dialogue also works during an exploratory run.
@@ -194,7 +196,9 @@ conversation; the editable memory file is only prior experience across runs.
 The session receives the newest 640-pixel JPEG once per second while model
 turns run. Movement and speech tools return without waiting for their duration,
 so the brain can continue receiving video, telemetry, and dialogue. The CM5
-still expires, limits, and overrides every physical command.
+still expires, limits, and overrides every physical command. The trace reads
+Gemini's native `thought` parts separately from visible responses and tool
+calls; ER 2 may emit no thought summaries even when it reasons internally.
 
 ## Current state
 
@@ -204,9 +208,9 @@ still expires, limits, and overrides every physical command.
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It now uses native context compression and
-  non-blocking high-level actions. A live 20-second depth-world run accepted
-  that configuration, streamed 20 frames, completed 14 turns, and landed and
-  disarmed safely. Local Ollama VLM and LLM sessions remain an explicit
+  non-blocking high-level actions. Native thought-part tracing is enabled, but
+  the latest live depth-world run emitted no thought summaries; actions remain
+  separately visible. Local Ollama VLM and LLM sessions remain an explicit
   fallback.
 - The brain sends only slow forward or lateral velocity. CM5 limits commands
   and uses TOF safety; PX4 stabilizes, lands, and disarms.

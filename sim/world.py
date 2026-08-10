@@ -535,13 +535,13 @@ async def run(
             if gemini:
                 if control.decision_count != last_traced_decision:
                     decision = control.latest_decision
-                    observation = control.latest_observation
                     if decision is not None:
                         print(
                             f"[Gemini {elapsed_s:5.1f}s] "
                             f"goal={clean(decision.intent)}; "
-                            f"thought={clean(decision.summary)}; "
-                            f"action={observation.movement if observation else 'hover'}; "
+                            f"thought={clean(control.latest_thought)}; "
+                            f"response={clean(control.latest_response)}; "
+                            f"action={clean(control.latest_action)}; "
                             f"latency={control.latest_decision_duration_s:.2f}s",
                             flush=True,
                         )
@@ -787,7 +787,13 @@ async def run(
         print("Conscious visual memory=verified.")
         print("Brain visual observation=verified.")
         print(f"Brain visual observations=verified ({control.observation_count}).")
-        print(f"Conscious thoughts=verified ({control.decision_count}).")
+        if gemini:
+            print(
+                "Gemini native thought summaries observed: "
+                f"{control.thought_count}; thought tokens: {control.thought_token_count}."
+            )
+        else:
+            print(f"Conscious thoughts=verified ({control.decision_count}).")
         if ollama:
             print(
                 "Local Ollama brain=verified: "

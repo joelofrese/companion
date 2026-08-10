@@ -53,6 +53,9 @@ class GeminiRuntime:
         self._movement_blocked = False
         self.latest_observation: Optional[VisualObservation] = None
         self.latest_decision: Optional[ConsciousDecision] = None
+        self.latest_thought = ""
+        self.latest_response = ""
+        self.latest_action = "stop"
         self._last_heartbeat_at_s: Optional[float] = None
         self.latest_observation_duration_s: Optional[float] = None
         self.latest_decision_duration_s: Optional[float] = None
@@ -61,6 +64,10 @@ class GeminiRuntime:
         self.turn_count = 0
         self.video_frame_count = 0
         self._response_parts = []
+        self._response_thoughts = []
+        self._action_summary = ""
+        self.thought_count = 0
+        self.thought_token_count = 0
         self._memory_sent = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
@@ -166,6 +173,7 @@ class GeminiRuntime:
                 response_modalities=["TEXT"],
                 tools=_tools(),
                 system_instruction=_system_instruction(),
+                thinking_config=types.ThinkingConfig(include_thoughts=True),
                 context_window_compression=types.ContextWindowCompressionConfig(
                     sliding_window=types.SlidingWindow()
                 ),
@@ -248,9 +256,10 @@ class GeminiRuntime:
         state = (
             f"[HEARTBEAT] Goal: {self.intent}\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
-            "Inspect the latest image. If uncertain, hover. Use a tool for every "
-            "physical action. Never infer that a move is safe from the image alone. "
-            "Reply to every heartbeat with one concise observation and decision."
+            "Inspect the latest image and current state. Decide for yourself whether "
+            "to move, hover, speak, or do nothing. Never infer that a move is safe "
+            "from the image alone. A heartbeat does not require a tool or a visible "
+            "response."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -260,24 +269,27 @@ class GeminiRuntime:
 
     async def _receive(self, session, types):
         async for message in session.receive():
+            usage = message.usage_metadata
+            if usage is not None and usage.thoughts_token_count is not None:
+                self.thought_token_count = usage.thoughts_token_count
             content = message.server_content
             if content is not None:
-                transcript = content.output_transcription
-                if transcript is not None and transcript.text:
-                    self._response_parts.append(transcript.text)
+                turn = content.model_turn
+                if turn is not None and turn.parts:
+                    for part in turn.parts:
+                        if not part.text:
+                            continue
+                        if getattr(part, "thought", False):
+                            self._response_thoughts.append(part.text)
+                        else:
+                            self._response_parts.append(part.text)
                 else:
-                    turn = content.model_turn
-                    if turn is not None and turn.parts:
-                        self._response_parts.extend(
-                            part.text for part in turn.parts if part.text
-                        )
+                    transcript = content.output_transcription
+                    if transcript is not None and transcript.text:
+                        self._response_parts.append(transcript.text)
                 if content.turn_complete:
                     self.turn_count += 1
-                    text = "".join(self._response_parts).strip()
-                    self._response_parts.clear()
-                    if text:
-                        self._record(text)
-                        print(f"Companion: {text}", flush=True)
+                    self._finish_turn()
             tool_call = message.tool_call
             if tool_call is not None:
                 responses = []
@@ -295,7 +307,7 @@ class GeminiRuntime:
             if message.tool_call_cancellation is not None:
                 self._movement = "stop"
                 self._movement_until_s = 0.0
-                self._record("Gemini cancelled the current action.")
+                self._record_action("cancelled the current action")
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":
@@ -303,13 +315,13 @@ class GeminiRuntime:
         if name == "hover":
             self._movement = "stop"
             self._movement_until_s = 0.0
-            self._record("Chose to hover.")
+            self._record_action("hover")
             return {"status": "hovering", "telemetry": _telemetry_text(self._telemetry)}
         if name == "speak":
             message = str(args.get("message", "")).strip()
             if not message:
                 return {"status": "rejected", "reason": "message is required"}
-            self._record(message, dialogue=message)
+            self._record_action(f"speak: {message}")
             print(f"Companion: {message}", flush=True)
             return {"status": "spoken"}
         return {"status": "rejected", "reason": "unknown tool"}
@@ -335,17 +347,33 @@ class GeminiRuntime:
         self._movement = direction
         self._movement_until_s = time.monotonic() + duration_s
         self._movement_blocked = False
-        self._record(f"Chose to move {direction} for {duration_s:.1f} seconds.")
+        self._record_action(f"move {direction} for {duration_s:.1f}s")
         return {
             "status": "accepted",
             "expires_in_s": duration_s,
             "telemetry": _telemetry_text(self._telemetry),
         }
 
-    def _record(self, text: str, dialogue: str = ""):
-        text = " ".join(str(text).split())
-        if not text:
-            return
+    def _record_action(self, action: str):
+        action = " ".join(str(action).split())
+        if action:
+            self._action_summary = (
+                f"{self._action_summary}; {action}"
+                if self._action_summary
+                else action
+            )
+
+    def _finish_turn(self):
+        thought = " ".join("".join(self._response_thoughts).split())
+        response = " ".join("".join(self._response_parts).split())
+        action = self._action_summary or "none"
+        self._response_thoughts.clear()
+        self._response_parts.clear()
+        self._action_summary = ""
+        self.latest_thought = thought
+        self.latest_response = response
+        self.latest_action = action
+        summary = thought or response or action
         now = time.monotonic()
         latency = (
             max(0.0, now - self._last_heartbeat_at_s)
@@ -354,23 +382,28 @@ class GeminiRuntime:
         )
         self.latest_observation = VisualObservation(
             timestamp_s=now,
-            description=text,
+            description=summary,
             movement=self._movement,
             confidence=1.0,
         )
         self.latest_decision = ConsciousDecision(
             intent=self.intent,
-            dialogue=dialogue,
-            summary=text,
+            dialogue=response,
+            summary=summary,
         )
         self.latest_observation_duration_s = latency
         self.latest_decision_duration_s = latency
         self.observation_count += 1
         self.decision_count += 1
+        if thought:
+            self.thought_count += 1
+            print(f"Gemini thought: {thought}", flush=True)
+        if response:
+            print(f"Gemini response: {response}", flush=True)
         if self.memory_store is not None:
             self.memory_store.remember(
                 f"intent={self.intent}; "
-                f"{_telemetry_text(self._telemetry)}; summary={text}"
+                f"{_telemetry_text(self._telemetry)}; summary={summary}"
             )
 
 
@@ -422,11 +455,14 @@ def _system_instruction() -> str:
     return (
         "You are the high-level brain of an indoor companion drone. Observe the "
         "latest camera image, user dialogue, goal, and telemetry. Think broadly, "
-        "but move slowly and deliberately. You can request brief forward or "
-        "lateral translation; the CM5 checks every action and may stop it. "
+        "but move slowly and deliberately. You have optional tools for brief "
+        "forward or lateral translation, hovering, and speech. Choose freely "
+        "whether to use one, use several, or use none; a heartbeat is not a "
+        "requirement to act or speak. The CM5 checks every physical action and "
+        "may stop it. "
         "Never request altitude, heading, motors, attitude, position, or a long "
-        "move. Use hover whenever the scene or telemetry is unclear. Describe "
-        "important observations briefly and speak when a user needs an answer."
+        "move. Use hover when stopping is appropriate or the scene or telemetry "
+        "is unclear."
     )
 
 
