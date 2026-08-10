@@ -66,7 +66,7 @@ class GeminiRuntime:
         """Connect the persistent Gemini session before flight begins."""
 
         if not self.api_key:
-            raise RuntimeError("GEMINI_API_KEY is required for Gemini simulation")
+            raise RuntimeError("GEMINI_API_KEY is required for Gemini")
         if self._task is not None:
             return
         self._task = asyncio.create_task(self._run())

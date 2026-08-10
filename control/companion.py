@@ -1,13 +1,10 @@
-"""Run the Mac brain with local VLM and LLM models."""
+"""Run the Mac-side companion brain."""
 
 import argparse
 import asyncio
+import sys
 
 from control.memory import CompanionMemory
-from control.mind import MacMind
-from control.mind_runtime import MindRuntime
-from control.ollama_brain import OllamaLanguageModel, OllamaVisionModel
-from control.ollama_client import OllamaClient
 from control.dialogue import DialogueInput
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
@@ -42,6 +39,15 @@ def build_parser():
     parser.add_argument("--llm-model", default="moondream")
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
+        "--gemini",
+        action="store_true",
+        help="use one Gemini Robotics ER 2 Streaming brain instead of local Ollama",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default="gemini-robotics-er-2-streaming-preview",
+    )
+    parser.add_argument(
         "--memory",
         default="~/.companion/memory.txt",
         help="editable experience-memory file",
@@ -67,10 +73,6 @@ async def run(args):
 
         voice_request = await asyncio.to_thread(listen_once)
 
-    client = OllamaClient(args.ollama_url, timeout_s=args.ollama_timeout)
-    await asyncio.to_thread(client.check)
-    await asyncio.to_thread(client.preload, args.vlm_model)
-    await asyncio.to_thread(client.preload, args.llm_model)
     video_config = H264StreamConfig(
         port=args.video_port,
         width=args.width,
@@ -79,13 +81,33 @@ async def run(args):
     )
     receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(receiver)
-    brain = MacMind(
-        OllamaVisionModel(client, args.vlm_model),
-        OllamaLanguageModel(client, args.llm_model),
-        memory=CompanionMemory(args.memory),
-    )
-    brain.set_intent(args.intent)
-    control = MindRuntime(brain)
+    memory = CompanionMemory(args.memory)
+    if args.gemini:
+        from control.gemini_brain import GeminiRuntime
+
+        control = GeminiRuntime(
+            args.intent,
+            model=args.gemini_model,
+            memory=memory,
+        )
+        await control.start()
+    else:
+        from control.mind import MacMind
+        from control.mind_runtime import MindRuntime
+        from control.ollama_brain import OllamaLanguageModel, OllamaVisionModel
+        from control.ollama_client import OllamaClient
+
+        client = OllamaClient(args.ollama_url, timeout_s=args.ollama_timeout)
+        await asyncio.to_thread(client.check)
+        await asyncio.to_thread(client.preload, args.vlm_model)
+        await asyncio.to_thread(client.preload, args.llm_model)
+        brain = MacMind(
+            OllamaVisionModel(client, args.vlm_model),
+            OllamaLanguageModel(client, args.llm_model),
+            memory=memory,
+        )
+        brain.set_intent(args.intent)
+        control = MindRuntime(brain)
     sender = UdpCommandSender(args.cm5_host, args.command_port)
     service = UdpControlService(
         control,
@@ -100,19 +122,38 @@ async def run(args):
         if args.dialogue or voice_request
         else None
     )
-    mind_task = asyncio.create_task(
-        control.think_loop(
-            mind_stop,
-            telemetry_provider=sender.telemetry,
-            dialogue_provider=dialogue_input.next if dialogue_input else None,
+    mind_task = None
+    if args.gemini and dialogue_input is not None:
+        async def route_dialogue():
+            while not mind_stop.is_set():
+                message = dialogue_input.next()
+                if message:
+                    control.add_dialogue(message)
+                try:
+                    await asyncio.wait_for(mind_stop.wait(), timeout=0.1)
+                except asyncio.TimeoutError:
+                    pass
+
+        mind_task = asyncio.create_task(route_dialogue())
+    elif not args.gemini:
+        mind_task = asyncio.create_task(
+            control.think_loop(
+                mind_stop,
+                telemetry_provider=sender.telemetry,
+                dialogue_provider=dialogue_input.next if dialogue_input else None,
+            )
         )
-    )
     try:
         receiver.start()
+        model_name = (
+            f"Gemini={args.gemini_model}"
+            if args.gemini
+            else f"VLM={args.vlm_model}, LLM={args.llm_model}"
+        )
         print(
             f"Companion ready: video :{video_config.port}, "
             f"commands {args.cm5_host}:{args.command_port}, intent={args.intent}, "
-            f"VLM={args.vlm_model}, LLM={args.llm_model}."
+            f"{model_name}."
         )
         if args.dialogue:
             dialogue_input.start()
@@ -120,8 +161,11 @@ async def run(args):
     finally:
         receiver.close()
         mind_stop.set()
-        await mind_task
+        if mind_task is not None:
+            await mind_task
         control.close()
+        if args.gemini:
+            await control.wait_closed()
 
 
 def main(argv=None):
@@ -129,8 +173,12 @@ def main(argv=None):
     try:
         asyncio.run(run(args))
     except KeyboardInterrupt:
-        pass
+        return 130
+    except RuntimeError as error:
+        print(f"companion: {error}", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
