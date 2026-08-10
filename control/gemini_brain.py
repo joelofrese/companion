@@ -29,7 +29,8 @@ MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
 MIN_TURN_DEG = 15.0
 MAX_TURN_DEG = 90.0
-TURN_RATE_DEG_S = MAX_YAW_RATE_DEG_S
+# Leave room for PX4 to settle before the requested heading is reached.
+TURN_RATE_DEG_S = 30.0
 MAX_IMAGE_WIDTH = 640
 ACTION_GRACE_S = 1.0
 ACTION_SETTLE_S = 1.0
