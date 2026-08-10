@@ -181,6 +181,8 @@ and `--memory` for editable experience memory.
   visual focus, memory, bounded motion, and simulated TOF safety. Camera-only
   motion stops because it has no forward range reading; depth is a simulation
   approximation of the DEXI 3 TOF sensor.
+- A 120-second local-model depth run passed long-running perception, memory
+  reload, landing, and disarm.
 - The companion-owned `objects` world contains simple colored objects and a
   mannequin. `--moving-person` moves the mannequin through fixed poses.
   Non-default worlds require a rendered camera or simulated depth so motion is
