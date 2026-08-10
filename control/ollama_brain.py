@@ -31,6 +31,7 @@ DESCRIPTION_PLACEHOLDERS = PLACEHOLDER_TEXT | frozenset(
         "measured body velocity",
         "forward tof distance",
         "the scene is clear",
+        "the scene is clear and safe",
     )
 )
 MAX_OUTPUT_TOKENS = 64
@@ -299,7 +300,6 @@ worth checking next, or empty.
             not description
             or description_key in DESCRIPTION_PLACEHOLDERS
             or "unclear" in description_key
-            or description_key == "the scene is clear and safe"
         ):
             description = "the scene is unclear"
             focused_answer = ""
