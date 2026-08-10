@@ -172,8 +172,8 @@ DEXI 3's forward TOF sensor, not a claim that DEXI 3 has a depth camera. Use
 `--intent following` and `--pose x,y,z,roll,pitch,yaw` to start near an
 obstacle.
 Add `--moving-person` in the `objects` world to move its visible mannequin
-between fixed poses through Gazebo's native pose service. This is a visual
-interaction fixture, not a DEXI 3 hardware claim.
+smoothly between fixed waypoints through Gazebo's native pose service. This is
+a visual interaction fixture, not a DEXI 3 hardware claim.
 When Gazebo depth reaches the obstacle limit, the run also requires observed
 CM5 backoff; runs that never reach it remain exploratory and only check bounded
 behavior.

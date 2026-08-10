@@ -5,9 +5,13 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 from typing import Any, Callable, Optional
 
 from vision.video_stream import close_subprocess
+
+
+POSE_UPDATE_S = 0.1
 
 
 class GazeboTopicReader:
@@ -73,7 +77,7 @@ class GazeboTopicReader:
 
 
 class GazeboPoseAnimator:
-    """Move one visual model through fixed poses in a background worker."""
+    """Move one visual model smoothly between fixed waypoints."""
 
     def __init__(
         self,
@@ -111,10 +115,25 @@ class GazeboPoseAnimator:
         self._thread.start()
 
     def _run(self):
-        index = 0
+        current = self._poses[0]
+        index = 1 % len(self._poses)
         try:
-            while not self._stop.wait(self._interval_s):
-                self._set_pose(self._poses[index])
+            while not self._stop.is_set():
+                target = self._poses[index]
+                started_at = time.monotonic()
+                while True:
+                    progress = min(
+                        (time.monotonic() - started_at) / self._interval_s,
+                        1.0,
+                    )
+                    pose = tuple(
+                        start + (end - start) * progress
+                        for start, end in zip(current, target)
+                    )
+                    self._set_pose(pose)
+                    if progress >= 1.0 or self._stop.wait(POSE_UPDATE_S):
+                        break
+                current = target
                 index = (index + 1) % len(self._poses)
         except Exception as error:
             self._error = error
