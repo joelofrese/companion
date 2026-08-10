@@ -186,6 +186,8 @@ and `--memory` for editable experience memory.
   exploratory simulation reloads and verifies those records.
 - If the conscious model omits a summary, Mac keeps the latest visual
   observation as context.
+- Unanswered visual focus stays active; answered focus can be released or
+  replaced by the conscious model.
 - Stale, missing, malformed, low-confidence, or failed brain and sensor input
   stops Mac motion. CM5 still rejects unsafe or stale commands and remains the
   final authority.
