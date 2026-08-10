@@ -15,7 +15,7 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError
 
 from control.memory import CompanionMemory
-from control.mind import CompanionMind, Telemetry
+from control.mind import CompanionMind
 from control.dialogue import DialogueInput
 from control.mind_runtime import (
     MAX_FRAME_GAP_S,
@@ -49,7 +49,6 @@ from sim.offboard_control import (
     THIRD_FOLLOW_START_S,
 )
 from sim.safety_stack import SimulatedSafetyStack
-from sim.trajectory import TrajectoryRecorder
 from sim.world_fixture import (
     BRAIN_SHUTDOWN_START_S,
     CONSCIOUS_FAILURE_END_S,
@@ -108,7 +107,6 @@ async def run(
     depth: bool = False,
     memory_path: Optional[Path] = None,
     snapshot_path: Optional[Path] = None,
-    record_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
     moving_person: bool = False,
@@ -154,8 +152,6 @@ async def run(
         raise ValueError("camera snapshot requires exploratory simulation")
     if snapshot_path is not None and not (camera or depth):
         raise ValueError("camera snapshot requires Gazebo camera or depth mode")
-    if record_path is not None and not (exploratory and (camera or depth)):
-        raise ValueError("trajectory recording requires exploratory camera or depth mode")
     if dialogue_request is not None and not exploratory:
         raise ValueError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and not dialogue_request.strip():
@@ -177,34 +173,6 @@ async def run(
         await asyncio.to_thread(ollama_client.preload, llm_model)
     memory_store = CompanionMemory(memory_path) if memory_path is not None else None
     memory_before = memory_store.context() if memory_store is not None else ""
-    recorder = (
-        TrajectoryRecorder(
-            record_path,
-            {
-                "world": world_name,
-                "camera": camera,
-                "depth": depth,
-                "brain": (
-                    "gemini"
-                    if gemini
-                    else "ollama"
-                    if ollama
-                    else "synthetic"
-                ),
-                "model": (
-                    gemini_model
-                    if gemini
-                    else f"{vlm_model}/{llm_model}"
-                    if ollama
-                    else "synthetic"
-                ),
-                "initial_intent": initial_intent,
-                "dialogue_request": dialogue_request or "",
-            },
-        )
-        if record_path is not None
-        else None
-    )
 
     sender = None
     drone = System()
@@ -233,8 +201,6 @@ async def run(
     current_heading_deg = None
     initial_yaw_deg = None
     max_heading_change_deg = 0.0
-    latest_frame = None
-    latest_telemetry = Telemetry()
     try:
         world = SyntheticWorld(exploratory, faults)
         if camera or depth:
@@ -407,7 +373,6 @@ async def run(
         def send_packet(timestamp_s: float, step, intent=None):
             nonlocal brain_shutdown, camera_frames, snapshot_saved
             nonlocal applied_dialogue_intent
-            nonlocal latest_frame, latest_telemetry
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
@@ -427,8 +392,6 @@ async def run(
                     applied_dialogue_intent = parse_intent(message)
                     control.add_dialogue(message)
             telemetry = brain_telemetry()
-            latest_frame = frame
-            latest_telemetry = telemetry
             if gemini:
                 command = control.tick(
                     frame=frame,
@@ -502,34 +465,6 @@ async def run(
         last_decision_signature = None
         last_traced_command = None
         requested_focus_answered = False
-
-        def record_sample(elapsed_s, step, command):
-            if recorder is None:
-                return
-            forwarded = (
-                safe_commands.commands[-1][1]
-                if safe_commands.commands
-                else None
-            )
-            distance = step.obstacle_distance_m
-            if distance is None or not math.isfinite(distance):
-                distance = None
-            recorder.record(
-                elapsed_s,
-                latest_frame,
-                latest_telemetry,
-                command,
-                forwarded,
-                getattr(control, "latest_action", ""),
-                {
-                    "transmit": step.transmit,
-                    "distance_fresh": step.distance_fresh,
-                    "velocity_fresh": step.velocity_fresh,
-                    "brain_shutdown": step.brain_shutdown,
-                    "command_override": step.command_override is not None,
-                    "obstacle_distance_m": distance,
-                },
-            )
 
         async def observe_velocity():
             nonlocal max_forward_velocity, min_forward_velocity
@@ -757,11 +692,9 @@ async def run(
                     step = read_step(now - started_at)
                     command = send_packet(now, step)
                     trace_brain(now - started_at, step, command)
-                    record_sample(now - started_at, step, command)
                     continue
                 command = send_packet(now, step)
                 trace_brain(elapsed, step, command)
-                record_sample(elapsed, step, command)
                 if (
                     dialogue_request is not None
                     and control.latest_observation is not None
@@ -1253,13 +1186,6 @@ async def run(
                         "CM5 did not back off after Gazebo depth reached the obstacle limit"
                     )
                 print("CM5 Gazebo-depth obstacle backoff=verified.")
-        if recorder is not None:
-            if recorder.sample_count == 0:
-                raise RuntimeError("Gazebo trajectory recorder captured no samples")
-            print(
-                "Gazebo trajectory=recorded: "
-                f"{record_path} ({recorder.sample_count} samples)."
-            )
         print(f"Max observed forward velocity: {max_forward_velocity:.2f}m/s")
         print(f"Max observed right velocity: {max_right_velocity:.2f}m/s")
         print(f"Min observed forward velocity: {min_forward_velocity:.2f}m/s")
@@ -1303,8 +1229,6 @@ async def run(
             except Exception:
                 pass
         close_mavsdk(drone)
-        if recorder is not None:
-            recorder.close()
 
 
 if __name__ == "__main__":
@@ -1345,11 +1269,6 @@ if __name__ == "__main__":
         help="save the first Gazebo camera frame for visual inspection",
     )
     parser.add_argument(
-        "--record",
-        type=Path,
-        help="save camera, telemetry, and actions for future policy learning",
-    )
-    parser.add_argument(
         "--request",
         help="send one dialogue request automatically at the start of an exploratory run",
     )
@@ -1387,7 +1306,6 @@ if __name__ == "__main__":
                 initial_intent=args.intent,
                 memory_path=args.memory,
                 snapshot_path=args.snapshot,
-                record_path=args.record,
                 dialogue_request=args.request,
                 trace=args.trace,
                 moving_person=args.moving_person,

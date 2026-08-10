@@ -170,7 +170,6 @@ def _run_once(
     model_pose: Optional[str],
     memory_path: Optional[Path],
     snapshot_path: Optional[Path],
-    record_path: Optional[Path],
     dialogue_request: Optional[str],
     trace: bool,
     moving_person: bool,
@@ -314,8 +313,6 @@ def _run_once(
                 scenario += ["--memory", str(memory_path)]
             if snapshot_path is not None:
                 scenario += ["--snapshot", str(snapshot_path)]
-            if record_path is not None:
-                scenario += ["--record", str(record_path)]
             if dialogue_request is not None:
                 scenario += ["--request", dialogue_request]
             if trace:
@@ -351,7 +348,6 @@ def run(
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
     snapshot_path: Optional[Path] = None,
-    record_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
     moving_person: bool = False,
@@ -402,10 +398,6 @@ def run(
         raise RuntimeError("camera snapshot cannot use an RTP image scenario")
     if snapshot_path is not None and not (camera or depth):
         raise RuntimeError("camera snapshot requires Gazebo camera or depth mode")
-    if record_path is not None and not (exploratory and (camera or depth)):
-        raise RuntimeError(
-            "trajectory recording requires exploratory camera or depth mode"
-        )
     if dialogue_request is not None and not exploratory:
         raise RuntimeError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and image_path is not None:
@@ -460,7 +452,6 @@ def run(
                     model_pose=model_pose,
                     memory_path=memory_path,
                     snapshot_path=snapshot_path,
-                    record_path=record_path,
                     dialogue_request=dialogue_request,
                     trace=trace,
                     moving_person=moving_person,
@@ -553,11 +544,6 @@ def main(argv=None):
         help="save the first Gazebo camera frame for visual inspection",
     )
     parser.add_argument(
-        "--record",
-        type=Path,
-        help="save camera, telemetry, and actions for future policy learning",
-    )
-    parser.add_argument(
         "--request",
         help="send one dialogue request automatically during an exploratory run",
     )
@@ -603,7 +589,6 @@ def main(argv=None):
             model_pose=args.pose,
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
             snapshot_path=args.snapshot.expanduser().resolve() if args.snapshot else None,
-            record_path=args.record.expanduser().resolve() if args.record else None,
             dialogue_request=args.request,
             trace=args.trace,
             moving_person=args.moving_person,

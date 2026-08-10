@@ -643,8 +643,8 @@ class GeminiRuntime:
             )
 
     def _finish_turn(self):
-        thought = " ".join("".join(self._response_thoughts).split())
-        response = " ".join("".join(self._response_parts).split())
+        thought = _model_text(self._response_thoughts)
+        response = _model_text(self._response_parts)
         action = self._action_summary or "none"
         self._response_thoughts.clear()
         self._response_parts.clear()
@@ -762,6 +762,8 @@ def _system_instruction() -> str:
         "You have optional tools for brief forward or lateral translation, turning "
         "in place, hovering, and speech. Choose freely whether to use one, use "
         "several, or use none; a heartbeat is not a requirement to act or speak. "
+        "When you decide to act, call the matching tool; do not describe a tool "
+        "call as JSON or in a code fence. Speak only when useful. "
         "The CM5 checks every physical action and may stop it. Physical movement "
         "is serialized: when the current state says a move or turn is in progress, "
         "do not call move or turn again. Keep observing and thinking until the "
@@ -783,6 +785,19 @@ def _jpeg(frame) -> bytes:
     output = BytesIO()
     image.save(output, format="JPEG", quality=85)
     return output.getvalue()
+
+
+def _model_text(parts) -> str:
+    """Return useful model text without empty structured-output placeholders."""
+
+    value = " ".join("".join(parts).split())
+    if value.replace("```json", "").replace("```", "").strip() in {
+        "{}",
+        "[]",
+        "null",
+    }:
+        return ""
+    return value
 
 
 def _telemetry_text(telemetry: Telemetry) -> str:
