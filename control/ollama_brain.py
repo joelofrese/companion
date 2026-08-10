@@ -248,33 +248,24 @@ class OllamaVisionModel:
         telemetry: Telemetry,
     ) -> VisualObservation:
         prompt = f"""
-You are the Companion Drone's subconscious visual system. Describe the current
-camera frame and suggest one cautious next movement. Look broadly, but answer
-the requested focus when one is present. Never suggest backward movement. Use
-stop only when the scene or movement is uncertain, unsafe, or blocked. If the
-requested thing is not visible but the scene is clear and safe, use a slow left
-or right movement to look around it. The description must say what is visible,
-not repeat a movement word. The focused answer must answer the requested focus,
-not describe the movement. Never substitute another visible object for the
-requested focus; if the focus cannot be confirmed, say it is not visible.
-Return only the requested JSON.
+You are the Companion Drone's visual mind. Look carefully at the image and
+return only the requested JSON. Describe the most obvious visible object,
+person, wall, or open path in short plain English. If a visual focus is given,
+answer that subject exactly; never substitute another object. If it is not
+visible, say so. Suggest one cautious movement. Use stop when the image is
+unclear, unsafe, or blocked. Never move backward.
 
-Current high-level intent: {intent or "none"}
-Requested visual focus: {focus or "none"}
+Intent: {intent or "none"}
+Visual focus: {focus or "none"}
 Previous movement: {previous_movement or "stop"}
 Previous description: {previous_observation or "none"}
-Last requested command: {telemetry.last_command or "none yet"}
-Measured body velocity:
-forward={telemetry.forward_velocity_m_s}
-right={telemetry.right_velocity_m_s}
-down={telemetry.down_velocity_m_s}
+Last command: {telemetry.last_command or "none yet"}
+Body velocity: forward={telemetry.forward_velocity_m_s}, right={telemetry.right_velocity_m_s}, down={telemetry.down_velocity_m_s}
 Forward TOF distance: {telemetry.obstacle_distance_m}
 
-The movement must be one of: forward, left, right, up, down, stop, hover.
-Use measured velocity to distinguish the requested movement from what the
-vehicle actually did. The description should be short plain English.
-Confidence must be between 0 and 1. The next focus should be a short thing
-worth checking next, or empty.
+Movement must be one of: forward, left, right, up, down, stop, hover.
+Confidence must be between 0 and 1. Choose a short next visual focus or leave
+it empty.
 """.strip()
         data = self.client.chat(
             self.model,
