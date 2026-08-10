@@ -196,7 +196,7 @@ class MacMind:
 
     @property
     def awaiting_focus_answer(self) -> bool:
-        """Return whether a dialogue-requested visual answer is pending."""
+        """Return whether a one-shot visual answer is pending."""
 
         with self._lock:
             return bool(self.memory.requested_focus)
@@ -284,6 +284,7 @@ class MacMind:
             intent_changed = intent != information.intent
             focus = decision.focus.strip() if isinstance(decision.focus, str) else ""
             requested_focus = parse_focus(information.dialogue or "")
+            dialogue_intent = parse_intent(information.dialogue or "")
             if requested_focus:
                 focus = requested_focus
             elif intent_changed and not focus:
@@ -370,9 +371,9 @@ class MacMind:
                 self._invalidate_visual_context()
             self.memory.focus = decision.focus
             self.memory.summary = decision.summary
-            if requested_focus:
+            if requested_focus and dialogue_intent is None:
                 self.memory.requested_focus = requested_focus
-            elif information.dialogue and parse_intent(information.dialogue):
+            elif dialogue_intent:
                 self.memory.requested_focus = ""
             elif (
                 self.memory.requested_focus == pending_focus
