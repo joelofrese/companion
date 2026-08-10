@@ -89,6 +89,8 @@ class Ros2SafetyBridge:
 
         if self._thread is not None:
             return
+        self._stop.clear()
+        self._error = None
         self._service.start()
         self._thread = threading.Thread(target=self._run, name="cm5-safety", daemon=True)
         self._thread.start()
