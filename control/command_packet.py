@@ -1,4 +1,4 @@
-"""Encode the small Mac-to-CM5 UDP contract."""
+"""Encode the small brain-to-CM5 UDP contract."""
 
 import json
 import math
@@ -84,7 +84,7 @@ class CommandPacket:
 
 @dataclass(frozen=True)
 class TelemetryPacket:
-    """Return the newest CM5 sensor and body velocity readings to the Mac."""
+    """Return the newest CM5 sensor and body velocity readings to the brain."""
 
     sequence: int
     obstacle_distance_m: Optional[float]

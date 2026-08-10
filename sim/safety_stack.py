@@ -1,4 +1,4 @@
-"""Start the simulated Mac-to-CM5 safety path."""
+"""Start the simulated brain-to-CM5 safety path."""
 
 import asyncio
 from typing import Callable, Optional
@@ -36,7 +36,7 @@ class SimulatedSafetyStack:
         self.sender = None
 
     def start(self):
-        """Start CM5 safety and return the Mac command sender."""
+        """Start CM5 safety and return the brain command sender."""
 
         service = SafetyCommandService(
             self.receiver,

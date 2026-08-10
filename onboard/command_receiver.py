@@ -1,4 +1,4 @@
-"""Receive Mac commands and apply CM5 safety checks."""
+"""Receive brain commands and apply CM5 safety checks."""
 
 import math
 import socket
@@ -20,7 +20,7 @@ def _finite_or_none(value):
 
 
 class UdpSafetyReceiver:
-    """Read Mac packets and return only safe commands."""
+    """Read brain packets and return only safe commands."""
 
     def __init__(
         self,
@@ -84,7 +84,7 @@ class UdpSafetyReceiver:
         right_velocity_m_s: Optional[float] = None,
         down_velocity_m_s: Optional[float] = None,
     ):
-        """Return the latest sensor and vehicle readings to the Mac."""
+        """Return the latest sensor and vehicle readings to the brain."""
 
         if self._socket is None or self._client_address is None:
             return

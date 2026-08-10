@@ -1,4 +1,4 @@
-"""Run Gemini Robotics ER as one streaming Mac brain."""
+"""Run Gemini Robotics ER as the companion's streaming brain."""
 
 import asyncio
 from collections import deque
@@ -61,6 +61,7 @@ class GeminiRuntime:
         self.turn_count = 0
         self.video_frame_count = 0
         self._response_parts = []
+        self._memory_sent = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -165,6 +166,9 @@ class GeminiRuntime:
                 response_modalities=["TEXT"],
                 tools=_tools(),
                 system_instruction=_system_instruction(),
+                context_window_compression=types.ContextWindowCompressionConfig(
+                    sliding_window=types.SlidingWindow()
+                ),
             )
             async with client.aio.live.connect(
                 model=self.model,
@@ -236,7 +240,11 @@ class GeminiRuntime:
             await session.send_realtime_input(text=self._heartbeat_text(dialogue))
 
     def _heartbeat_text(self, dialogue: str) -> str:
-        memory = self.memory_store.context() if self.memory_store is not None else ""
+        memory = ""
+        if not self._memory_sent:
+            self._memory_sent = True
+            if self.memory_store is not None:
+                memory = self.memory_store.context()
         state = (
             f"[HEARTBEAT] Goal: {self.intent}\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
@@ -284,6 +292,10 @@ class GeminiRuntime:
                     )
                 async with self._send_lock:
                     await session.send_tool_response(function_responses=responses)
+            if message.tool_call_cancellation is not None:
+                self._movement = "stop"
+                self._movement_until_s = 0.0
+                self._record("Gemini cancelled the current action.")
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":
@@ -324,16 +336,11 @@ class GeminiRuntime:
         self._movement_until_s = time.monotonic() + duration_s
         self._movement_blocked = False
         self._record(f"Chose to move {direction} for {duration_s:.1f} seconds.")
-        try:
-            await asyncio.wait_for(self._closed.wait(), timeout=duration_s)
-            return {"status": "cancelled"}
-        except asyncio.TimeoutError:
-            pass
-        finally:
-            self._movement = "stop"
-            self._movement_until_s = 0.0
-        status = "stopped by local safety" if self._movement_blocked else "completed"
-        return {"status": status, "telemetry": _telemetry_text(self._telemetry)}
+        return {
+            "status": "accepted",
+            "expires_in_s": duration_s,
+            "telemetry": _telemetry_text(self._telemetry),
+        }
 
     def _record(self, text: str, dialogue: str = ""):
         text = " ".join(str(text).split())
@@ -368,13 +375,13 @@ class GeminiRuntime:
 
 
 def _tools():
-    """Return the complete, bounded body exposed to Gemini."""
+    """Return the high-level actions exposed to Gemini."""
 
     return [{"function_declarations": [
         {
             "name": "move",
             "description": "Move slowly in one body direction for a short time.",
-            "behavior": "BLOCKING",
+            "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -393,13 +400,13 @@ def _tools():
         {
             "name": "hover",
             "description": "Stop horizontal motion and hold position.",
-            "behavior": "BLOCKING",
+            "behavior": "NON_BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
         },
         {
             "name": "speak",
             "description": "Say one short message to the nearby user.",
-            "behavior": "BLOCKING",
+            "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {"message": {"type": "STRING"}},
@@ -415,8 +422,8 @@ def _system_instruction() -> str:
     return (
         "You are the high-level brain of an indoor companion drone. Observe the "
         "latest camera image, user dialogue, goal, and telemetry. Think broadly, "
-        "but move slowly and deliberately. You can only request brief forward or "
-        "lateral translation; another computer checks every action and may stop it. "
+        "but move slowly and deliberately. You can request brief forward or "
+        "lateral translation; the CM5 checks every action and may stop it. "
         "Never request altitude, heading, motors, attitude, position, or a long "
         "move. Use hover whenever the scene or telemetry is unclear. Describe "
         "important observations briefly and speak when a user needs an answer."

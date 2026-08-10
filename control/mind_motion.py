@@ -1,4 +1,4 @@
-"""Turn VLM movement suggestions into slow Mac commands."""
+"""Turn VLM movement suggestions into slow body commands."""
 
 import math
 from numbers import Real

@@ -1,4 +1,4 @@
-"""Run the Mac-side companion brain."""
+"""Run the companion brain beside the CM5 safety bridge."""
 
 import argparse
 import asyncio
@@ -8,6 +8,7 @@ from control.memory import CompanionMemory
 from control.dialogue import DialogueInput
 from control.udp_control import UdpControlService
 from control.udp_sender import UdpCommandSender
+from onboard.video_sender import GStreamerH264Sender
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
@@ -15,8 +16,18 @@ DEFAULT_INTENT = "explore the surroundings"
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="Run the Mac-side Companion control stack")
-    parser.add_argument("cm5_host", help="CM5 IP address or hostname")
+    parser = argparse.ArgumentParser(description="Run the Companion control stack")
+    parser.add_argument(
+        "cm5_host",
+        nargs="?",
+        default="127.0.0.1",
+        help="CM5 IP address or hostname (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="run the brain and camera on the CM5 beside its safety bridge",
+    )
     parser.add_argument(
         "--intent",
         default=DEFAULT_INTENT,
@@ -81,6 +92,11 @@ async def run(args):
     )
     receiver = GStreamerH264Receiver(video_config)
     frame_reader = AsyncLatestFrameReader(receiver)
+    camera_sender = (
+        GStreamerH264Sender("127.0.0.1", video_config)
+        if args.local
+        else None
+    )
     memory = CompanionMemory(args.memory)
     use_gemini = not args.ollama
     if use_gemini:
@@ -93,7 +109,7 @@ async def run(args):
         )
         await control.start()
     else:
-        from control.mind import MacMind
+        from control.mind import CompanionMind
         from control.mind_runtime import MindRuntime
         from control.ollama_brain import OllamaLanguageModel, OllamaVisionModel
         from control.ollama_client import OllamaClient
@@ -102,14 +118,15 @@ async def run(args):
         await asyncio.to_thread(client.check)
         await asyncio.to_thread(client.preload, args.vlm_model)
         await asyncio.to_thread(client.preload, args.llm_model)
-        brain = MacMind(
+        brain = CompanionMind(
             OllamaVisionModel(client, args.vlm_model),
             OllamaLanguageModel(client, args.llm_model),
             memory=memory,
         )
         brain.set_intent(args.intent)
         control = MindRuntime(brain)
-    sender = UdpCommandSender(args.cm5_host, args.command_port)
+    body_host = "127.0.0.1" if args.local else args.cm5_host
+    sender = UdpCommandSender(body_host, args.command_port)
     service = UdpControlService(
         control,
         sender,
@@ -146,6 +163,8 @@ async def run(args):
         )
     try:
         receiver.start()
+        if camera_sender is not None:
+            camera_sender.start()
         model_name = (
             f"Gemini={args.gemini_model}"
             if use_gemini
@@ -153,7 +172,7 @@ async def run(args):
         )
         print(
             f"Companion ready: video :{video_config.port}, "
-            f"commands {args.cm5_host}:{args.command_port}, intent={args.intent}, "
+            f"commands {body_host}:{args.command_port}, intent={args.intent}, "
             f"{model_name}."
         )
         if args.dialogue:
@@ -161,6 +180,8 @@ async def run(args):
         await service.run(stop_event)
     finally:
         receiver.close()
+        if camera_sender is not None:
+            camera_sender.close()
         mind_stop.set()
         if mind_task is not None:
             await mind_task

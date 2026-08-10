@@ -1,4 +1,4 @@
-"""Use local Ollama models for the Mac brain."""
+"""Use local Ollama models for the companion brain."""
 
 import base64
 from io import BytesIO

@@ -1,4 +1,4 @@
-"""Verify the Mac-to-CM5 command link over local UDP."""
+"""Verify the brain-to-CM5 command link over local UDP."""
 
 import asyncio
 import math
@@ -14,7 +14,7 @@ from onboard.command_service import SafetyCommandService
 
 
 class FixedCommandControl:
-    """Provide one normal Mac command for the transport loopback."""
+    """Provide one normal brain command for the transport loopback."""
 
     def __init__(self):
         self.obstacle_distances = []
@@ -40,7 +40,7 @@ async def run():
     receiver = UdpSafetyReceiver(bind_host="127.0.0.1", port=0)
     forwarder = RecordingForwarder()
     cm5_stop_event = asyncio.Event()
-    mac_stop_event = asyncio.Event()
+    brain_stop_event = asyncio.Event()
     frame_count = 0
     cm5_started_at = None
     obstacle_cleared = False
@@ -61,7 +61,7 @@ async def run():
         frame_count += 1
         await asyncio.sleep(0.05)
         if frame_count >= 3:
-            mac_stop_event.set()
+            brain_stop_event.set()
         return time.monotonic(), None
 
     cm5_service = SafetyCommandService(
@@ -71,7 +71,7 @@ async def run():
         velocity_provider=cm5_velocity,
     )
     cm5_task = None
-    mac_task = None
+    brain_task = None
     sender = None
     reconnect_sender = None
     control = FixedCommandControl()
@@ -80,29 +80,29 @@ async def run():
         cm5_started_at = time.monotonic()
         cm5_task = asyncio.create_task(cm5_service.run(cm5_stop_event))
         sender = UdpCommandSender("127.0.0.1", receiver.port)
-        mac_task = asyncio.create_task(
+        brain_task = asyncio.create_task(
             UdpControlService(
                 control,
                 sender,
                 frame_reader,
                 telemetry_provider=sender.telemetry,
                 tick_period_s=0.01,
-            ).run(mac_stop_event)
+            ).run(brain_stop_event)
         )
-        await mac_task
+        await brain_task
         await asyncio.sleep(0.05)
         commands = []
         while not forwarder.commands.empty():
             commands.append(forwarder.commands.get_nowait())
         if VelocityCommand(forward_m_s=0.25) not in commands:
             raise RuntimeError(
-                "Mac control service did not produce a fresh follow command: "
+                "Brain control service did not produce a fresh follow command: "
                 f"{commands}"
             )
         if VelocityCommand() not in commands:
             raise RuntimeError("CM5 did not stop when obstacle data was missing")
         if VelocityCommand(forward_m_s=-0.2) not in commands:
-            raise RuntimeError(f"Mac control service did not produce obstacle backoff: {commands}")
+            raise RuntimeError(f"Brain control service did not produce obstacle backoff: {commands}")
         if not any(
             distance is not None
             and not (isinstance(distance, float) and math.isnan(distance))
@@ -110,7 +110,7 @@ async def run():
             for distance in control.obstacle_distances
         ):
             raise RuntimeError(
-                f"Mac did not receive a clear CM5 distance: {control.obstacle_distances}"
+                f"Brain did not receive a clear CM5 distance: {control.obstacle_distances}"
             )
         if not any(
             distance is not None
@@ -119,7 +119,7 @@ async def run():
             for distance in control.obstacle_distances
         ):
             raise RuntimeError(
-                f"Mac did not receive the CM5 obstacle distance: {control.obstacle_distances}"
+                f"Brain did not receive the CM5 obstacle distance: {control.obstacle_distances}"
             )
         telemetry = sender.telemetry()
         if (
@@ -127,7 +127,7 @@ async def run():
             or telemetry.right_velocity_m_s != -0.04
             or telemetry.down_velocity_m_s != 0.03
         ):
-            raise RuntimeError(f"Mac did not receive CM5 velocity telemetry: {telemetry}")
+            raise RuntimeError(f"Brain did not receive CM5 velocity telemetry: {telemetry}")
         obstacle_cleared = True
         await asyncio.sleep(0.2)
         while not forwarder.commands.empty():
@@ -140,10 +140,10 @@ async def run():
             reconnect_commands.append(forwarder.commands.get_nowait())
         if VelocityCommand(forward_m_s=0.25) not in reconnect_commands:
             raise RuntimeError(
-                "a restarted Mac sender did not reconnect through CM5 safety: "
+                "a restarted brain sender did not reconnect through CM5 safety: "
                 f"{reconnect_commands}"
             )
-        print("Mac sender restart=verified.")
+        print("Brain sender restart=verified.")
         while not forwarder.commands.empty():
             forwarder.commands.get_nowait()
         cm5_stop_event.set()
@@ -166,7 +166,7 @@ async def run():
             or restarted_telemetry.down_velocity_m_s != 0.03
         ):
             raise RuntimeError(
-                "Mac did not receive fresh telemetry after CM5 restart: "
+                "Brain did not receive fresh telemetry after CM5 restart: "
                 f"{restarted_telemetry}"
             )
         print("CM5 restart=verified.")
@@ -178,7 +178,7 @@ async def run():
         if shutdown_command != VelocityCommand():
             raise RuntimeError("command service did not send zero on shutdown")
         print(
-            "Mac control service=verified; CM5 telemetry=verified; "
+            "Brain control service=verified; CM5 telemetry=verified; "
             "velocity telemetry=verified; missing sensor=zero; "
             "obstacle command=verified; shutdown=zero"
         )
@@ -187,9 +187,9 @@ async def run():
             sender.close()
         if reconnect_sender is not None:
             reconnect_sender.close()
-        if mac_task is not None and not mac_task.done():
-            mac_stop_event.set()
-            await mac_task
+        if brain_task is not None and not brain_task.done():
+            brain_stop_event.set()
+            await brain_task
         if cm5_task is not None and not cm5_task.done():
             cm5_stop_event.set()
             await cm5_task

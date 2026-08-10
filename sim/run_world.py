@@ -495,7 +495,7 @@ def main(argv=None):
     parser.add_argument(
         "--camera",
         action="store_true",
-        help="use Gazebo's x500_mono_cam and feed its rendered frames to the Mac brain",
+        help="use Gazebo's x500_mono_cam and feed its rendered frames to the brain",
     )
     parser.add_argument(
         "--depth",

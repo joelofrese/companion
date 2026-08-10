@@ -1,4 +1,4 @@
-"""Send the CM5 camera to the Mac."""
+"""Send the CM5 camera to the companion brain."""
 
 import argparse
 import subprocess
@@ -53,7 +53,7 @@ class GStreamerH264Sender:
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Stream the CM5 camera to the Mac over RTP/H.264")
+    parser = argparse.ArgumentParser(description="Stream the CM5 camera over RTP/H.264")
     parser.add_argument("destination_host")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--width", type=int, default=640)

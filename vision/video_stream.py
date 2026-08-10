@@ -1,4 +1,4 @@
-"""Receive the drone's H.264 video stream on the Mac."""
+"""Receive the drone's H.264 video stream."""
 
 import asyncio
 import subprocess

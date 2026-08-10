@@ -13,7 +13,7 @@ from onboard.safety import LatestDistanceSensor, LatestVelocity
 class Ros2SafetyBridge:
     """Connect ROS messages to the CM5 safety service.
 
-    The ROS objects are passed in so this Mac package does not need ROS 2.
+    The ROS objects are passed in so the control package does not need ROS 2.
     """
 
     def __init__(

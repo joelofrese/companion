@@ -15,7 +15,7 @@ from mavsdk import System
 from mavsdk.offboard import OffboardError
 
 from control.memory import CompanionMemory
-from control.mind import MacMind
+from control.mind import CompanionMind
 from control.dialogue import DialogueInput
 from control.mind_runtime import (
     MAX_FRAME_GAP_S,
@@ -287,7 +287,7 @@ async def run(
                 visual_model = OllamaVisionModel(ollama_client, vlm_model)
                 language_model = OllamaLanguageModel(ollama_client, llm_model)
             control = MindRuntime(
-                MacMind(visual_model, language_model, memory=memory_store)
+                CompanionMind(visual_model, language_model, memory=memory_store)
             )
 
         camera_frames = 0
@@ -517,12 +517,12 @@ async def run(
             if THIRD_FOLLOW_START_S <= elapsed_s < THIRD_FOLLOW_END_S:
                 return "intent changed to following again"
             if step.brain_shutdown:
-                return "Mac brain shutdown; holding zero"
+                return "Brain shutdown; holding zero"
             if elapsed_s >= HOVER_START_S:
                 return "intent changed to hover"
             return None
 
-        def trace_brain(elapsed_s, step, mac_command):
+        def trace_brain(elapsed_s, step, brain_command):
             nonlocal last_traced_observation, last_traced_decision
             nonlocal last_observation_signature, last_decision_signature
             nonlocal last_traced_command
@@ -604,7 +604,7 @@ async def run(
                 reason = "CM5 obstacle protection"
             elif step.command_override is not None:
                 reason = "CM5 rejected the injected invalid command"
-            elif mac_command == VelocityCommand():
+            elif brain_command == VelocityCommand():
                 decision = control.latest_decision
                 observation = control.latest_observation
                 if decision is not None and parse_intent(decision.intent) == "hover":
@@ -642,18 +642,18 @@ async def run(
                 elif observation.movement in ("stop", "hover"):
                     reason = f"VLM suggested {observation.movement}"
                 else:
-                    reason = "Mac timing or intent refresh held zero"
+                    reason = "Brain timing or intent refresh held zero"
             else:
-                reason = "Mac suggested movement"
+                reason = "Brain suggested movement"
             last_forwarded = (
                 safe_commands.commands[-1][1]
                 if safe_commands.commands
                 else None
             )
-            command_state = (mac_command, last_forwarded, reason)
+            command_state = (brain_command, last_forwarded, reason)
             if command_state != last_traced_command:
                 print(
-                    f"[CMD {elapsed_s:5.1f}s] mac={mac_command}; "
+                    f"[CMD {elapsed_s:5.1f}s] brain={brain_command}; "
                     f"cm5-last={last_forwarded or 'pending'}; reason={reason}",
                     flush=True,
                 )
@@ -670,9 +670,9 @@ async def run(
                     print(event.capitalize() + ".")
                     reported.add(event)
                 if not exploratory and CONTROL_PAUSE_START_S <= elapsed < CONTROL_PAUSE_END_S:
-                    if "Mac control pause" not in reported:
-                        print("Mac control pause; CM5 timeout holds zero.")
-                        reported.add("Mac control pause")
+                    if "Brain control pause" not in reported:
+                        print("Brain control pause; CM5 timeout holds zero.")
+                        reported.add("Brain control pause")
                     await asyncio.sleep(CONTROL_PAUSE_END_S - elapsed)
                     now = time.monotonic()
                     step = read_step(now - started_at)
@@ -725,16 +725,16 @@ async def run(
 
         decision = control.latest_decision
         if decision is None:
-            raise RuntimeError("SITL did not observe a conscious Mac decision")
+            raise RuntimeError("SITL did not observe a conscious brain decision")
         if not decision.summary:
             raise RuntimeError("SITL did not retain a conscious visual summary")
         if control.observation_count == 0:
-            raise RuntimeError("SITL did not complete a Mac VLM observation")
+            raise RuntimeError("SITL did not complete a visual observation")
         if control.decision_count == 0:
             raise RuntimeError("SITL did not complete a conscious thought")
         if not velocity_telemetry_seen:
-            raise RuntimeError("SITL did not feed CM5 velocity telemetry to the Mac brain")
-        print("Mac velocity telemetry=verified.")
+            raise RuntimeError("SITL did not feed CM5 velocity telemetry to the brain")
+        print("Brain velocity telemetry=verified.")
         if initial_yaw_deg is None:
             raise RuntimeError("SITL did not provide heading telemetry")
         if max_heading_change_deg > MAX_HEADING_CHANGE_DEG:
@@ -781,12 +781,12 @@ async def run(
                 f"{requested_focus} ({'answered' if requested_focus_answered else 'active'})."
             )
         print(
-            "Conscious Mac decision=verified: "
+            "Conscious brain decision=verified: "
             f"intent={decision.intent}, focus={decision.focus or 'none'}."
         )
         print("Conscious visual memory=verified.")
-        print("Mac visual observation=verified.")
-        print(f"Mac VLM observations=verified ({control.observation_count}).")
+        print("Brain visual observation=verified.")
+        print(f"Brain visual observations=verified ({control.observation_count}).")
         print(f"Conscious thoughts=verified ({control.decision_count}).")
         if ollama:
             print(
@@ -914,13 +914,13 @@ async def run(
                 CONTROL_PAUSE_START_S,
                 CONTROL_PAUSE_END_S + 0.1,
                 lambda command: command == VelocityCommand(),
-                "Mac heartbeat pause fail-safe",
+                "Brain heartbeat pause fail-safe",
             ),
             (
                 CONTROL_PAUSE_END_S + 0.1,
                 TARGET_RIGHT_END_S,
                 lambda command: command.right_m_s > 0.0,
-                "Mac heartbeat recovery",
+                "Brain heartbeat recovery",
             ),
             (
                 2.1,
@@ -1087,8 +1087,8 @@ async def run(
                 PROFILE_DURATION_S,
                 lambda command: command == VelocityCommand(),
             ):
-                raise RuntimeError("SITL did not observe zero after Mac brain shutdown")
-            print("Mac brain shutdown fail-safe=verified.")
+                raise RuntimeError("SITL did not observe zero after brain shutdown")
+            print("Brain shutdown fail-safe=verified.")
             if max_forward_velocity <= 0.02:
                 raise RuntimeError(
                     "SITL did not observe forward following: "

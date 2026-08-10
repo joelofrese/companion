@@ -10,7 +10,7 @@ import time
 from mavsdk import System
 
 from control.command_packet import CommandPacket
-from control.mind import MacMind
+from control.mind import CompanionMind
 from control.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
 from control.velocity import VelocityCommand, ned_to_body
@@ -70,12 +70,12 @@ async def run(image_path: str, expect_person: bool = False):
     sender = None
     drone = System()
     control = None
-    mac_task = None
+    brain_task = None
     mind_task = None
     telemetry_task = None
     attitude_task = None
     offboard_task = None
-    mac_stop = asyncio.Event()
+    brain_stop = asyncio.Event()
     mind_stop = asyncio.Event()
     distance_sensor = LatestDistanceSensor()
     flight_started_at = None
@@ -193,11 +193,11 @@ async def run(image_path: str, expect_person: bool = False):
             def close(self):
                 sender.close()
 
-        mac_sender = ScenarioSender()
+        brain_sender = ScenarioSender()
 
         visual_model = FixedVisualModel(expect_person)
         control = MindRuntime(
-            MacMind(
+            CompanionMind(
                 visual_model,
                 FixedLanguageModel(),
             )
@@ -250,15 +250,15 @@ async def run(image_path: str, expect_person: bool = False):
                 frames_received += 1
             return sample
 
-        mac_service = UdpControlService(
+        brain_service = UdpControlService(
             control,
-            mac_sender,
+            brain_sender,
             read_frame,
             intent_provider=current_intent,
             telemetry_provider=brain_telemetry,
             tick_period_s=SETPOINT_PERIOD_S,
         )
-        mac_task = asyncio.create_task(mac_service.run(mac_stop))
+        brain_task = asyncio.create_task(brain_service.run(brain_stop))
         deadline = time.monotonic() + 5.0
         while len(safe_commands.commands) < 3 and time.monotonic() < deadline:
             await asyncio.sleep(SETPOINT_PERIOD_S)
@@ -269,7 +269,7 @@ async def run(image_path: str, expect_person: bool = False):
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
         flight_started_at = time.monotonic()
-        print("Offboard started through full Mac/CM5 stack.")
+        print("Offboard started through full brain/CM5 stack.")
 
         async def observe_velocity():
             nonlocal max_forward_velocity, min_forward_velocity
@@ -293,25 +293,25 @@ async def run(image_path: str, expect_person: bool = False):
         telemetry_task = asyncio.create_task(observe_velocity())
         await asyncio.sleep(PROFILE_DURATION_S + 2.0)
         await asyncio.wait_for(offboard_task, timeout=5.0)
-        print("Offboard telemetry=verified through full Mac/CM5 stack.")
+        print("Offboard telemetry=verified through full brain/CM5 stack.")
         if control.latest_decision is None:
-            raise RuntimeError("full stack did not observe a conscious Mac decision")
+            raise RuntimeError("full stack did not observe a conscious brain decision")
         if control.latest_observation is None:
-            raise RuntimeError("full stack did not observe a Mac visual observation")
+            raise RuntimeError("full stack did not observe a visual observation")
         if not control.latest_decision.summary:
             raise RuntimeError("full stack did not retain a conscious visual summary")
         if not velocity_telemetry_seen:
-            raise RuntimeError("full stack did not feed CM5 velocity telemetry to the Mac brain")
-        print("Conscious Mac decision=verified through full Mac/CM5 stack.")
-        print("Mac velocity telemetry=verified through full Mac/CM5 stack.")
-        print("Conscious visual memory=verified through full Mac/CM5 stack.")
-        print("Mac visual observation=verified through full Mac/CM5 stack.")
+            raise RuntimeError("full stack did not feed CM5 velocity telemetry to the brain")
+        print("Conscious brain decision=verified through full brain/CM5 stack.")
+        print("Brain velocity telemetry=verified through full brain/CM5 stack.")
+        print("Conscious visual memory=verified through full brain/CM5 stack.")
+        print("Brain visual observation=verified through full brain/CM5 stack.")
         try:
-            await asyncio.wait_for(mac_task, timeout=2.0)
+            await asyncio.wait_for(brain_task, timeout=2.0)
         except RuntimeError as error:
             if str(error) != "video stream stalled before control shutdown":
                 raise
-            print("Video stall=verified; Mac sent zero and stopped.")
+            print("Video stall=verified; brain sent zero and stopped.")
         except asyncio.TimeoutError:
             raise RuntimeError("full stack did not observe the video-stall shutdown")
         else:
@@ -467,7 +467,7 @@ async def run(image_path: str, expect_person: bool = False):
                 f"{max_heading_change_deg:.1f} degrees"
             )
         print(
-            "PX4 heading hold=verified through full Mac/CM5 stack: "
+            "PX4 heading hold=verified through full brain/CM5 stack: "
             f"maximum change {max_heading_change_deg:.1f} degrees."
         )
         print(f"Max observed forward velocity: {max_forward_velocity:.2f}m/s")
@@ -481,7 +481,7 @@ async def run(image_path: str, expect_person: bool = False):
         await land(drone)
         landed = True
     finally:
-        await _stop_task(mac_task, mac_stop)
+        await _stop_task(brain_task, brain_stop)
         if stack is not None:
             try:
                 await stack.stop()

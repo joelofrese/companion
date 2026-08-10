@@ -44,7 +44,7 @@ VISUAL_FAILURE_START_S = 12.2
 VISUAL_FAILURE_END_S = 12.6
 CONSCIOUS_FAILURE_START_S = 24.2
 # Leave time for the independent conscious loop to observe the fault and make
-# the Mac command go to zero before recovery is allowed.
+# the brain command goes to zero before recovery is allowed.
 CONSCIOUS_FAILURE_END_S = 25.0
 MALFORMED_CONSCIOUS_START_S = 26.0
 MALFORMED_CONSCIOUS_END_S = 26.6
@@ -122,7 +122,7 @@ class SyntheticWorld:
 
 
 class WorldVisualModel:
-    """Provide fixed scene descriptions to the Mac VLM boundary."""
+    """Provide fixed scene descriptions to the visual boundary."""
 
     def __init__(
         self,

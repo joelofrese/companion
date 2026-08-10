@@ -1,4 +1,4 @@
-"""The Mac's subconscious and conscious brain."""
+"""The companion's subconscious and conscious brain."""
 
 from collections import deque
 from dataclasses import dataclass
@@ -142,7 +142,7 @@ class LanguageModel(Protocol):
         ...
 
 
-class MacMind:
+class CompanionMind:
     """Connect a VLM subconscious to a conscious language model."""
 
     def __init__(

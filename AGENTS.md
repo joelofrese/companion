@@ -33,22 +33,22 @@ merge and delete it.
 
 ## Control flow
 
-- The Mac brain uses images, dialogue, telemetry, and memory to choose intent
-  and cautious movement.
+- The companion brain uses images, dialogue, telemetry, and memory to choose
+  intent and cautious movement.
 - Local mode runs a subconscious VLM and conscious LLM in separate sessions.
-- Gemini ER 2 Streaming is the simulation candidate for one persistent Mac
-  brain.
+- Gemini ER 2 Streaming is the default persistent brain for hardware and
+  simulation.
 - The visual model describes images and suggests cautious movement.
 - When forward is blocked, the VLM may suggest a visible lateral alternate;
-  Mac uses it only after the TOF stop clears.
+  the brain uses it only after the TOF stop clears.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
 - A follow goal passes its subject to the VLM as visual focus.
-- Mac control turns that intent and visual suggestion into slow forward or
+- The brain turns that intent and visual suggestion into slow forward or
   lateral body-frame velocity; flight lifecycle owns altitude.
 - A real intent change invalidates old visual context and pending brain
   results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
-- When the LLM leaves a recognized request unanswered, Mac gives a short
+- When the LLM leaves a recognized request unanswered, the brain gives a short
   acknowledgement, then reports the first confirmed focused answer.
 - A confirmed one-shot visual request holds motion until it is reported.
 - Negative movement requests become hover before model interpretation.
@@ -63,15 +63,17 @@ may override normal intent. Keep movement slow, deliberate, and easy to stop.
 
 ## Hardware boundary
 
-Heavy perception, cognition, and interaction run on the Mac. The CM5 relays
-video and telemetry, performs the final safety checks, and forwards approved
-body-frame velocity setpoints to PX4, converting them with fresh vehicle
-heading. Keep hardware-specific code on the CM5 so Mac behavior stays easy to
-simulate.
+The CM5 runs the camera, Gemini connection, companion brain, final safety
+checks, and PX4 forwarding. It sends only approved body-frame velocity
+setpoints to PX4, converting them with fresh vehicle heading. A Mac remains
+useful for Gazebo, development, and optional remote operation, but is not
+needed during flight.
 
-The Ollama client handles local-model transport; `control/ollama_brain.py`
-handles its prompts and response cleanup. `control/gemini_brain.py` keeps the
-Gemini session and its small movement, hover, and speech tools on the Mac.
+The Ollama client handles the explicit local-model fallback;
+`control/ollama_brain.py` handles its prompts and response cleanup.
+`control/gemini_brain.py` keeps the Gemini session and its movement, hover, and
+speech tools. Run `control.companion --local` on the CM5 beside
+`onboard.ros2_bridge` to use the hardware camera and localhost safety link.
 
 The target is the DroneBlocks DEXI 3: PX4, optical flow, a TOF distance sensor,
 a Raspberry Pi camera, and a Raspberry Pi CM5. It has no lidar. Keep
@@ -120,7 +122,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 world checks motion, target loss, obstacles, visual detour recovery, invalid
 and stale sensors, command faults, recovery, hover, shutdown, landing, and
 disarm. The RTP image
-scenario checks decoded video, deterministic person/non-person fixtures, Mac
+scenario checks decoded video, deterministic person/non-person fixtures, brain
 commands, CM5 safety, PX4, landing, and disarm. `--expect-person` selects the
 person fixture; without it the fixture stays stopped. The image still travels
 through the complete RTP path. Real visual perception is checked through the
@@ -154,7 +156,7 @@ range reading, so they check visual behavior and bounded flight, not obstacle
 clearance. Every non-default exploratory world requires `--camera` or
 `--depth`; this prevents blind motion in collidable worlds.
 
-`--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the Mac and
+`--depth` uses PX4's stock `x500_depth` model. Its RGB frames feed the brain and
 its depth readings feed CM5 safety. This is only a simulation approximation of
 DEXI 3's forward TOF sensor, not a claim that DEXI 3 has a depth camera. Use
 `--intent following` and `--pose x,y,z,roll,pitch,yaw` to start near an
@@ -174,20 +176,25 @@ ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip>
 .venv/bin/python -m control.companion <cm5-ip> --dialogue
 .venv/bin/python -m control.companion <cm5-ip> --ollama
+
+# On the CM5, with onboard.ros2_bridge already running:
+.venv/bin/python -m control.companion --local --dialogue
 ```
 
-Production defaults to one Gemini Robotics ER 2 Streaming session. It starts
-with `explore the surroundings` unless `--intent` supplies another goal. Use
+Production defaults to one Gemini Robotics ER 2 Streaming session on the CM5.
+It starts with `explore the surroundings` unless `--intent` supplies another goal. Use
 `--ollama` for separate local VLM and LLM sessions, defaulting to the faster
 `moondream` for both. Set `--vlm-model` or `--llm-model` to use another local
 model. Use `--dialogue` for typed conversation, `--voice-once` for one spoken
 request, and `--memory` for editable experience memory.
 
-With `GEMINI_API_KEY`, the optional Mac runner uses one persistent Gemini
-Robotics ER 2 Streaming session. Exploratory simulation uses `--gemini`. It
-receives the newest 640-pixel JPEG once per second while model turns run. A
-high-level heartbeat follows each completed turn, never faster than once per
-second. It can only request a brief forward or lateral move, hover, or speech.
+With `GEMINI_API_KEY`, the brain uses one persistent Gemini Robotics ER 2
+Streaming session. Native context-window compression manages the in-flight
+conversation; the editable memory file is only prior experience across runs.
+The session receives the newest 640-pixel JPEG once per second while model
+turns run. Movement and speech tools return without waiting for their duration,
+so the brain can continue receiving video, telemetry, and dialogue. The CM5
+still expires, limits, and overrides every physical command.
 
 ## Current state
 
@@ -195,14 +202,13 @@ second. It can only request a brief forward or lateral move, hover, or speech.
   command path, faults, recovery, safety, landing, and disarm.
 - Exploratory camera and depth worlds exercise open-ended goals, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
-- Gemini ER 2 Streaming is the current Mac production path and the persistent
-  brain for simulation. Local Ollama VLM and LLM sessions remain an explicit
-  fallback. Live depth-world runs verified a focused red-box response, person
-  following, reloadable experience memory, continuous one-frame-per-second
-  video during model turns, bounded motion, the fault schedule, and a
-  two-minute run with safety, landing, and disarm.
-- The Mac sends only slow forward or lateral velocity. CM5 limits commands and
-  uses TOF safety; PX4 stabilizes, lands, and disarms.
+- Gemini ER 2 Streaming is the current production path and persistent brain
+  for simulation and the CM5. It now uses native context compression and
+  non-blocking high-level actions. Local Ollama VLM and LLM sessions remain an
+  explicit fallback. The deterministic mission and local safety loopback pass;
+  the new ER 2 session configuration still needs a live-key Gazebo run.
+- The brain sends only slow forward or lateral velocity. CM5 limits commands
+  and uses TOF safety; PX4 stabilizes, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
   hardware remains unverified. DEXI 3 has no lidar.
 

@@ -1,4 +1,4 @@
-"""Run the Mac brain beside the fixed-rate motion loop."""
+"""Run the companion brain beside the fixed-rate motion loop."""
 
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -6,7 +6,7 @@ from dataclasses import replace
 import time
 from typing import Callable, Optional
 
-from control.mind import ConsciousDecision, MacMind, Telemetry, VisualObservation
+from control.mind import ConsciousDecision, CompanionMind, Telemetry, VisualObservation
 from control.mind_motion import movement_command
 from control.velocity import VelocityCommand
 from voice.intent import parse_intent
@@ -19,11 +19,11 @@ CONSCIOUS_PERIOD_S = 0.5
 
 
 class MindRuntime:
-    """Turn VLM suggestions into safe Mac-side commands."""
+    """Turn VLM suggestions into safe companion commands."""
 
     def __init__(
         self,
-        mind: MacMind,
+        mind: CompanionMind,
     ):
         self.mind = mind
         self._executor = ThreadPoolExecutor(max_workers=1)

@@ -1,4 +1,4 @@
-"""Send Mac control commands to the CM5."""
+"""Send companion commands to the CM5 safety bridge."""
 
 import asyncio
 import math

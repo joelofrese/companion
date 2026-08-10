@@ -1,4 +1,4 @@
-"""faster-whisper voice transcription for the Mac."""
+"""faster-whisper voice transcription for the companion."""
 
 
 class WhisperTranscriber:

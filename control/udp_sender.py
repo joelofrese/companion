@@ -1,4 +1,4 @@
-"""Send commands and receive CM5 distance telemetry."""
+"""Send brain commands and receive CM5 telemetry."""
 
 import math
 import socket
@@ -31,7 +31,7 @@ class UdpCommandSender:
             raise ValueError("destination port must be between 1 and 65535")
         self.destination = (destination_host, destination_port)
         self._socket = None
-        # A restarted Mac must be newer than packets the CM5 already accepted.
+        # A restarted brain must be newer than packets the CM5 already accepted.
         self._sequence = time.time_ns()
         self._telemetry_sequence = None
         self._obstacle_distance_m = None
