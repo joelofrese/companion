@@ -149,7 +149,10 @@ class MindRuntime:
                     movement = alternate
             if (
                 self._observation.focused_answer
-                and parse_intent(self.mind.intent) is None
+                and (
+                    self.mind.awaiting_focus_answer
+                    or parse_intent(self.mind.intent) is None
+                )
             ):
                 movement = "stop"
         # A visual suggestion is unsafe without fresh vehicle state.

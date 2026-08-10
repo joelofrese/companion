@@ -194,6 +194,13 @@ class MacMind:
         with self._lock:
             return self.memory.focus
 
+    @property
+    def awaiting_focus_answer(self) -> bool:
+        """Return whether a dialogue-requested visual answer is pending."""
+
+        with self._lock:
+            return bool(self.memory.requested_focus)
+
     def see(
         self,
         image: Any,

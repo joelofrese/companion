@@ -46,6 +46,7 @@ merge and delete it.
 - A recognized dialogue intent stays active until a new open-ended request.
 - When the LLM leaves a recognized request unanswered, Mac gives a short
   acknowledgement, then reports the first confirmed focused answer.
+- A confirmed dialogue-requested answer holds motion until it is reported.
 - Negative movement requests become hover before model interpretation.
 - Low-confidence, stale, malformed, or missing input becomes zero motion.
 - CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
@@ -198,8 +199,8 @@ and `--memory` for editable experience memory.
   observations and `qwen3-vl:2b` completed 7 without improving following, so
   `moondream` remains the default.
 - Focused dialogue now receives one acknowledgement and one confirmed visual
-  result when the model leaves its replies blank; local rendered-world focus
-  and answers are verified.
+  result when the model leaves its replies blank, holding motion until that
+  result is reported; local rendered-world focus and answers are verified.
 - The Mac brain uses slow forward or lateral movement only; takeoff and landing
   own altitude.
 - `--trace` shows observations, decisions, latencies, and command reasons;

@@ -589,7 +589,10 @@ async def run(
                     reason = "VLM confidence is below the movement threshold"
                 elif (
                     observation.focused_answer
-                    and parse_intent(control.mind.intent) is None
+                    and (
+                        control.mind.awaiting_focus_answer
+                        or parse_intent(control.mind.intent) is None
+                    )
                 ):
                     reason = "visual focus confirmed"
                 elif observation.movement in ("stop", "hover"):
