@@ -110,6 +110,9 @@ commands, CM5 safety, PX4, landing, and disarm. `--expect-person` selects the
 person fixture; without it the fixture stays stopped. The image still travels
 through the complete RTP path. Real visual perception is checked through the
 Gazebo camera with Ollama, not this deterministic fixture.
+The deterministic timing, fault, and brain fixtures live in
+`sim/world_fixture.py`; `sim/world.py` owns the PX4/Gazebo lifecycle and
+verification.
 
 `--camera` uses Gazebo's rendered camera as VLM input. Without `--ollama`, it
 checks camera transport through a zero-confidence placeholder and keeps motion
