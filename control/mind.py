@@ -214,6 +214,8 @@ class MacMind:
         intent = intent.strip()
         with self._lock:
             focus = parse_focus(intent)
+            if focus is None and parse_intent(intent) == "following":
+                focus = "person"
             if _same_goal(intent, self.memory.intent) and (
                 not focus or focus == self.memory.focus
             ):
