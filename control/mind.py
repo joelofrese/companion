@@ -295,15 +295,18 @@ class MacMind:
                 summary = information.summary
             if not summary and information.new_observations:
                 summary = information.new_observations[-1].description
+            dialogue_response = (
+                decision.dialogue.strip()
+                if isinstance(decision.dialogue, str)
+                else ""
+            )
+            if not dialogue_response and information.dialogue:
+                dialogue_response = _acknowledgement(intent, requested_focus)
             decision = ConsciousDecision(
                 intent=intent,
                 intent_changed=intent_changed,
                 focus=focus,
-                dialogue=(
-                    decision.dialogue.strip()
-                    if isinstance(decision.dialogue, str)
-                    else ""
-                ),
+                dialogue=dialogue_response,
                 summary=summary,
             )
         except Exception:
@@ -367,3 +370,18 @@ def _same_goal(first: str, second: str) -> bool:
         return first_kind == parse_intent(second)
     first_focus = parse_focus(first)
     return bool(first_focus and first_focus == parse_focus(second))
+
+
+def _acknowledgement(intent: str, focus: Optional[str]) -> str:
+    """Return a short reply when the conscious model leaves dialogue blank."""
+
+    intent_kind = parse_intent(intent)
+    if intent_kind == "following":
+        return "Following."
+    if intent_kind == "hover":
+        return "Hovering."
+    if focus:
+        return f"Looking for {focus}."
+    if intent_kind == "exploring":
+        return "Exploring."
+    return ""
