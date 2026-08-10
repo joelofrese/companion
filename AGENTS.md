@@ -179,14 +179,16 @@ and `--memory` for editable experience memory.
   prompt. A 20-second open-ended run produced six person observations and two
   conscious thoughts but chose zero movement; a current focused red-box run
   produced four confirmed answers and retained focus while also holding zero.
-  A 24-second moving-person run recognized the person in seven observations
-  and kept focus, but lateral position remains model-limited. The slower Qwen
-  and Gemma vision options produced no thought in 20 seconds.
+  A current 20-second focused-follow run produced six person observations,
+  three forward suggestions, and 0.24m/s telemetry while staying bounded;
+  lateral position remains model-limited. The slower Qwen and Gemma vision
+  options produced no thought in 20 seconds.
 - Non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Synthetic open-ended goals can move through clear simulated space. Real
-  open-ended VLM runs hold zero when the scene is unclear. Dialogue can change
-  intent or visual focus; natural requests such as "follow me" focus the
+  open-ended VLM runs may hold zero when the model chooses stop; focused follow
+  can issue slow forward commands when the person is recognized. Dialogue can
+  change intent or visual focus; natural requests such as "follow me" focus the
   person, and an intent such as "inspect the red box" can provide focus when
   the LLM leaves that field empty. Experience memory is editable, persists
   across runs, and records command, velocity, and obstacle outcomes;
