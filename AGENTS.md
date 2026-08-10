@@ -182,7 +182,8 @@ and `--memory` for editable experience memory.
   still holds zero.
 - Non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
-- Open-ended goals can move through clear simulated space. Dialogue can change
+- Synthetic open-ended goals can move through clear simulated space. Real
+  open-ended VLM runs hold zero when the scene is unclear. Dialogue can change
   intent or visual focus; natural requests such as "follow me" focus the
   person, and an intent such as "inspect the red box" can provide focus when
   the LLM leaves that field empty. Experience memory is editable, persists
