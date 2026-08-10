@@ -129,7 +129,7 @@ class MindRuntime:
         if self._observation is not None:
             age_s = self.latest_observation_age_s
             frame_age_s = self.latest_frame_age_s
-            if self._thought_error is None and (
+            observation_fresh = self._thought_error is None and (
                 self._observation_intent == self.mind.intent
                 and self._observation_focus == self.mind.visual_focus
                 and age_s is not None
@@ -137,8 +137,16 @@ class MindRuntime:
                 and frame_age_s is not None
                 and frame_age_s <= MAX_FRAME_GAP_S
                 and self._observation.confidence >= MIN_MOVEMENT_CONFIDENCE
-            ):
+            )
+            if observation_fresh:
                 movement = self._observation.movement
+                alternate = self._observation.alternate_movement
+                if (
+                    alternate in ("left", "right")
+                    and movement in ("forward", "stop")
+                    and parse_intent(self.mind.intent) in ("following", "exploring")
+                ):
+                    movement = alternate
             if (
                 self._observation.focused_answer
                 and parse_intent(self.mind.intent) is None

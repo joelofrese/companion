@@ -515,6 +515,7 @@ async def run(
                     signature = (
                         clean(observation.description),
                         clean(observation.focused_answer),
+                        clean(observation.alternate_movement),
                         clean(observation.next_focus),
                         observation.movement,
                         round(observation.confidence, 2),
@@ -523,8 +524,9 @@ async def run(
                         print(
                             f"[VLM {elapsed_s:5.1f}s] "
                             f"{signature[0]}; answer={signature[1]}; "
-                            f"next-focus={signature[2]}; movement={signature[3]}; "
-                            f"confidence={signature[4]:.2f}; "
+                            f"alternate={signature[2] or 'none'}; "
+                            f"next-focus={signature[3]}; movement={signature[4]}; "
+                            f"confidence={signature[5]:.2f}; "
                             f"latency={control.latest_observation_duration_s:.2f}s",
                             flush=True,
                         )
@@ -876,8 +878,10 @@ async def run(
             (
                 OBSTACLE_END_S,
                 RECOVERY_END_S,
-                lambda command: command.forward_m_s > 0.0,
-                "following recovery after obstacle",
+                lambda command: (
+                    command.forward_m_s > 0.0 or command.right_m_s != 0.0
+                ),
+                "following recovery or detour after obstacle",
             ),
             (
                 INVALID_SENSOR_START_S,

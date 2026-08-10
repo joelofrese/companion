@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from control.mind import ConsciousDecision, Telemetry, VisualObservation
+from control.safety_limits import OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 from sim.offboard_control import (
     SECOND_FOLLOW_END_S,
@@ -188,11 +189,20 @@ class WorldVisualModel:
             and f"no {focus_text}" not in description_text
             else ""
         )
+        alternate_movement = ""
+        if (
+            movement in ("forward", "stop")
+            and telemetry.obstacle_distance_m is not None
+            and math.isfinite(telemetry.obstacle_distance_m)
+            and telemetry.obstacle_distance_m <= OBSTACLE_STOP_M
+        ):
+            alternate_movement = "right"
         return VisualObservation(
             timestamp_s=timestamp_s,
             description=description,
             focused_answer=focused_answer,
             movement=movement,
+            alternate_movement=alternate_movement,
             next_focus=focus or ("person" if following else ""),
             confidence=self.world.vision_confidence(elapsed_s),
         )

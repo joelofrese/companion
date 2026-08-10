@@ -69,6 +69,7 @@ class VisualObservation:
     description: str
     focused_answer: str = ""
     movement: str = "stop"
+    alternate_movement: str = ""
     next_focus: str = ""
     confidence: float = 0.0
 

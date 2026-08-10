@@ -35,6 +35,8 @@ merge and delete it.
 
 - The Mac runs a subconscious VLM and a conscious LLM in separate sessions.
 - The VLM describes images and suggests cautious movement.
+- When forward is blocked, the VLM may suggest a visible lateral alternate;
+  Mac uses it only after the TOF stop clears.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
 - A follow goal passes its subject to the VLM as visual focus.
 - Mac control turns that intent and visual suggestion into slow body-frame

@@ -19,6 +19,7 @@ from control.safety_limits import OBSTACLE_STOP_M
 
 
 MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
+ALTERNATE_MOVEMENTS = frozenset(("left", "right"))
 DESCRIPTION_PLACEHOLDERS = PLACEHOLDER_TEXT | frozenset(
     (
         "current high-level intent",
@@ -54,6 +55,10 @@ VISION_SCHEMA = {
         "description": {"type": "string"},
         "focused_answer": {"type": "string"},
         "movement": {"type": "string", "enum": sorted(MOVEMENTS)},
+        "alternate_movement": {
+            "type": "string",
+            "enum": sorted(ALTERNATE_MOVEMENTS | frozenset(("none",))),
+        },
         "next_focus": {"type": "string"},
         "confidence": {"type": "number"},
     },
@@ -61,6 +66,7 @@ VISION_SCHEMA = {
         "description",
         "focused_answer",
         "movement",
+        "alternate_movement",
         "next_focus",
         "confidence",
     ],
@@ -187,6 +193,8 @@ right movement when a clear path is visible. For following, move toward a
 visible focused subject when the path is clear. If forward TOF is at or below
 {OBSTACLE_STOP_M:.1f}m,
 choose stop. Never move backward.
+Return alternate_movement as left or right only when the forward path is
+blocked and that side is visibly clear; otherwise return none.
 
 Intent: {intent or "none"}
 Visual focus: {focus or "none"}
@@ -210,6 +218,9 @@ it empty.
         movement = _text(data, "movement").lower()
         if movement not in MOVEMENTS:
             movement = "stop"
+        alternate_movement = _text(data, "alternate_movement").lower()
+        if alternate_movement not in ALTERNATE_MOVEMENTS:
+            alternate_movement = ""
         description = _meaningful_text(data, "description")
         next_focus = _meaningful_text(data, "next_focus")
         if next_focus.lower() in FOCUS_PLACEHOLDER_TEXT:
@@ -235,12 +246,14 @@ it empty.
             description = "the scene is unclear"
             focused_answer = ""
             movement = "stop"
+            alternate_movement = ""
             confidence = 0.0
         return VisualObservation(
             timestamp_s=timestamp_s,
             description=description,
             focused_answer=focused_answer,
             movement=movement,
+            alternate_movement=alternate_movement,
             next_focus=next_focus,
             confidence=confidence,
         )
@@ -260,6 +273,7 @@ class OllamaLanguageModel:
                 f"- {observation.description}; "
                 f"focused answer={observation.focused_answer or 'none'}; "
                 f"suggested movement={observation.movement}; "
+                f"alternate={observation.alternate_movement or 'none'}; "
                 f"focus next={observation.next_focus or 'none'}; "
                 f"confidence={observation.confidence}"
             )
