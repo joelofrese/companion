@@ -179,10 +179,11 @@ and `--memory` for editable experience memory.
   prompt. A 20-second open-ended run produced six person observations and two
   conscious thoughts but chose zero movement; a current focused red-box run
   produced four confirmed answers and retained focus while also holding zero.
-  A current 20-second focused-follow run produced six person observations,
-  three forward suggestions, and 0.24m/s telemetry while staying bounded;
-  lateral position remains model-limited. The slower Qwen and Gemma vision
-  options produced no thought in 20 seconds.
+  A current 45-second moving-person follow run produced 13 person observations,
+  repeated bounded forward suggestions, 0.24m/s maximum telemetry, and CM5
+  backoff when the red box reached 0.49m; lateral position remains
+  model-limited. The slower Qwen and Gemma vision options produced no thought
+  in 20 seconds.
 - Non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Synthetic open-ended goals can move through clear simulated space. Real
