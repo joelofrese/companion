@@ -357,6 +357,8 @@ class MacMind:
             summary = decision.summary.strip() if isinstance(decision.summary, str) else ""
             if not summary:
                 summary = information.summary
+            if not summary and information.new_observations:
+                summary = information.new_observations[-1].description
             decision = ConsciousDecision(
                 intent=intent,
                 intent_changed=intent_changed,

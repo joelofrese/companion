@@ -184,6 +184,8 @@ and `--memory` for editable experience memory.
   the LLM leaves that field empty. Experience memory is editable, persists
   across runs, and records command, velocity, and obstacle outcomes;
   exploratory simulation reloads and verifies those records.
+- If the conscious model omits a summary, Mac keeps the latest visual
+  observation as context.
 - Stale, missing, malformed, low-confidence, or failed brain and sensor input
   stops Mac motion. CM5 still rejects unsafe or stale commands and remains the
   final authority.
