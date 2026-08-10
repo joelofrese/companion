@@ -17,6 +17,7 @@ BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
 BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
+OLLAMA_BOOT_TIMEOUT_S = 10.0
 # Keep the PX4 and Gazebo starting headings aligned.
 DEFAULT_MODEL_POSE = "0,0,0,0,0,0"
 
@@ -94,6 +95,56 @@ def _validate_pose(pose: Optional[str]) -> Optional[str]:
     if not all(math.isfinite(value) for value in numbers):
         raise RuntimeError("model pose must contain finite numbers")
     return ",".join(str(value) for value in numbers)
+
+
+def _start_ollama_if_needed():
+    """Return a local Ollama process only when this run had to start it."""
+
+    from control.ollama_client import OllamaClient
+
+    client = OllamaClient(timeout_s=1.0)
+    try:
+        client.check()
+        return None
+    except RuntimeError:
+        pass
+    ollama = shutil.which("ollama")
+    if ollama is None:
+        raise RuntimeError("Ollama is unavailable and `ollama` is not installed")
+    process = subprocess.Popen(
+        [ollama, "serve"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    deadline = time.monotonic() + OLLAMA_BOOT_TIMEOUT_S
+    while process.poll() is None and time.monotonic() < deadline:
+        try:
+            client.check()
+        except RuntimeError:
+            time.sleep(0.1)
+        else:
+            print("Started local Ollama for this simulation.")
+            return process
+    _stop_process(process)
+    raise RuntimeError("Ollama did not become ready")
+
+
+def _stop_ollama(process, *models):
+    """Release models and stop only a server started by this run."""
+
+    if process is None:
+        return
+    from control.ollama_client import OllamaClient
+
+    client = OllamaClient(timeout_s=1.0)
+    for model in set(models):
+        try:
+            client.unload(model)
+        except RuntimeError:
+            pass
+    _stop_process(process)
 
 
 def _run_once(
@@ -364,38 +415,42 @@ def run(
     if not world_file.is_file():
         raise RuntimeError(f"Gazebo world does not exist: {world_file}")
 
-    for attempt in range(BOOT_RETRIES + 1):
-        try:
-            return _run_once(
-                px4_dir=px4_dir,
-                companion_dir=companion_dir,
-                world_file=world_file,
-                image_path=image_path,
-                expect_person=expect_person,
-                world=world,
-                stdbuf=stdbuf,
-                exploratory=exploratory,
-                faults=faults,
-                camera=camera,
-                depth=depth,
-                duration_s=duration_s,
-                ollama=ollama,
-                vlm_model=vlm_model,
-                llm_model=llm_model,
-                ollama_timeout=ollama_timeout,
-                initial_intent=initial_intent,
-                model_pose=model_pose,
-                memory_path=memory_path,
-                snapshot_path=snapshot_path,
-                dialogue_request=dialogue_request,
-                trace=trace,
-                moving_person=moving_person,
-                headless=headless,
-            )
-        except _BootError:
-            if attempt == BOOT_RETRIES:
-                raise
-            print("PX4 did not boot; retrying once.", file=sys.stderr)
+    ollama_process = _start_ollama_if_needed() if ollama else None
+    try:
+        for attempt in range(BOOT_RETRIES + 1):
+            try:
+                return _run_once(
+                    px4_dir=px4_dir,
+                    companion_dir=companion_dir,
+                    world_file=world_file,
+                    image_path=image_path,
+                    expect_person=expect_person,
+                    world=world,
+                    stdbuf=stdbuf,
+                    exploratory=exploratory,
+                    faults=faults,
+                    camera=camera,
+                    depth=depth,
+                    duration_s=duration_s,
+                    ollama=ollama,
+                    vlm_model=vlm_model,
+                    llm_model=llm_model,
+                    ollama_timeout=ollama_timeout,
+                    initial_intent=initial_intent,
+                    model_pose=model_pose,
+                    memory_path=memory_path,
+                    snapshot_path=snapshot_path,
+                    dialogue_request=dialogue_request,
+                    trace=trace,
+                    moving_person=moving_person,
+                    headless=headless,
+                )
+            except _BootError:
+                if attempt == BOOT_RETRIES:
+                    raise
+                print("PX4 did not boot; retrying once.", file=sys.stderr)
+    finally:
+        _stop_ollama(ollama_process, vlm_model, llm_model)
 
 
 def main(argv=None):

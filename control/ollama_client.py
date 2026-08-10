@@ -62,6 +62,13 @@ class OllamaClient:
             },
         )
 
+    def unload(self, model: str):
+        """Release one model from memory."""
+
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("Ollama model must not be empty")
+        self._request("/api/generate", {"model": model, "keep_alive": 0})
+
     def chat(
         self,
         model: str,
