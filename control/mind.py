@@ -213,17 +213,13 @@ class MacMind:
             raise ValueError("intent must be a non-empty string")
         intent = intent.strip()
         with self._lock:
-            if _same_goal(intent, self.memory.intent):
-                focus = parse_focus(intent)
-                if focus and focus != self.memory.focus:
-                    self.memory.intent = intent
-                    self._invalidate_visual_context()
-                    self.memory.focus = focus
-                    self.memory.focus_requested = bool(focus)
+            focus = parse_focus(intent)
+            if _same_goal(intent, self.memory.intent) and (
+                not focus or focus == self.memory.focus
+            ):
                 return
             self.memory.intent = intent
             self._invalidate_visual_context()
-            focus = parse_focus(intent)
             if focus:
                 self.memory.focus = focus
                 self.memory.focus_requested = True
