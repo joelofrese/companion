@@ -532,6 +532,23 @@ async def run(
             def clean(value):
                 return " ".join(str(value).split()) or "none"
 
+            if gemini:
+                if control.decision_count != last_traced_decision:
+                    decision = control.latest_decision
+                    observation = control.latest_observation
+                    if decision is not None:
+                        print(
+                            f"[Gemini {elapsed_s:5.1f}s] "
+                            f"goal={clean(decision.intent)}; "
+                            f"thought={clean(decision.summary)}; "
+                            f"action={observation.movement if observation else 'hover'}; "
+                            f"latency={control.latest_decision_duration_s:.2f}s",
+                            flush=True,
+                        )
+                    last_traced_decision = control.decision_count
+                    last_traced_observation = control.observation_count
+                return
+
             if control.observation_count != last_traced_observation:
                 observation = control.latest_observation
                 if observation is not None:
@@ -545,7 +562,7 @@ async def run(
                     )
                     if signature != last_observation_signature:
                         print(
-                            f"[{'Gemini' if gemini else 'VLM'} {elapsed_s:5.1f}s] "
+                            f"[VLM {elapsed_s:5.1f}s] "
                             f"{signature[0]}; answer={signature[1]}; "
                             f"alternate={signature[2] or 'none'}; "
                             f"next-focus={signature[3]}; movement={signature[4]}; "
@@ -567,7 +584,7 @@ async def run(
                     )
                     if signature != last_decision_signature:
                         print(
-                            f"[{'Gemini' if gemini else 'LLM'} {elapsed_s:5.1f}s] "
+                            f"[LLM {elapsed_s:5.1f}s] "
                             f"intent={signature[0]}; changed={signature[1]}; "
                             f"focus={signature[2]}; summary={signature[3]}; "
                             f"latency={control.latest_decision_duration_s:.2f}s",
@@ -594,7 +611,9 @@ async def run(
                     reason = "conscious intent is hover"
                 elif observation is None:
                     reason = (
-                        "waiting for the first VLM observation"
+                        "waiting for the first Gemini decision"
+                        if gemini and control.observation_count == 0
+                        else "waiting for the first VLM observation"
                         if control.observation_count == 0
                         else "latest VLM observation failed"
                     )
