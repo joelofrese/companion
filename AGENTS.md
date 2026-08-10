@@ -197,7 +197,8 @@ and `--memory` for editable experience memory.
   person, and an intent such as "inspect the red box" can provide focus when
   the LLM leaves that field empty. Experience memory is editable, persists
   across runs, and records command, velocity, and obstacle outcomes;
-  exploratory simulation reloads and verifies those records.
+  exploratory simulation reloads and verifies those records. Its storage
+  boundary is `control/memory.py`, separate from Mac cognition.
 - If the conscious model omits a summary, Mac keeps the latest visual
   observation as context.
 - Unanswered visual focus stays active; answered focus can be released or

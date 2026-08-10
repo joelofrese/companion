@@ -3,7 +3,8 @@
 import argparse
 import asyncio
 
-from control.mind import CompanionMemory, MacMind
+from control.memory import CompanionMemory
+from control.mind import MacMind
 from control.mind_runtime import MindRuntime
 from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
 from control.dialogue import DialogueInput

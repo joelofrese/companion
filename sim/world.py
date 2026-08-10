@@ -14,7 +14,8 @@ from typing import Optional
 from mavsdk import System
 from mavsdk.offboard import OffboardError
 
-from control.mind import CompanionMemory, MacMind
+from control.memory import CompanionMemory
+from control.mind import MacMind
 from control.dialogue import DialogueInput
 from control.mind_runtime import (
     MAX_FRAME_GAP_S,
