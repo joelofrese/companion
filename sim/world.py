@@ -878,10 +878,8 @@ async def run(
             (
                 OBSTACLE_END_S,
                 RECOVERY_END_S,
-                lambda command: (
-                    command.forward_m_s > 0.0 or command.right_m_s != 0.0
-                ),
-                "following recovery or detour after obstacle",
+                lambda command: command.right_m_s > 0.0,
+                "visual detour after obstacle",
             ),
             (
                 INVALID_SENSOR_START_S,

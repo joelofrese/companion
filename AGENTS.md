@@ -108,8 +108,9 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 ```
 
 `sim.run_world` manages PX4/Gazebo and cleanup. The deterministic synthetic
-world checks motion, target loss, obstacles, invalid and stale sensors,
-command faults, recovery, hover, shutdown, landing, and disarm. The RTP image
+world checks motion, target loss, obstacles, visual detour recovery, invalid
+and stale sensors, command faults, recovery, hover, shutdown, landing, and
+disarm. The RTP image
 scenario checks decoded video, deterministic person/non-person fixtures, Mac
 commands, CM5 safety, PX4, landing, and disarm. `--expect-person` selects the
 person fixture; without it the fixture stays stopped. The image still travels
