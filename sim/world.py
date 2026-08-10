@@ -561,7 +561,7 @@ async def run(
             elif not step.distance_fresh or distance is None or not math.isfinite(distance):
                 reason = "CM5 has no fresh distance reading"
             elif distance < OBSTACLE_STOP_M:
-                reason = f"CM5 obstacle protection at {distance:.2f}m"
+                reason = "CM5 obstacle protection"
             elif step.command_override is not None:
                 reason = "CM5 rejected the injected invalid command"
             elif mac_command == VelocityCommand():
