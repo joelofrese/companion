@@ -45,7 +45,7 @@ merge and delete it.
   results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
 - When the LLM leaves a recognized request unanswered, Mac gives a short
-  acknowledgement while the request continues.
+  acknowledgement, then reports the first confirmed focused answer.
 - Negative movement requests become hover before model interpretation.
 - Low-confidence, stale, malformed, or missing input becomes zero motion.
 - CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
@@ -194,8 +194,9 @@ and `--memory` for editable experience memory.
   quicker default for both; slower models remain selectable. The Ollama client
   is in `control/ollama_client.py`; prompts and response cleanup are in
   `control/ollama_brain.py`; memory storage is in `control/memory.py`.
-- Focused dialogue now receives an immediate acknowledgement when the model
-  leaves its reply blank; local rendered-world focus and answers are verified.
+- Focused dialogue now receives one acknowledgement and one confirmed visual
+  result when the model leaves its replies blank; local rendered-world focus
+  and answers are verified.
 - The Mac brain uses slow forward or lateral movement only; takeoff and landing
   own altitude.
 - `--trace` shows observations, decisions, latencies, and command reasons;

@@ -108,6 +108,8 @@ class MindMemory:
     summary: str = ""
     previous_movement: str = "stop"
     previous_observation: str = ""
+    requested_focus: str = ""
+    focus_reported: bool = False
 
 
 class VisualModel(Protocol):
@@ -176,6 +178,8 @@ class MacMind:
         self.memory.summary = ""
         self.memory.previous_movement = "stop"
         self.memory.previous_observation = ""
+        self.memory.requested_focus = ""
+        self.memory.focus_reported = False
         self._new_observations.clear()
 
     @property
@@ -246,6 +250,8 @@ class MacMind:
                 observation.focused_answer
                 for observation in information.new_observations
             )
+            pending_focus = self.memory.requested_focus
+            focus_reported = self.memory.focus_reported
             self._new_observations.clear()
         try:
             decision = self.language_model.think(information)
@@ -302,6 +308,16 @@ class MacMind:
             )
             if not dialogue_response and information.dialogue:
                 dialogue_response = _acknowledgement(intent, requested_focus)
+            answered_focus = next(
+                (
+                    observation.focused_answer
+                    for observation in reversed(information.new_observations)
+                    if observation.focused_answer
+                ),
+                "",
+            )
+            if not dialogue_response and pending_focus and not focus_reported:
+                dialogue_response = _focused_reply(answered_focus)
             decision = ConsciousDecision(
                 intent=intent,
                 intent_changed=intent_changed,
@@ -350,6 +366,17 @@ class MacMind:
                 self._invalidate_visual_context()
             self.memory.focus = decision.focus
             self.memory.summary = decision.summary
+            if requested_focus:
+                self.memory.requested_focus = requested_focus
+                self.memory.focus_reported = False
+            elif information.dialogue and parse_intent(information.dialogue):
+                self.memory.requested_focus = ""
+                self.memory.focus_reported = False
+            elif (
+                self.memory.requested_focus == pending_focus
+                and answered_focus
+            ):
+                self.memory.focus_reported = True
         return decision
 
     def close(self):
@@ -385,3 +412,9 @@ def _acknowledgement(intent: str, focus: Optional[str]) -> str:
     if intent_kind == "exploring":
         return "Exploring."
     return ""
+
+
+def _focused_reply(answer: str) -> str:
+    """Return one focused visual result after a dialogue request."""
+
+    return f"I see {answer}." if answer else ""
