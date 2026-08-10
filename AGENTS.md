@@ -39,8 +39,8 @@ merge and delete it.
   Mac uses it only after the TOF stop clears.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
 - A follow goal passes its subject to the VLM as visual focus.
-- Mac control turns that intent and visual suggestion into slow body-frame
-  velocity.
+- Mac control turns that intent and visual suggestion into slow forward or
+  lateral body-frame velocity; flight lifecycle owns altitude.
 - A real intent change invalidates old visual context and pending brain
   results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
@@ -50,9 +50,9 @@ merge and delete it.
   protects against obstacles, and is the final vehicle-side authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
-The brain sends body-frame velocity only: never motor, attitude, or
-absolute-position commands. A fresh obstacle reading may override normal
-intent. Keep movement slow, deliberate, and easy to stop.
+The brain sends forward or lateral body-frame velocity only: never motor,
+attitude, altitude, or absolute-position commands. A fresh obstacle reading
+may override normal intent. Keep movement slow, deliberate, and easy to stop.
 
 ## Hardware boundary
 
@@ -190,6 +190,8 @@ and `--memory` for editable experience memory.
   quicker default for both; slower models remain selectable. The Ollama client
   is in `control/ollama_client.py`; prompts and response cleanup are in
   `control/ollama_brain.py`; memory storage is in `control/memory.py`.
+- The Mac brain uses slow forward or lateral movement only; takeoff and landing
+  own altitude.
 - `--trace` shows observations, decisions, latencies, and command reasons;
   `--snapshot` saves a rendered frame; `--faults` exercises sensor, link,
   command, and brain failures through the real simulated control path.

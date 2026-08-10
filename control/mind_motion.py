@@ -12,11 +12,10 @@ MOVEMENT_COMMANDS = {
     "forward": VelocityCommand(forward_m_s=0.25),
     "left": VelocityCommand(right_m_s=-0.2),
     "right": VelocityCommand(right_m_s=0.2),
-    "up": VelocityCommand(down_m_s=-0.15),
-    "down": VelocityCommand(down_m_s=0.15),
     "stop": VelocityCommand(),
     "hover": VelocityCommand(),
 }
+MOVEMENT_NAMES = frozenset(MOVEMENT_COMMANDS)
 
 
 def movement_command(

@@ -14,11 +14,11 @@ from control.mind import (
     Telemetry,
     VisualObservation,
 )
+from control.mind_motion import MOVEMENT_NAMES
 from control.ollama_client import OllamaClient
 from control.safety_limits import OBSTACLE_STOP_M
 
 
-MOVEMENTS = frozenset(("forward", "left", "right", "up", "down", "stop", "hover"))
 ALTERNATE_MOVEMENTS = frozenset(("left", "right"))
 DESCRIPTION_PLACEHOLDERS = PLACEHOLDER_TEXT | frozenset(
     (
@@ -54,7 +54,7 @@ VISION_SCHEMA = {
     "properties": {
         "description": {"type": "string"},
         "focused_answer": {"type": "string"},
-        "movement": {"type": "string", "enum": sorted(MOVEMENTS)},
+        "movement": {"type": "string", "enum": sorted(MOVEMENT_NAMES)},
         "alternate_movement": {
             "type": "string",
             "enum": sorted(ALTERNATE_MOVEMENTS | frozenset(("none",))),
@@ -204,7 +204,7 @@ Last command: {telemetry.last_command or "none yet"}
 Body velocity: forward={telemetry.forward_velocity_m_s}, right={telemetry.right_velocity_m_s}, down={telemetry.down_velocity_m_s}
 Forward TOF distance: {telemetry.obstacle_distance_m}
 
-Movement must be one of: forward, left, right, up, down, stop, hover.
+Movement must be one of: forward, left, right, stop, hover.
 Confidence must be between 0 and 1. Choose a short next visual focus or leave
 it empty.
 """.strip()
@@ -216,7 +216,7 @@ it empty.
             think=False,
         )
         movement = _text(data, "movement").lower()
-        if movement not in MOVEMENTS:
+        if movement not in MOVEMENT_NAMES:
             movement = "stop"
         alternate_movement = _text(data, "alternate_movement").lower()
         if alternate_movement not in ALTERNATE_MOVEMENTS:
