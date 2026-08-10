@@ -177,9 +177,9 @@ and `--memory` for editable experience memory.
   moondream model recognizes focused subjects but does not reliably describe
   broad-scene position. A 24-second moving-person run recognized the person
   in seven observations and kept focus, but lateral position remains
-  model-limited. A 20-second open-ended run produced six unclear observations,
-  while the slower Qwen option produced no thought in that time. Unclear output
-  still holds zero.
+  model-limited. A 20-second open-ended run produced six unclear observations;
+  the slower Qwen and Gemma vision options produced no thought in that time.
+  Unclear output still holds zero.
 - Non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Synthetic open-ended goals can move through clear simulated space. Real
@@ -205,9 +205,10 @@ and `--memory` for editable experience memory.
   observations rather than movement suggestions.
 - Brain and CM5 use slow forward, right, and down body-frame velocity. Both
   simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
-- Long synthetic and real Ollama/depth runs complete with bounded motion, valid
-  depth, landing, and disarm. RTP fixtures and rendered Gazebo camera runs also
-  verify the video, Mac, CM5, and PX4 paths.
+- A 120-second synthetic exploratory run completed with 2,331 VLM observations
+  and 240 conscious thoughts, bounded motion, landing, and disarm. Near-wall
+  depth runs also observe CM5 backoff. RTP fixtures and rendered Gazebo camera
+  runs verify the video, Mac, CM5, and PX4 paths.
 - The target remains the DEXI 3: no lidar, DEXI hardware is unverified, and
   current SITL's GPS-denied optical-flow topic publishes no messages, so no
   flow-dependent behavior is claimed.
