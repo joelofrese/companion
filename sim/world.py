@@ -311,6 +311,7 @@ async def run(
     initial_intent: str = DEFAULT_EXPLORATORY_INTENT,
     depth: bool = False,
     memory_path: Optional[Path] = None,
+    snapshot_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
     moving_person: bool = False,
@@ -348,6 +349,10 @@ async def run(
         raise ValueError("Ollama simulation requires exploratory camera or depth mode")
     if memory_path is not None and not exploratory:
         raise ValueError("experience memory requires exploratory simulation")
+    if snapshot_path is not None and not exploratory:
+        raise ValueError("camera snapshot requires exploratory simulation")
+    if snapshot_path is not None and not (camera or depth):
+        raise ValueError("camera snapshot requires Gazebo camera or depth mode")
     if dialogue_request is not None and not exploratory:
         raise ValueError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and not dialogue_request.strip():
@@ -480,6 +485,7 @@ async def run(
         )
 
         camera_frames = 0
+        snapshot_saved = False
         depth_samples = 0
         valid_depth_samples = 0
         minimum_depth_distance = math.inf
@@ -555,10 +561,16 @@ async def run(
             return replace(step, obstacle_distance_m=distance_sensor.read())
 
         def send_packet(timestamp_s: float, step, intent=None):
-            nonlocal brain_shutdown, camera_frames
+            nonlocal brain_shutdown, camera_frames, snapshot_saved
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
+                if snapshot_path is not None and not snapshot_saved:
+                    from PIL import Image
+
+                    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+                    Image.fromarray(frame[:, :, ::-1]).save(snapshot_path)
+                    snapshot_saved = True
             if step.brain_shutdown and not brain_shutdown:
                 control.close()
                 mind_stop.set()
@@ -1259,6 +1271,10 @@ async def run(
             if camera_frames == 0:
                 raise RuntimeError("Gazebo did not provide a camera frame")
             print(f"Gazebo camera frames=verified ({camera_frames}).")
+        if snapshot_path is not None:
+            if not snapshot_saved:
+                raise RuntimeError("Gazebo did not provide a frame snapshot")
+            print(f"Gazebo frame snapshot=verified: {snapshot_path}")
         if camera:
             if any(command != VelocityCommand() for _, command in commands):
                 raise RuntimeError(
@@ -1349,6 +1365,11 @@ if __name__ == "__main__":
     parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
     parser.add_argument(
+        "--snapshot",
+        type=Path,
+        help="save the first Gazebo camera frame for visual inspection",
+    )
+    parser.add_argument(
         "--request",
         help="send one dialogue request automatically at the start of an exploratory run",
     )
@@ -1383,6 +1404,7 @@ if __name__ == "__main__":
                 ollama_timeout=args.ollama_timeout,
                 initial_intent=args.intent,
                 memory_path=args.memory,
+                snapshot_path=args.snapshot,
                 dialogue_request=args.request,
                 trace=args.trace,
                 moving_person=args.moving_person,

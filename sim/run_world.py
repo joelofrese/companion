@@ -116,6 +116,7 @@ def _run_once(
     initial_intent: str,
     model_pose: Optional[str],
     memory_path: Optional[Path],
+    snapshot_path: Optional[Path],
     dialogue_request: Optional[str],
     trace: bool,
     moving_person: bool,
@@ -255,6 +256,8 @@ def _run_once(
                 ]
             if memory_path is not None:
                 scenario += ["--memory", str(memory_path)]
+            if snapshot_path is not None:
+                scenario += ["--snapshot", str(snapshot_path)]
             if dialogue_request is not None:
                 scenario += ["--request", dialogue_request]
             if trace:
@@ -287,6 +290,7 @@ def run(
     initial_intent: str = "explore the surroundings",
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
+    snapshot_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
     trace: bool = False,
     moving_person: bool = False,
@@ -333,6 +337,10 @@ def run(
         raise RuntimeError("experience memory requires exploratory simulation")
     if memory_path is not None and image_path is not None:
         raise RuntimeError("experience memory cannot run with an RTP image scenario")
+    if snapshot_path is not None and image_path is not None:
+        raise RuntimeError("camera snapshot cannot use an RTP image scenario")
+    if snapshot_path is not None and not (camera or depth):
+        raise RuntimeError("camera snapshot requires Gazebo camera or depth mode")
     if dialogue_request is not None and not exploratory:
         raise RuntimeError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and image_path is not None:
@@ -378,6 +386,7 @@ def run(
                 initial_intent=initial_intent,
                 model_pose=model_pose,
                 memory_path=memory_path,
+                snapshot_path=snapshot_path,
                 dialogue_request=dialogue_request,
                 trace=trace,
                 moving_person=moving_person,
@@ -454,6 +463,11 @@ def main(argv=None):
         help="persist conscious experience across exploratory runs",
     )
     parser.add_argument(
+        "--snapshot",
+        type=Path,
+        help="save the first Gazebo camera frame for visual inspection",
+    )
+    parser.add_argument(
         "--request",
         help="send one dialogue request automatically during an exploratory run",
     )
@@ -496,6 +510,7 @@ def main(argv=None):
             initial_intent=args.intent,
             model_pose=args.pose,
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
+            snapshot_path=args.snapshot.expanduser().resolve() if args.snapshot else None,
             dialogue_request=args.request,
             trace=args.trace,
             moving_person=args.moving_person,

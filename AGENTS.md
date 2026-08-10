@@ -117,10 +117,11 @@ stopped. With `--ollama`, local VLM and LLM sessions make the run exploratory,
 but CM5 keeps motion stopped because this model has no TOF reading. Use
 `--depth` when the brain should be allowed to move.
 Use `--trace` to print visual observations, conscious decisions, model
-latencies, and command reasons. Use `--world`,
-`--duration`, `--request`, `--intent`, and `--memory` to vary the world, run
-length, dialogue, goal, and persistent experience. Typed dialogue also works
-during an exploratory run. Add `--faults` to inject the normal obstacle,
+latencies, and command reasons. Use `--snapshot PATH` to save the first
+rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
+`--intent`, and `--memory` to vary the world, run length, dialogue, goal, and
+persistent experience. Typed dialogue also works during an exploratory run.
+Add `--faults` to inject the normal obstacle,
 sensor, link, invalid-command, and brain-shutdown schedule into an exploratory
 run. Add `--headless` for unattended runs without the Gazebo GUI.
 
@@ -197,8 +198,9 @@ and `--memory` for editable experience memory.
   stops Mac motion. CM5 still rejects unsafe or stale commands and remains the
   final authority.
 - `--trace` shows observations, decisions, latencies, and command reasons;
-  `--faults` checks the same safety schedule through synthetic sensors and
-  live Gazebo depth without requiring exact brain decisions.
+  `--snapshot` saves a rendered frame for inspection; `--faults` checks the
+  same safety schedule through synthetic sensors and live Gazebo depth without
+  requiring exact brain decisions.
 - Conscious prompts keep distinct visual changes and drop repeated descriptions
   so local thinking stays responsive.
 - VLM prompt echoes and intent-only descriptions become unclear, zero-confidence
