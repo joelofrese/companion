@@ -122,7 +122,7 @@ async def run(
     if faults and not exploratory:
         raise ValueError("fault injection requires exploratory simulation")
     if not isinstance(initial_intent, str) or not initial_intent.strip():
-        raise ValueError("initial intent must be a non-empty string")
+        raise ValueError("initial situation or intent must be a non-empty string")
     initial_intent = initial_intent.strip()
     if camera and depth:
         raise ValueError("camera and depth modes cannot run together")
@@ -216,7 +216,7 @@ async def run(
             from control.gemini_brain import GeminiRuntime
 
             control = GeminiRuntime(
-                initial_intent,
+                situation=initial_intent,
                 model=gemini_model,
                 memory=memory_store,
             )
@@ -388,12 +388,19 @@ async def run(
                     applied_dialogue_intent = parse_intent(message)
                     control.add_dialogue(message)
             telemetry = brain_telemetry()
-            command = control.tick(
-                frame=frame,
-                timestamp_s=timestamp_s,
-                intent=intent,
-                telemetry=telemetry,
-            )
+            if gemini:
+                command = control.tick(
+                    frame=frame,
+                    timestamp_s=timestamp_s,
+                    telemetry=telemetry,
+                )
+            else:
+                command = control.tick(
+                    frame=frame,
+                    timestamp_s=timestamp_s,
+                    intent=intent,
+                    telemetry=telemetry,
+                )
             if step.transmit:
                 sender.send(step.command_override or command)
             return command
@@ -538,7 +545,6 @@ async def run(
                     if decision is not None:
                         print(
                             f"[Gemini {elapsed_s:5.1f}s] "
-                            f"goal={clean(decision.intent)}; "
                             f"thought={clean(control.latest_thought)}; "
                             f"response={clean(control.latest_response)}; "
                             f"action={clean(control.latest_action)}; "
@@ -607,7 +613,11 @@ async def run(
             elif brain_command == VelocityCommand():
                 decision = control.latest_decision
                 observation = control.latest_observation
-                if decision is not None and parse_intent(decision.intent) == "hover":
+                if (
+                    not gemini
+                    and decision is not None
+                    and parse_intent(decision.intent) == "hover"
+                ):
                     reason = "conscious intent is hover"
                 elif observation is None:
                     reason = (
@@ -798,10 +808,13 @@ async def run(
                 "Scripted visual focus=verified: "
                 f"{requested_focus} ({'answered' if requested_focus_answered else 'active'})."
             )
-        print(
-            "Conscious brain decision=verified: "
-            f"intent={decision.intent}, focus={decision.focus or 'none'}."
-        )
+        if gemini:
+            print("Gemini brain decision=verified.")
+        else:
+            print(
+                "Conscious brain decision=verified: "
+                f"intent={decision.intent}, focus={decision.focus or 'none'}."
+            )
         print("Conscious visual memory=verified.")
         print("Brain visual observation=verified.")
         print(f"Brain visual observations=verified ({control.observation_count}).")
@@ -830,13 +843,9 @@ async def run(
             latest_memory = (
                 persisted_memory.splitlines()[-1] if persisted_memory else ""
             )
-            required_memory = (
-                "intent=",
-                "summary=",
-                "obstacle=",
-                "command=",
-                "velocity=",
-            )
+            required_memory = ("summary=", "obstacle=", "command=", "velocity=")
+            if not gemini:
+                required_memory = ("intent=",) + required_memory
             if not latest_memory or any(
                 field not in latest_memory for field in required_memory
             ):
@@ -1272,7 +1281,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--intent",
         default=DEFAULT_EXPLORATORY_INTENT,
-        help="initial high-level intent for an exploratory run",
+        help="initial situation for Gemini or intent for the local fallback",
     )
     args = parser.parse_args()
     try:

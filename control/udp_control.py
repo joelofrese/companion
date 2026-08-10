@@ -56,7 +56,7 @@ class UdpControlService:
         self.control = control
         self.sender = sender
         self.frame_reader = frame_reader
-        self.intent_provider = intent_provider or (lambda timestamp_s: None)
+        self.intent_provider = intent_provider
         self.telemetry_provider = telemetry_provider or (
             lambda: Telemetry(obstacle_distance_m=math.nan)
         )
@@ -80,12 +80,14 @@ class UdpControlService:
                     last_frame_at_s = timestamp_s
                 elif timestamp_s - last_frame_at_s > self.frame_timeout_s:
                     raise RuntimeError("video stream stalled before control shutdown")
-                command = self.control.tick(
-                    frame=frame,
-                    timestamp_s=timestamp_s,
-                    intent=self.intent_provider(timestamp_s),
-                    telemetry=self.telemetry_provider(),
-                )
+                tick = {
+                    "frame": frame,
+                    "timestamp_s": timestamp_s,
+                    "telemetry": self.telemetry_provider(),
+                }
+                if self.intent_provider is not None:
+                    tick["intent"] = self.intent_provider(timestamp_s)
+                command = self.control.tick(**tick)
                 self.sender.send(command)
                 await asyncio.sleep(self.tick_period_s)
         finally:

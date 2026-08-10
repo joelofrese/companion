@@ -31,7 +31,10 @@ def build_parser():
     parser.add_argument(
         "--intent",
         default=DEFAULT_INTENT,
-        help=f"initial high-level intent in plain language (default: {DEFAULT_INTENT})",
+        help=(
+            "initial situation for Gemini or intent for the local fallback "
+            f"(default: {DEFAULT_INTENT})"
+        ),
     )
     parser.add_argument(
         "--voice-once",
@@ -103,7 +106,7 @@ async def run(args):
         from control.gemini_brain import GeminiRuntime
 
         control = GeminiRuntime(
-            args.intent,
+            situation=args.intent,
             model=args.gemini_model,
             memory=memory,
         )
@@ -170,9 +173,14 @@ async def run(args):
             if use_gemini
             else f"VLM={args.vlm_model}, LLM={args.llm_model}"
         )
+        context_name = (
+            f"situation={args.intent}"
+            if use_gemini
+            else f"intent={args.intent}"
+        )
         print(
             f"Companion ready: video :{video_config.port}, "
-            f"commands {body_host}:{args.command_port}, intent={args.intent}, "
+            f"commands {body_host}:{args.command_port}, {context_name}, "
             f"{model_name}."
         )
         if args.dialogue:

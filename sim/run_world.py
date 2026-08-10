@@ -371,7 +371,7 @@ def run(
     if depth and image_path is not None:
         raise RuntimeError("depth mode cannot use an RTP image")
     if not isinstance(initial_intent, str) or not initial_intent.strip():
-        raise RuntimeError("initial intent must be a non-empty string")
+        raise RuntimeError("initial situation or intent must be a non-empty string")
     if camera and depth:
         raise RuntimeError("camera and depth modes cannot run together")
     if camera and not exploratory:
@@ -510,7 +510,7 @@ def main(argv=None):
     parser.add_argument(
         "--intent",
         default="explore the surroundings",
-        help="initial high-level intent for an exploratory run",
+        help="initial situation for Gemini or intent for the local fallback",
     )
     parser.add_argument(
         "--pose",

@@ -33,25 +33,31 @@ merge and delete it.
 
 ## Control flow
 
-- The companion brain uses images, dialogue, telemetry, and memory to choose
-  intent and cautious movement.
+- The companion brain uses images, dialogue, telemetry, memory, and previous
+  outputs to decide what to do.
 - Local mode runs a subconscious VLM and conscious LLM in separate sessions.
-- Gemini ER 2 Streaming is the default persistent brain for hardware and
-  simulation.
+- Gemini ER 2 Streaming starts with one situation prompt, then continuously
+  decides from its live session without a repeated external goal.
 - The visual model describes images and suggests cautious movement.
 - When forward is blocked, the VLM may suggest a visible lateral alternate;
   the brain uses it only after the TOF stop clears.
-- The LLM uses observations, dialogue, telemetry, and memory to choose intent.
+- The local LLM uses observations, dialogue, telemetry, and memory to choose
+  intent.
 - A follow goal passes its subject to the VLM as visual focus.
-- The brain turns intent and visual suggestions into slow forward, lateral, or
-  yaw-rate body-frame commands; flight lifecycle owns altitude.
-- A real intent change invalidates old visual context and pending brain
-  results; rewording the same goal does not.
-- A recognized dialogue intent stays active until a new open-ended request.
-- When the LLM leaves a recognized request unanswered, the brain gives a short
+- The local fallback turns intent and visual suggestions into slow forward,
+  lateral, or yaw-rate body-frame commands; flight lifecycle owns altitude.
+- Gemini chooses among its bounded movement, turn, hover, and speech tools;
+  the CM5 still limits every physical command.
+- A real intent change invalidates old local visual context; rewording the same
+  goal does not.
+- A recognized local dialogue intent stays active until a new open-ended
+  request.
+- When the local LLM leaves a recognized request unanswered, it gives a short
   acknowledgement, then reports the first confirmed focused answer.
-- A confirmed one-shot visual request holds motion until it is reported.
-- Negative movement requests become hover before model interpretation.
+- The local fallback holds motion for a confirmed one-shot visual request until
+  it is reported.
+- Negative movement requests become hover before local model interpretation;
+  Gemini receives dialogue directly.
 - Low-confidence, stale, malformed, or missing input becomes zero motion.
 - CM5 returns fresh TOF and vehicle telemetry, rejects unsafe commands,
   protects against obstacles, and is the final vehicle-side authority.
@@ -59,7 +65,7 @@ merge and delete it.
 
 The brain sends slow forward or lateral body-frame velocity and yaw rate only:
 never motor, attitude, altitude, or absolute-position commands. A fresh
-obstacle reading may override normal intent. Keep movement slow, deliberate,
+obstacle reading may override normal movement. Keep movement slow, deliberate,
 and easy to stop.
 
 ## Hardware boundary
@@ -97,9 +103,9 @@ Keep two simulation modes:
 
 - Deterministic missions prove flight, perception fixtures, transport, and
   safety behavior.
-- Exploratory worlds give the brain an open-ended goal and let it choose what
-  happens. Verify bounded motion, safety, landing, and disarm rather than exact
-  decisions.
+- Exploratory worlds give the brain an open-ended situation and let it choose
+  what happens. Verify bounded motion, safety, landing, and disarm rather than
+  exact decisions.
 
 From `companion/`:
 
@@ -142,8 +148,9 @@ responses, actions, model latencies, and command reasons. Native thought
 summaries are optional; raw private reasoning is not exposed. Use
 `--snapshot PATH` to save the first
 rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
-`--intent`, and `--memory` to vary the world, run length, dialogue, goal, and
-persistent experience. Typed dialogue also works during an exploratory run.
+`--intent`, and `--memory` to vary the world, run length, dialogue, initial
+situation or local intent, and persistent experience. Typed dialogue also works
+during an exploratory run.
 Add `--faults` to inject the normal obstacle,
 sensor, link, invalid-command, and brain-shutdown schedule into an exploratory
 run. Add `--headless` for unattended runs without the Gazebo GUI.
@@ -185,11 +192,12 @@ ollama pull gemma3:4b
 ```
 
 Production defaults to one Gemini Robotics ER 2 Streaming session on the CM5.
-It starts with `explore the surroundings` unless `--intent` supplies another goal. Use
-`--ollama` for separate local VLM and LLM sessions, defaulting to the faster
-`moondream` for both. Set `--vlm-model` or `--llm-model` to use another local
-model. Use `--dialogue` for typed conversation, `--voice-once` for one spoken
-request, and `--memory` for editable experience memory.
+It starts with one situation prompt, using `explore the surroundings` by
+default or the value of `--intent`. Use `--ollama` for separate local VLM and
+LLM sessions, defaulting to the faster `moondream` for both. Set `--vlm-model`
+or `--llm-model` to use another local model. Use `--dialogue` for typed
+conversation, `--voice-once` for one spoken request, and `--memory` for
+editable experience memory.
 
 With `GEMINI_API_KEY`, the brain uses one persistent Gemini Robotics ER 2
 Streaming session. Native context-window compression keeps the in-flight
@@ -207,11 +215,12 @@ when it reasons internally.
 
 - The deterministic PX4/Gazebo mission and local UDP loopback verify the full
   command path, faults, recovery, safety, landing, and disarm.
-- Exploratory camera and depth worlds exercise open-ended goals, dialogue,
+- Exploratory camera and depth worlds exercise open-ended situations, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
-  for simulation and the CM5. It uses native context compression and session
-  resumption, with non-blocking move, turn, hover, and speech actions. Native
+  for simulation and the CM5. It starts with one situation prompt, then uses
+  native context compression and session resumption while continuously
+  choosing non-blocking move, turn, hover, and speech actions. Native
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
   actions remain separately visible. Local Ollama VLM and LLM sessions remain
   an explicit fallback. A live 45-degree turn request produced 47.6 degrees

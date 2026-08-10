@@ -15,10 +15,10 @@ from control.mind import ConsciousDecision, Telemetry, VisualObservation
 from control.mind_motion import movement_command
 from control.safety_limits import MAX_YAW_RATE_DEG_S, OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
-from voice.intent import parse_intent
 
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
+DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
 RESPONSE_TIMEOUT_S = 10.0
@@ -37,16 +37,16 @@ class GeminiRuntime:
 
     def __init__(
         self,
-        intent: str,
+        situation: str = DEFAULT_SITUATION,
         model: str = DEFAULT_MODEL,
         memory: Optional[CompanionMemory] = None,
         api_key: Optional[str] = None,
     ):
-        if not isinstance(intent, str) or not intent.strip():
-            raise ValueError("intent must be a non-empty string")
+        if not isinstance(situation, str) or not situation.strip():
+            raise ValueError("situation must be a non-empty string")
         if not isinstance(model, str) or not model.strip():
             raise ValueError("Gemini model must be a non-empty string")
-        self.intent = intent.strip()
+        self.situation = situation.strip()
         self.model = model.strip()
         self.memory_store = memory
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
@@ -76,6 +76,7 @@ class GeminiRuntime:
         self.thought_count = 0
         self.thought_token_count = 0
         self._memory_sent = False
+        self._bootstrap_pending = True
         self._session_handle: Optional[str] = None
         self.session_reconnect_count = 0
         self._reconnect_requested = False
@@ -106,40 +107,23 @@ class GeminiRuntime:
                 f"Gemini did not connect: {self._error}"
             ) from self._error
 
-    def set_intent(self, intent: str):
-        """Set the current goal included in the next heartbeat."""
-
-        if not isinstance(intent, str) or not intent.strip():
-            raise ValueError("intent must be a non-empty string")
-        self.intent = intent.strip()
-
     def add_dialogue(self, message: str):
         """Deliver one user request in the next model heartbeat."""
 
         if not isinstance(message, str) or not message.strip():
             return
-        message = message.strip()
-        self._dialogue.append(message)
-        if parse_intent(message) == "hover":
-            self.set_intent(message)
-            self._movement = "stop"
-            self._movement_until_s = 0.0
-            self._turn_direction = "stop"
-            self._turn_until_s = 0.0
+        self._dialogue.append(message.strip())
 
     def tick(
         self,
         frame,
         timestamp_s: float,
-        intent: Optional[str] = None,
         telemetry: Telemetry = Telemetry(),
     ) -> VelocityCommand:
         """Store fresh state and return the current bounded action."""
 
         if self._closed.is_set() or self._error is not None:
             return VelocityCommand()
-        if intent is not None:
-            self.set_intent(intent)
         if frame is not None:
             self._latest_frame = frame
             self._frame_ready.set()
@@ -205,6 +189,9 @@ class GeminiRuntime:
             connected = False
             while not self._closed.is_set():
                 self._reconnect_requested = False
+                if self._session_handle is None:
+                    self._memory_sent = False
+                    self._bootstrap_pending = True
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -319,8 +306,12 @@ class GeminiRuntime:
             self._memory_sent = True
             if self.memory_store is not None:
                 memory = self.memory_store.context()
+        start = ""
+        if self._bootstrap_pending:
+            self._bootstrap_pending = False
+            start = f"[START]\nSituation: {self.situation}\n"
         state = (
-            f"[HEARTBEAT] Goal: {self.intent}\n"
+            f"{start}[STATE]\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
             "to move, turn, hover, speak, or do nothing. Never infer that a move or "
@@ -497,7 +488,7 @@ class GeminiRuntime:
             confidence=1.0,
         )
         self.latest_decision = ConsciousDecision(
-            intent=self.intent,
+            intent="",
             dialogue=response,
             summary=summary,
         )
@@ -512,7 +503,6 @@ class GeminiRuntime:
             print(f"Gemini response: {response}", flush=True)
         if self.memory_store is not None:
             self.memory_store.remember(
-                f"intent={self.intent}; "
                 f"{_telemetry_text(self._telemetry)}; summary={summary}"
             )
 
@@ -583,8 +573,9 @@ def _system_instruction() -> str:
 
     return (
         "You are the high-level brain of an indoor companion drone. Observe the "
-        "latest camera image, user dialogue, goal, and telemetry. Think broadly, "
-        "but move slowly and deliberately. You have optional tools for brief "
+        "latest camera image, user dialogue, telemetry, and previous outputs. "
+        "Think broadly, but move slowly and deliberately. You have optional tools "
+        "for brief "
         "forward or lateral translation, turning in place, hovering, and speech. "
         "Choose freely "
         "whether to use one, use several, or use none; a heartbeat is not a "
