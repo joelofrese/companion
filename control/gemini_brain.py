@@ -18,6 +18,7 @@ from voice.intent import parse_intent
 
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
+VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
 RESPONSE_TIMEOUT_S = 10.0
 START_TIMEOUT_S = 20.0
@@ -57,9 +58,12 @@ class GeminiRuntime:
         self.latest_decision_duration_s: Optional[float] = None
         self.observation_count = 0
         self.decision_count = 0
+        self.turn_count = 0
+        self.video_frame_count = 0
         self._response_parts = []
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
+        self._send_lock = asyncio.Lock()
         self._ready = asyncio.Event()
         self._task = None
         self._error: Optional[Exception] = None
@@ -170,39 +174,66 @@ class GeminiRuntime:
                 await self._frame_ready.wait()
                 if self._closed.is_set():
                     return
-                while not self._closed.is_set():
-                    sent_at_s = time.monotonic()
-                    await self._heartbeat(session, types)
-                    try:
-                        await asyncio.wait_for(
-                            self._receive(session, types), timeout=RESPONSE_TIMEOUT_S
-                        )
-                    except asyncio.TimeoutError:
-                        pass
-                    remaining_s = MIN_HEARTBEAT_PERIOD_S - (
-                        time.monotonic() - sent_at_s
-                    )
-                    if remaining_s > 0.0:
+                await self._send_frame(session, types)
+                video_task = asyncio.create_task(self._stream_video(session, types))
+                try:
+                    while not self._closed.is_set():
+                        sent_at_s = time.monotonic()
+                        await self._heartbeat(session)
                         try:
                             await asyncio.wait_for(
-                                self._closed.wait(), timeout=remaining_s
+                                self._receive(session, types), timeout=RESPONSE_TIMEOUT_S
                             )
                         except asyncio.TimeoutError:
                             pass
+                        if video_task.done():
+                            await video_task
+                        remaining_s = MIN_HEARTBEAT_PERIOD_S - (
+                            time.monotonic() - sent_at_s
+                        )
+                        if remaining_s > 0.0:
+                            try:
+                                await asyncio.wait_for(
+                                    self._closed.wait(), timeout=remaining_s
+                                )
+                            except asyncio.TimeoutError:
+                                pass
+                finally:
+                    video_task.cancel()
+                    await asyncio.gather(video_task, return_exceptions=True)
         except Exception as error:
             self._error = error
             self._ready.set()
 
-    async def _heartbeat(self, session, types):
+    async def _stream_video(self, session, types):
+        """Keep the Live session supplied with the newest camera frame."""
+
+        while not self._closed.is_set():
+            try:
+                await asyncio.wait_for(self._closed.wait(), timeout=VIDEO_PERIOD_S)
+            except asyncio.TimeoutError:
+                await self._send_frame(session, types)
+
+    async def _send_frame(self, session, types):
+        """Send one current JPEG without waiting for a model decision."""
+
         frame = self._latest_frame
-        if frame is not None:
-            image_bytes = await asyncio.to_thread(_jpeg, frame)
+        if frame is None:
+            return
+        image_bytes = await asyncio.to_thread(_jpeg, frame)
+        async with self._send_lock:
             await session.send_realtime_input(
                 video=types.Blob(data=image_bytes, mime_type="image/jpeg")
             )
+        self.video_frame_count += 1
+
+    async def _heartbeat(self, session):
+        """Ask for one high-level decision while video keeps streaming."""
+
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue.popleft() if self._dialogue else ""
-        await session.send_realtime_input(text=self._heartbeat_text(dialogue))
+        async with self._send_lock:
+            await session.send_realtime_input(text=self._heartbeat_text(dialogue))
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = self.memory_store.context() if self.memory_store is not None else ""
@@ -233,6 +264,7 @@ class GeminiRuntime:
                             part.text for part in turn.parts if part.text
                         )
                 if content.turn_complete:
+                    self.turn_count += 1
                     text = "".join(self._response_parts).strip()
                     self._response_parts.clear()
                     if text:
@@ -250,7 +282,8 @@ class GeminiRuntime:
                             id=call.id,
                         )
                     )
-                await session.send_tool_response(function_responses=responses)
+                async with self._send_lock:
+                    await session.send_tool_response(function_responses=responses)
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":

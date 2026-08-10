@@ -795,6 +795,12 @@ async def run(
             )
         if gemini:
             print(f"Gemini ER 2 brain=verified: model={gemini_model}.")
+            if control.turn_count == 0:
+                raise RuntimeError("SITL did not complete a Gemini model turn")
+            if control.video_frame_count < 2:
+                raise RuntimeError("SITL did not stream Gemini video frames")
+            print(f"Gemini completed turns=verified ({control.turn_count}).")
+            print(f"Gemini live video frames=verified ({control.video_frame_count}).")
         if memory_store is not None:
             persisted_memory = CompanionMemory(memory_store.path).context()
             latest_memory = (
