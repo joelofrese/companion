@@ -214,8 +214,8 @@ class MacMind:
         intent = intent.strip()
         with self._lock:
             if _same_goal(intent, self.memory.intent):
-                focus = parse_focus(intent) or ""
-                if focus != self.memory.focus:
+                focus = parse_focus(intent)
+                if focus and focus != self.memory.focus:
                     self.memory.intent = intent
                     self._invalidate_visual_context()
                     self.memory.focus = focus

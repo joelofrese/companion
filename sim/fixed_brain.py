@@ -8,6 +8,8 @@ class FixedVisualModel:
 
     def __init__(self, person: bool):
         self.person = person
+        self.following_focus_seen = False
+        self.following_focus_lost = False
 
     def observe(
         self,
@@ -19,6 +21,12 @@ class FixedVisualModel:
         previous_observation: str,
         telemetry: Telemetry,
     ) -> VisualObservation:
+        if intent != "following":
+            self.following_focus_seen = False
+        elif focus:
+            self.following_focus_seen = True
+        elif self.following_focus_seen:
+            self.following_focus_lost = True
         if self.person:
             description = "a person is visible ahead"
             movement = "forward" if intent == "following" else "stop"

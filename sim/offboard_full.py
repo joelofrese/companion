@@ -195,9 +195,10 @@ async def run(image_path: str, expect_person: bool = False):
 
         mac_sender = ScenarioSender()
 
+        visual_model = FixedVisualModel(expect_person)
         control = MindRuntime(
             MacMind(
-                FixedVisualModel(expect_person),
+                visual_model,
                 FixedLanguageModel(),
             )
         )
@@ -347,6 +348,10 @@ async def run(image_path: str, expect_person: bool = False):
             if max_forward_velocity <= 0.02:
                 raise RuntimeError(
                     f"full stack did not observe visual following: {max_forward_velocity:.2f}m/s"
+                )
+            if visual_model.following_focus_lost:
+                raise RuntimeError(
+                    "full stack lost visual focus during a repeated following goal"
                 )
             print("Visual following=verified.")
         elif any(
