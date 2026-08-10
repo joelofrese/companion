@@ -174,8 +174,10 @@ and `--memory` for editable experience memory.
 - The `objects` world provides simple colored objects and a mannequin in the
   forward camera view; `--moving-person` moves that mannequin between fixed
   poses on both sides and exercises changing visual scenes. The default
-  moondream model recognizes these subjects but does not reliably describe
-  their position; unclear output still holds zero.
+  moondream model recognizes focused subjects but does not reliably describe
+  broad-scene position; a 20-second open-ended run produced six unclear
+  observations, while the slower Qwen option produced no thought in that time.
+  Unclear output still holds zero.
 - Non-default worlds require rendered camera or simulated depth so motion is
   never blind in a collidable world. Gazebo frames are reduced to 640 pixels.
 - Open-ended goals can move through clear simulated space. Dialogue can change
