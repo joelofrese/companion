@@ -212,6 +212,9 @@ and `--memory` for editable experience memory.
 - A fault-injected live-depth run verified 584/584 valid depth samples, CM5
   backoff, stale and invalid depth, command dropout and rejection, missing
   velocity, brain shutdown, landing, and disarm; forward motion stayed bounded.
+- A real Ollama fault-injected depth run also passed all seven exploratory
+  fault checks with 507/507 valid depth samples, bounded motion, landing, and
+  disarm.
 - Conscious prompts keep distinct visual changes and drop repeated descriptions
   so local thinking stays responsive.
 - VLM prompt echoes and intent-only descriptions become unclear, zero-confidence
