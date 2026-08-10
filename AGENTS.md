@@ -212,6 +212,8 @@ and `--memory` for editable experience memory.
 - Missing, stale, malformed, low-confidence, or failed input stops Mac motion.
   CM5 command limits, TOF protection, and PX4 forwarding remain the final
   vehicle-side path.
+- Generic prompt labels are not valid visual focus; the brain keeps only real
+  subjects such as a person or red box.
 - RTP video, rendered Gazebo video, simulated depth, landing, and disarm are
   verified. ROS 2 forwarding is implemented but hardware remains unverified;
   DEXI 3 has no lidar, and current GPS-denied SITL optical flow is not used.

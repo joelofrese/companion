@@ -291,6 +291,8 @@ Keep a clear current visual focus until it is answered, not visible, or no
 longer relevant; do not replace it just because another object is visible.
 When dialogue asks you to find or inspect something, make that subject the
 focus even if the first frame is unclear.
+Leave focus empty unless it names a concrete visible subject, such as a person
+or red box. Never use a prompt label such as "visual observations" as focus.
 Set intent_changed true only when the high-level goal really changes. When
 continuing the current goal, set it false and copy the current intent exactly;
 do not rephrase it. You may choose a short natural intent, but do not issue

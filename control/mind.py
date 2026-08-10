@@ -14,7 +14,19 @@ from voice.intent import parse_focus, parse_intent
 MAX_PENDING_OBSERVATIONS = 32
 PLACEHOLDER_TEXT = frozenset(("stop", "camera", "camera frame"))
 FOCUS_PLACEHOLDER_TEXT = PLACEHOLDER_TEXT | frozenset(
-    ("forward", "backward", "left", "right", "up", "down", "hover")
+    (
+        "forward",
+        "backward",
+        "left",
+        "right",
+        "up",
+        "down",
+        "hover",
+        "observation",
+        "observations",
+        "visual observation",
+        "visual observations",
+    )
 )
 
 @dataclass(frozen=True)
