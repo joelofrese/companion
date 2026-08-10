@@ -184,7 +184,7 @@ answer that subject exactly; never substitute another object. If it is not
 visible, say so. Suggest one cautious movement. Use stop when the image is
 unclear, unsafe, or blocked. For exploration, choose slow forward, left, or
 right movement when a clear path is visible. For following, move toward a
-visible focused subject when the path is clear. If forward TOF is below
+visible focused subject when the path is clear. If forward TOF is at or below
 {OBSTACLE_STOP_M:.1f}m,
 choose stop. Never move backward.
 

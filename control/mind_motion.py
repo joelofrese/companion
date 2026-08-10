@@ -31,7 +31,7 @@ def movement_command(
         or not isinstance(obstacle_distance_m, Real)
         or not math.isfinite(obstacle_distance_m)
         or obstacle_distance_m < 0.0
-        or obstacle_distance_m < OBSTACLE_STOP_M
+        or obstacle_distance_m <= OBSTACLE_STOP_M
     ):
         return VelocityCommand()
     if not isinstance(movement, str):
