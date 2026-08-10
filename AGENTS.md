@@ -192,14 +192,16 @@ model. Use `--dialogue` for typed conversation, `--voice-once` for one spoken
 request, and `--memory` for editable experience memory.
 
 With `GEMINI_API_KEY`, the brain uses one persistent Gemini Robotics ER 2
-Streaming session. Native context-window compression manages the in-flight
-conversation; the editable memory file is only prior experience across runs.
-The session receives the newest 640-pixel JPEG once per second while model
-turns run. Movement and speech tools return without waiting for their duration,
-so the brain can continue receiving video, telemetry, and dialogue. The CM5
-still expires, limits, and overrides every physical command. The trace reads
-Gemini's native `thought` parts separately from visible responses and tool
-calls; ER 2 may emit no thought summaries even when it reasons internally.
+Streaming session. Native context-window compression keeps the in-flight
+conversation bounded, and native session resumption reconnects it with the
+latest resumable handle when a connection ends. The editable memory file is
+only prior experience across runs. The session receives the newest 640-pixel
+JPEG once per second while model turns run. Movement and speech tools return
+without waiting for their duration, so the brain can continue receiving video,
+telemetry, and dialogue. The CM5 still expires, limits, and overrides every
+physical command. The trace reads Gemini's native `thought` parts separately
+from visible responses and tool calls; ER 2 may emit no thought summaries even
+when it reasons internally.
 
 ## Current state
 
@@ -208,12 +210,12 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
 - Exploratory camera and depth worlds exercise open-ended goals, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
-  for simulation and the CM5. It now uses native context compression and
-  non-blocking move, turn, hover, and speech actions. Native thought-part
-  tracing is enabled, but ER 2 may emit no thought summaries; actions remain
-  separately visible. Local Ollama VLM and LLM sessions remain an explicit
-  fallback. A live 45-degree turn request produced 47.6 degrees of observed
-  yaw and landed and disarmed safely.
+  for simulation and the CM5. It uses native context compression and session
+  resumption, with non-blocking move, turn, hover, and speech actions. Native
+  thought-part tracing is enabled, but ER 2 may emit no thought summaries;
+  actions remain separately visible. Local Ollama VLM and LLM sessions remain
+  an explicit fallback. A live 45-degree turn request produced 47.6 degrees
+  of observed yaw and landed and disarmed safely.
 - The brain sends only slow forward, lateral, and yaw-rate commands. CM5 limits
   commands and uses TOF safety; PX4 stabilizes, turns, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;

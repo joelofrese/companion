@@ -23,6 +23,7 @@ VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
 RESPONSE_TIMEOUT_S = 10.0
 START_TIMEOUT_S = 20.0
+RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
 MIN_TURN_DEG = 15.0
@@ -75,6 +76,9 @@ class GeminiRuntime:
         self.thought_count = 0
         self.thought_token_count = 0
         self._memory_sent = False
+        self._session_handle: Optional[str] = None
+        self.session_reconnect_count = 0
+        self._reconnect_requested = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -198,50 +202,83 @@ class GeminiRuntime:
             from google.genai import types
 
             client = genai.Client(api_key=self.api_key)
-            config = types.LiveConnectConfig(
-                response_modalities=["TEXT"],
-                tools=_tools(),
-                system_instruction=_system_instruction(),
-                thinking_config=types.ThinkingConfig(include_thoughts=True),
-                context_window_compression=types.ContextWindowCompressionConfig(
-                    sliding_window=types.SlidingWindow()
-                ),
-            )
-            async with client.aio.live.connect(
-                model=self.model,
-                config=config,
-            ) as session:
-                self._ready.set()
-                await self._frame_ready.wait()
+            connected = False
+            while not self._closed.is_set():
+                self._reconnect_requested = False
+                try:
+                    config = types.LiveConnectConfig(
+                        response_modalities=["TEXT"],
+                        tools=_tools(),
+                        system_instruction=_system_instruction(),
+                        thinking_config=types.ThinkingConfig(include_thoughts=True),
+                        context_window_compression=(
+                            types.ContextWindowCompressionConfig(
+                                sliding_window=types.SlidingWindow()
+                            )
+                        ),
+                        session_resumption=types.SessionResumptionConfig(
+                            handle=self._session_handle
+                        ),
+                    )
+                    async with client.aio.live.connect(
+                        model=self.model,
+                        config=config,
+                    ) as session:
+                        connected = True
+                        self._ready.set()
+                        await self._frame_ready.wait()
+                        if self._closed.is_set():
+                            return
+                        await self._send_frame(session, types)
+                        video_task = asyncio.create_task(
+                            self._stream_video(session, types)
+                        )
+                        try:
+                            while (
+                                not self._closed.is_set()
+                                and not self._reconnect_requested
+                            ):
+                                sent_at_s = time.monotonic()
+                                await self._heartbeat(session)
+                                try:
+                                    await asyncio.wait_for(
+                                        self._receive(session, types),
+                                        timeout=RESPONSE_TIMEOUT_S,
+                                    )
+                                except asyncio.TimeoutError:
+                                    pass
+                                if video_task.done():
+                                    await video_task
+                                remaining_s = MIN_HEARTBEAT_PERIOD_S - (
+                                    time.monotonic() - sent_at_s
+                                )
+                                if remaining_s > 0.0:
+                                    try:
+                                        await asyncio.wait_for(
+                                            self._closed.wait(), timeout=remaining_s
+                                        )
+                                    except asyncio.TimeoutError:
+                                        pass
+                        finally:
+                            video_task.cancel()
+                            await asyncio.gather(video_task, return_exceptions=True)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    if not connected:
+                        raise error
+                    if self._closed.is_set():
+                        return
+                    print(f"Gemini session reconnecting: {error}", flush=True)
                 if self._closed.is_set():
                     return
-                await self._send_frame(session, types)
-                video_task = asyncio.create_task(self._stream_video(session, types))
+                self.session_reconnect_count += 1
                 try:
-                    while not self._closed.is_set():
-                        sent_at_s = time.monotonic()
-                        await self._heartbeat(session)
-                        try:
-                            await asyncio.wait_for(
-                                self._receive(session, types), timeout=RESPONSE_TIMEOUT_S
-                            )
-                        except asyncio.TimeoutError:
-                            pass
-                        if video_task.done():
-                            await video_task
-                        remaining_s = MIN_HEARTBEAT_PERIOD_S - (
-                            time.monotonic() - sent_at_s
-                        )
-                        if remaining_s > 0.0:
-                            try:
-                                await asyncio.wait_for(
-                                    self._closed.wait(), timeout=remaining_s
-                                )
-                            except asyncio.TimeoutError:
-                                pass
-                finally:
-                    video_task.cancel()
-                    await asyncio.gather(video_task, return_exceptions=True)
+                    await asyncio.wait_for(
+                        self._closed.wait(), timeout=RECONNECT_DELAY_S
+                    )
+                except asyncio.TimeoutError:
+                    pass
         except Exception as error:
             self._error = error
             self._ready.set()
@@ -298,6 +335,13 @@ class GeminiRuntime:
 
     async def _receive(self, session, types):
         async for message in session.receive():
+            update = message.session_resumption_update
+            if update is not None and update.resumable and update.new_handle:
+                self._session_handle = update.new_handle
+
+            if message.go_away is not None:
+                self._reconnect_requested = True
+
             usage = message.usage_metadata
             if usage is not None and usage.thoughts_token_count is not None:
                 self.thought_token_count = usage.thoughts_token_count
@@ -337,6 +381,12 @@ class GeminiRuntime:
                 self._movement = "stop"
                 self._movement_until_s = 0.0
                 self._record_action("cancelled the current action")
+
+            if self._reconnect_requested:
+                self._response_parts.clear()
+                self._response_thoughts.clear()
+                self._action_summary = ""
+                return
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":
