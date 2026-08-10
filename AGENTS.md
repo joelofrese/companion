@@ -212,6 +212,11 @@ and `--memory` for editable experience memory.
   so local thinking stays responsive.
 - VLM prompt echoes and intent-only descriptions become unclear, zero-confidence
   observations rather than movement suggestions.
+- Prompt-field echoes from local models are discarded at the Ollama boundary.
+  An opt-in moondream conscious run produced seven thoughts in 20 seconds,
+  honored follow and stop dialogue, and issued bounded follow motion; Gemma
+  remains the default conscious model until broader dialogue shows equal
+  reliability.
 - Brain and CM5 use slow forward, right, and down body-frame velocity. Both
   simulated and ROS 2 CM5 paths convert it with fresh vehicle heading.
 - A 120-second synthetic exploratory run completed with 2,331 VLM observations

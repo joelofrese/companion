@@ -34,6 +34,20 @@ DESCRIPTION_PLACEHOLDERS = PLACEHOLDER_TEXT | frozenset(
         "the scene is clear and safe",
     )
 )
+PROMPT_ECHO_PREFIXES = (
+    "intent:",
+    "current intent:",
+    "visual focus:",
+    "requested visual focus:",
+    "previous movement:",
+    "previous description:",
+    "previous visual summary:",
+    "last command:",
+    "last requested command:",
+    "body velocity:",
+    "measured body velocity:",
+    "forward tof distance:",
+)
 MAX_OUTPUT_TOKENS = 64
 MAX_IMAGE_SIDE = 640
 
@@ -85,6 +99,13 @@ def _text(data: Dict[str, Any], name: str) -> str:
 def _meaningful_text(data: Dict[str, Any], name: str) -> str:
     value = _text(data, name)
     return "" if value.lower() in PLACEHOLDER_TEXT else value
+
+
+def _prompt_echo(value: str) -> bool:
+    """Return whether model text repeats a prompt field instead of the scene."""
+
+    value = " ".join(value.lower().split())
+    return any(value.startswith(prefix) for prefix in PROMPT_ECHO_PREFIXES)
 
 
 def _confirmed_focus(answer: str, focus: str) -> str:
@@ -295,6 +316,7 @@ it empty.
                 description_key.startswith(f"{placeholder}:")
                 for placeholder in DESCRIPTION_PLACEHOLDERS
             )
+            or _prompt_echo(description)
             or description_key == intent_key
             or "unclear" in description_key
         ):
@@ -379,10 +401,16 @@ The summary should stay short and describe what the drone currently knows.
             think=False,
         )
         intent = _text(data, "intent") or information.intent
+        focus = _meaningful_text(data, "focus")
+        summary = _meaningful_text(data, "summary")
+        if _prompt_echo(focus):
+            focus = ""
+        if _prompt_echo(summary):
+            summary = ""
         return ConsciousDecision(
             intent=intent,
             intent_changed=data.get("intent_changed") is True,
-            focus=_text(data, "focus"),
+            focus=focus,
             dialogue=_text(data, "dialogue"),
-            summary=_text(data, "summary"),
+            summary=summary,
         )
