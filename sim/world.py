@@ -152,7 +152,8 @@ async def run(
 
     ollama_client = None
     if ollama:
-        from control.ollama_brain import OllamaClient, OllamaLanguageModel, OllamaVisionModel
+        from control.ollama_brain import OllamaLanguageModel, OllamaVisionModel
+        from control.ollama_client import OllamaClient
 
         ollama_client = OllamaClient(timeout_s=ollama_timeout)
         await asyncio.to_thread(ollama_client.check)

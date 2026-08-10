@@ -60,6 +60,9 @@ body-frame velocity setpoints to PX4, converting them with fresh vehicle
 heading. Keep hardware-specific code on the CM5 so Mac behavior stays easy to
 simulate.
 
+The Ollama client handles local model transport; `control/ollama_brain.py`
+handles VLM and LLM prompts and response cleanup.
+
 The target is the DroneBlocks DEXI 3: PX4, optical flow, a TOF distance sensor,
 a Raspberry Pi camera, and a Raspberry Pi CM5. It has no lidar. Keep
 simulation-only sensors separate from this hardware boundary.
