@@ -98,6 +98,8 @@ def parse_focus(transcript: str) -> Optional[str]:
             subject = subject[:stop]
             subject = [word for word in subject if word != "please"][:4]
             if subject:
+                if subject in (["me"], ["us"]):
+                    return "person"
                 return " ".join(subject)
     return None
 
