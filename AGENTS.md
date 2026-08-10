@@ -204,7 +204,8 @@ and `--memory` for editable experience memory.
   depth, landing, and disarm. RTP fixtures and rendered Gazebo camera runs also
   verify the video, Mac, CM5, and PX4 paths.
 - The target remains the DEXI 3: no lidar, DEXI hardware is unverified, and
-  PX4's GPS-denied optical-flow quality is still unverified in SITL.
+  current SITL's GPS-denied optical-flow topic publishes no messages, so no
+  flow-dependent behavior is claimed.
 - Keep prioritizing closed-loop autonomous world operation and simpler code.
 
 At the end of a meaningful session, update this section with only the current
