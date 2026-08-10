@@ -104,7 +104,7 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --explore --camera --ollama --trace --world objects --request "look for the red box" --duration 20
 .venv/bin/python -m sim.run_world --explore --faults --world default --duration 32
 .venv/bin/python -m sim.run_world --explore --depth --world walls --intent following --pose 3.8,0,0,0,0,0
-.venv/bin/python -m sim.run_world --explore --depth --moving-person --world objects --intent "follow the person" --duration 20
+.venv/bin/python -m sim.run_world --explore --depth --ollama --moving-person --world objects --intent "follow the person" --duration 20
 .venv/bin/python -m sim.run_world --explore --duration 120
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg
 .venv/bin/python -m sim.run_world --image /Users/joelofrese/Code/Croppie/PX4-Autopilot/docs/assets/hardware/BeagleBone_Blue_balloons.jpg --expect-person
@@ -189,7 +189,8 @@ and `--memory` for editable experience memory.
 - The companion-owned `objects` world contains simple colored objects and a
   mannequin. `--moving-person` moves the mannequin through fixed poses.
   Non-default worlds require a rendered camera or simulated depth so motion is
-  never blind in a collidable world.
+  never blind in a collidable world. The red box and mannequin are visually
+  separate so focused inspection and following exercise distinct targets.
 - Separate local VLM and LLM sessions support open-ended goals, focused
   requests, dialogue, and editable experience memory. `moondream` is the
   quicker default for both; slower models remain selectable. The Ollama client
