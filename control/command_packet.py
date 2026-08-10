@@ -9,13 +9,13 @@ from typing import Optional
 from control.velocity import VelocityCommand
 
 
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 MAX_PACKET_BYTES = 512
 
 
 @dataclass(frozen=True)
 class CommandPacket:
-    """One numbered velocity command."""
+    """One numbered movement command."""
 
     sequence: int
     command: VelocityCommand
@@ -25,6 +25,7 @@ class CommandPacket:
             self.command.forward_m_s,
             self.command.right_m_s,
             self.command.down_m_s,
+            self.command.yaw_rate_deg_s,
         )
         if (
             isinstance(self.sequence, bool)
@@ -41,6 +42,7 @@ class CommandPacket:
                 "forward_m_s": self.command.forward_m_s,
                 "right_m_s": self.command.right_m_s,
                 "down_m_s": self.command.down_m_s,
+                "yaw_rate_deg_s": self.command.yaw_rate_deg_s,
             },
         }
         encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -58,7 +60,13 @@ class CommandPacket:
             sequence = data["sequence"]
             velocity = data["velocity"]
             values = tuple(
-                velocity[name] for name in ("forward_m_s", "right_m_s", "down_m_s")
+                velocity[name]
+                for name in (
+                    "forward_m_s",
+                    "right_m_s",
+                    "down_m_s",
+                    "yaw_rate_deg_s",
+                )
             )
         except (
             AttributeError,

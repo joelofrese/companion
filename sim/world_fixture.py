@@ -116,6 +116,7 @@ class SyntheticWorld:
                     forward_m_s=1.0,
                     right_m_s=1.0,
                     down_m_s=1.0,
+                    yaw_rate_deg_s=90.0,
                 )
             )
         return WorldStep()

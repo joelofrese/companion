@@ -23,7 +23,11 @@ from control.mind_runtime import (
     MIN_MOVEMENT_CONFIDENCE,
     MindRuntime,
 )
-from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
+from control.safety_limits import (
+    BACKOFF_SPEED_M_S,
+    MAX_YAW_RATE_DEG_S,
+    OBSTACLE_STOP_M,
+)
 from control.velocity import VelocityCommand, ned_to_body
 from onboard.safety import LatestDistanceSensor
 from sim.flight import (
@@ -262,12 +266,8 @@ async def run(
                 math.radians(current_heading_deg),
             )
 
-        def current_heading():
-            return current_heading_deg
-
         stack = SimulatedSafetyStack(
             drone,
-            heading_provider=current_heading,
             obstacle_distance=distance_sensor.read,
             velocity_provider=vehicle_velocity,
         )
@@ -644,7 +644,7 @@ async def run(
                 else:
                     reason = "Brain timing or intent refresh held zero"
             else:
-                reason = "Brain suggested movement"
+                reason = "Brain suggested movement or turn"
             last_forwarded = (
                 safe_commands.commands[-1][1]
                 if safe_commands.commands
@@ -737,15 +737,33 @@ async def run(
         print("Brain velocity telemetry=verified.")
         if initial_yaw_deg is None:
             raise RuntimeError("SITL did not provide heading telemetry")
-        if max_heading_change_deg > MAX_HEADING_CHANGE_DEG:
+        max_yaw_rate_deg_s = max(
+            abs(command.yaw_rate_deg_s) for _, command in commands
+        )
+        if max_yaw_rate_deg_s > MAX_YAW_RATE_DEG_S:
+            raise RuntimeError(
+                "CM5 forwarded an unsafe yaw rate: "
+                f"{max_yaw_rate_deg_s:.1f} degrees/s"
+            )
+        print(
+            "CM5 yaw-rate limit=verified: "
+            f"maximum {max_yaw_rate_deg_s:.1f} degrees/s."
+        )
+        if not exploratory and max_heading_change_deg > MAX_HEADING_CHANGE_DEG:
             raise RuntimeError(
                 "SITL heading changed unexpectedly: "
                 f"{max_heading_change_deg:.1f} degrees"
             )
-        print(
-            "PX4 heading hold=verified: "
-            f"maximum change {max_heading_change_deg:.1f} degrees."
-        )
+        if exploratory:
+            print(
+                "PX4 yaw control observed: "
+                f"maximum change {max_heading_change_deg:.1f} degrees."
+            )
+        else:
+            print(
+                "PX4 heading hold=verified: "
+                f"maximum change {max_heading_change_deg:.1f} degrees."
+            )
         if requested_intent is not None:
             if applied_dialogue_intent != requested_intent:
                 raise RuntimeError(

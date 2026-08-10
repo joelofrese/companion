@@ -1,4 +1,4 @@
-"""The body-frame velocity command shared by all control layers."""
+"""The body-frame movement command shared by all control layers."""
 
 import math
 from dataclasses import dataclass
@@ -6,11 +6,12 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class VelocityCommand:
-    """Forward, right, and down velocity setpoints in the body frame."""
+    """Body-frame velocity and yaw-rate setpoints."""
 
     forward_m_s: float = 0.0
     right_m_s: float = 0.0
     down_m_s: float = 0.0
+    yaw_rate_deg_s: float = 0.0
 
 
 def body_to_ned(command: VelocityCommand, heading_rad: float):

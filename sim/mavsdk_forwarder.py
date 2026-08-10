@@ -1,38 +1,24 @@
 """Forward simulated CM5 commands to PX4 through MAVSDK."""
 
-import math
-from typing import Callable, Optional
+from mavsdk.offboard import VelocityBodyYawspeed
 
-from mavsdk.offboard import VelocityNedYaw
-
-from control.velocity import VelocityCommand, body_to_ned
+from control.velocity import VelocityCommand
 
 
 class MavsdkVelocityForwarder:
     """Send one simulated velocity setpoint to PX4."""
 
-    def __init__(self, drone, heading_provider: Callable[[], Optional[float]]):
+    def __init__(self, drone):
         self.drone = drone
-        self.heading_provider = heading_provider
 
     async def send(self, command: VelocityCommand):
         """Send one velocity setpoint."""
 
-        heading_deg = self.heading_provider()
-        if heading_deg is None or not math.isfinite(heading_deg):
-            north_m_s = east_m_s = down_m_s = 0.0
-            yaw_deg = math.nan
-        else:
-            north_m_s, east_m_s, down_m_s = body_to_ned(
-                command,
-                math.radians(heading_deg),
-            )
-            yaw_deg = heading_deg
-        await self.drone.offboard.set_velocity_ned(
-            VelocityNedYaw(
-                north_m_s,
-                east_m_s,
-                down_m_s,
-                yaw_deg,
+        await self.drone.offboard.set_velocity_body(
+            VelocityBodyYawspeed(
+                command.forward_m_s,
+                command.right_m_s,
+                command.down_m_s,
+                command.yaw_rate_deg_s,
             )
         )

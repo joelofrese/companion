@@ -7,7 +7,11 @@ from numbers import Real
 from typing import Optional
 
 from control.command_packet import CommandPacket
-from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
+from control.safety_limits import (
+    BACKOFF_SPEED_M_S,
+    MAX_YAW_RATE_DEG_S,
+    OBSTACLE_STOP_M,
+)
 from control.velocity import VelocityCommand, ned_to_body
 
 
@@ -222,4 +226,5 @@ class OnboardSafetyEnvelope:
             abs(command.forward_m_s) <= MAX_HORIZONTAL_SPEED_M_S
             and abs(command.right_m_s) <= MAX_HORIZONTAL_SPEED_M_S
             and abs(command.down_m_s) <= MAX_VERTICAL_SPEED_M_S
+            and abs(command.yaw_rate_deg_s) <= MAX_YAW_RATE_DEG_S
         )

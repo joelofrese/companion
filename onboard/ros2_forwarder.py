@@ -46,15 +46,17 @@ class Ros2VelocityForwarder:
         heading = self.heading_provider()
         if heading is None or not math.isfinite(heading):
             north_m_s = east_m_s = down_m_s = 0.0
+            yaw_rate_rad_s = 0.0
         else:
             north_m_s, east_m_s, down_m_s = body_to_ned(command, heading)
+            yaw_rate_rad_s = math.radians(command.yaw_rate_deg_s)
         setpoint.velocity = [
             north_m_s,
             east_m_s,
             down_m_s,
         ]
         setpoint.acceleration = [math.nan, math.nan, math.nan]
-        # NaN tells PX4 to hold the current heading.
+        # NaN leaves heading unset; yawspeed controls optional turning.
         setpoint.yaw = math.nan
-        setpoint.yawspeed = math.nan
+        setpoint.yawspeed = yaw_rate_rad_s
         self.setpoint_publisher.publish(setpoint)

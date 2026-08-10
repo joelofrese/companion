@@ -58,6 +58,7 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         command.forward_m_s,
         command.right_m_s,
         command.down_m_s,
+        command.yaw_rate_deg_s,
     )
     velocity_values = (
         telemetry.forward_velocity_m_s,

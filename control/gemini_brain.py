@@ -13,6 +13,7 @@ from PIL import Image
 from control.memory import CompanionMemory
 from control.mind import ConsciousDecision, Telemetry, VisualObservation
 from control.mind_motion import movement_command
+from control.safety_limits import MAX_YAW_RATE_DEG_S, OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 from voice.intent import parse_intent
 
@@ -24,6 +25,9 @@ RESPONSE_TIMEOUT_S = 10.0
 START_TIMEOUT_S = 20.0
 MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
+MIN_TURN_DEG = 15.0
+MAX_TURN_DEG = 90.0
+TURN_RATE_DEG_S = MAX_YAW_RATE_DEG_S
 MAX_IMAGE_WIDTH = 640
 
 
@@ -50,6 +54,8 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._movement = "stop"
         self._movement_until_s = 0.0
+        self._turn_direction = "stop"
+        self._turn_until_s = 0.0
         self._movement_blocked = False
         self.latest_observation: Optional[VisualObservation] = None
         self.latest_decision: Optional[ConsciousDecision] = None
@@ -114,6 +120,8 @@ class GeminiRuntime:
             self.set_intent(message)
             self._movement = "stop"
             self._movement_until_s = 0.0
+            self._turn_direction = "stop"
+            self._turn_until_s = 0.0
 
     def tick(
         self,
@@ -132,8 +140,11 @@ class GeminiRuntime:
             self._latest_frame = frame
             self._frame_ready.set()
         self._telemetry = telemetry
-        if time.monotonic() >= self._movement_until_s:
+        now = time.monotonic()
+        if now >= self._movement_until_s:
             self._movement = "stop"
+        if now >= self._turn_until_s:
+            self._turn_direction = "stop"
         if any(
             value is None or not math.isfinite(value)
             for value in (
@@ -144,7 +155,23 @@ class GeminiRuntime:
         ):
             command = VelocityCommand()
         else:
-            command = movement_command(self._movement, telemetry.obstacle_distance_m)
+            movement = movement_command(self._movement, telemetry.obstacle_distance_m)
+            yaw_rate = 0.0
+            if (
+                self._turn_direction != "stop"
+                and telemetry.obstacle_distance_m is not None
+                and math.isfinite(telemetry.obstacle_distance_m)
+                and telemetry.obstacle_distance_m > OBSTACLE_STOP_M
+            ):
+                yaw_rate = TURN_RATE_DEG_S * (
+                    1.0 if self._turn_direction == "right" else -1.0
+                )
+            command = VelocityCommand(
+                movement.forward_m_s,
+                movement.right_m_s,
+                movement.down_m_s,
+                yaw_rate,
+            )
         if self._movement != "stop" and command == VelocityCommand():
             self._movement_blocked = True
         return command
@@ -154,6 +181,8 @@ class GeminiRuntime:
 
         self._movement = "stop"
         self._movement_until_s = 0.0
+        self._turn_direction = "stop"
+        self._turn_until_s = 0.0
         self._closed.set()
         self._frame_ready.set()
 
@@ -257,9 +286,9 @@ class GeminiRuntime:
             f"[HEARTBEAT] Goal: {self.intent}\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
-            "to move, hover, speak, or do nothing. Never infer that a move is safe "
-            "from the image alone. A heartbeat does not require a tool or a visible "
-            "response."
+            "to move, turn, hover, speak, or do nothing. Never infer that a move or "
+            "turn is safe from the image alone. A heartbeat does not require a tool "
+            "or a visible response."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -312,9 +341,13 @@ class GeminiRuntime:
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":
             return await self._move(args)
+        if name == "turn":
+            return await self._turn(args)
         if name == "hover":
             self._movement = "stop"
             self._movement_until_s = 0.0
+            self._turn_direction = "stop"
+            self._turn_until_s = 0.0
             self._record_action("hover")
             return {"status": "hovering", "telemetry": _telemetry_text(self._telemetry)}
         if name == "speak":
@@ -351,6 +384,33 @@ class GeminiRuntime:
         return {
             "status": "accepted",
             "expires_in_s": duration_s,
+            "telemetry": _telemetry_text(self._telemetry),
+        }
+
+    async def _turn(self, args: dict) -> dict:
+        direction = str(args.get("direction", "")).strip().lower()
+        angle_deg = args.get("angle_deg")
+        if direction not in ("left", "right"):
+            return {
+                "status": "rejected",
+                "reason": "direction must be left or right",
+            }
+        if (
+            isinstance(angle_deg, bool)
+            or not isinstance(angle_deg, (int, float))
+            or not math.isfinite(angle_deg)
+            or not MIN_TURN_DEG <= angle_deg <= MAX_TURN_DEG
+        ):
+            return {
+                "status": "rejected",
+                "reason": f"angle_deg must be {MIN_TURN_DEG} to {MAX_TURN_DEG}",
+            }
+        self._turn_direction = direction
+        self._turn_until_s = time.monotonic() + angle_deg / TURN_RATE_DEG_S
+        self._record_action(f"turn {direction} {angle_deg:.0f} degrees")
+        return {
+            "status": "accepted",
+            "expires_in_s": angle_deg / TURN_RATE_DEG_S,
             "telemetry": _telemetry_text(self._telemetry),
         }
 
@@ -431,6 +491,25 @@ def _tools():
             },
         },
         {
+            "name": "turn",
+            "description": "Turn in place slowly to look in another direction.",
+            "behavior": "NON_BLOCKING",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "direction": {
+                        "type": "STRING",
+                        "enum": ["left", "right"],
+                    },
+                    "angle_deg": {
+                        "type": "NUMBER",
+                        "description": "A turn from 15 through 90 degrees.",
+                    },
+                },
+                "required": ["direction", "angle_deg"],
+            },
+        },
+        {
             "name": "hover",
             "description": "Stop horizontal motion and hold position.",
             "behavior": "NON_BLOCKING",
@@ -456,13 +535,14 @@ def _system_instruction() -> str:
         "You are the high-level brain of an indoor companion drone. Observe the "
         "latest camera image, user dialogue, goal, and telemetry. Think broadly, "
         "but move slowly and deliberately. You have optional tools for brief "
-        "forward or lateral translation, hovering, and speech. Choose freely "
+        "forward or lateral translation, turning in place, hovering, and speech. "
+        "Choose freely "
         "whether to use one, use several, or use none; a heartbeat is not a "
         "requirement to act or speak. The CM5 checks every physical action and "
         "may stop it. "
-        "Never request altitude, heading, motors, attitude, position, or a long "
-        "move. Use hover when stopping is appropriate or the scene or telemetry "
-        "is unclear."
+        "Never request altitude, motors, attitude, position, or a long translation. "
+        "Turn only through the turn tool. Use hover when stopping is appropriate "
+        "or the scene or telemetry is unclear."
     )
 
 
@@ -490,6 +570,7 @@ def _telemetry_text(telemetry: Telemetry) -> str:
                     command.forward_m_s,
                     command.right_m_s,
                     command.down_m_s,
+                    command.yaw_rate_deg_s,
                 )
             ),
             "velocity=" + ",".join(

@@ -43,8 +43,8 @@ merge and delete it.
   the brain uses it only after the TOF stop clears.
 - The LLM uses observations, dialogue, telemetry, and memory to choose intent.
 - A follow goal passes its subject to the VLM as visual focus.
-- The brain turns that intent and visual suggestion into slow forward or
-  lateral body-frame velocity; flight lifecycle owns altitude.
+- The brain turns intent and visual suggestions into slow forward, lateral, or
+  yaw-rate body-frame commands; flight lifecycle owns altitude.
 - A real intent change invalidates old visual context and pending brain
   results; rewording the same goal does not.
 - A recognized dialogue intent stays active until a new open-ended request.
@@ -57,22 +57,23 @@ merge and delete it.
   protects against obstacles, and is the final vehicle-side authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
-The brain sends forward or lateral body-frame velocity only: never motor,
-attitude, altitude, or absolute-position commands. A fresh obstacle reading
-may override normal intent. Keep movement slow, deliberate, and easy to stop.
+The brain sends slow forward or lateral body-frame velocity and yaw rate only:
+never motor, attitude, altitude, or absolute-position commands. A fresh
+obstacle reading may override normal intent. Keep movement slow, deliberate,
+and easy to stop.
 
 ## Hardware boundary
 
 The CM5 runs the camera, Gemini connection, companion brain, final safety
-checks, and PX4 forwarding. It sends only approved body-frame velocity
-setpoints to PX4, converting them with fresh vehicle heading. A Mac remains
-useful for Gazebo, development, and optional remote operation, but is not
-needed during flight.
+checks, and PX4 forwarding. It sends only approved body-frame velocity and
+yaw-rate setpoints to PX4, converting translation with fresh vehicle heading.
+A Mac remains useful for Gazebo, development, and optional remote operation,
+but is not needed during flight.
 
 The Ollama client handles the explicit local-model fallback;
 `control/ollama_brain.py` handles its prompts and response cleanup.
-`control/gemini_brain.py` keeps the Gemini session and its movement, hover, and
-speech tools. Run `control.companion --local` on the CM5 beside
+`control/gemini_brain.py` keeps the Gemini session and its movement, turn, hover,
+and speech tools. Run `control.companion --local` on the CM5 beside
 `onboard.ros2_bridge` to use the hardware camera and localhost safety link.
 
 The target is the DroneBlocks DEXI 3: PX4, optical flow, a TOF distance sensor,
@@ -208,12 +209,13 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It now uses native context compression and
-  non-blocking high-level actions. Native thought-part tracing is enabled, but
-  the latest live depth-world run emitted no thought summaries; actions remain
+  non-blocking move, turn, hover, and speech actions. Native thought-part
+  tracing is enabled, but ER 2 may emit no thought summaries; actions remain
   separately visible. Local Ollama VLM and LLM sessions remain an explicit
-  fallback.
-- The brain sends only slow forward or lateral velocity. CM5 limits commands
-  and uses TOF safety; PX4 stabilizes, lands, and disarms.
+  fallback. A live 45-degree turn request produced 47.6 degrees of observed
+  yaw and landed and disarmed safely.
+- The brain sends only slow forward, lateral, and yaw-rate commands. CM5 limits
+  commands and uses TOF safety; PX4 stabilizes, turns, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
   hardware remains unverified. DEXI 3 has no lidar.
 

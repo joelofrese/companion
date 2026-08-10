@@ -145,12 +145,8 @@ async def run(image_path: str, expect_person: bool = False):
                 return (None, None, None)
             return ned_to_body(*values, math.radians(current_heading_deg))
 
-        def current_heading():
-            return current_heading_deg
-
         stack = SimulatedSafetyStack(
             drone,
-            heading_provider=current_heading,
             obstacle_distance=cm5_obstacle_distance,
             velocity_provider=body_velocity,
         )
