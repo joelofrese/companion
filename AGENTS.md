@@ -200,9 +200,9 @@ model run passes the same simulation checks.
   production path.
 - Gemini ER 2 Streaming is integrated as one persistent Mac brain for
   exploratory camera/depth simulation and the optional Mac runner. Live
-  depth-world runs verified visual decisions, a focused red-box request,
-  bounded motion, the fault schedule, and a two-minute 58-decision run with
-  safety, landing, and disarm.
+  depth-world runs verified a focused red-box response, person following,
+  reloadable experience memory, bounded motion, the fault schedule, and a
+  two-minute 58-decision run with safety, landing, and disarm.
 - The Mac sends only slow forward or lateral velocity. CM5 limits commands and
   uses TOF safety; PX4 stabilizes, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
