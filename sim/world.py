@@ -657,6 +657,8 @@ async def run(
                 reason = "CM5 has no fresh vehicle velocity"
             elif not step.distance_fresh or distance is None or not math.isfinite(distance):
                 reason = "CM5 has no fresh distance reading"
+            elif not step.frame_fresh:
+                reason = "camera frame stall fail-safe"
             elif distance < OBSTACLE_STOP_M:
                 reason = "CM5 obstacle protection"
             elif step.command_override is not None:

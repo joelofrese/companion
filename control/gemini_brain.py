@@ -144,8 +144,7 @@ class GeminiRuntime:
             return
         self._cancel_action("Gemini session reconnecting")
         self._reconnect_requested = True
-        if self._session is not None:
-            asyncio.create_task(self._session.close())
+        self._close_session()
 
     def tick(
         self,
@@ -207,6 +206,11 @@ class GeminiRuntime:
         self._cancel_action("brain closed")
         self._closed.set()
         self._frame_ready.set()
+        self._close_session()
+
+    def _close_session(self):
+        if self._session is not None:
+            asyncio.create_task(self._session.close())
 
     async def wait_closed(self):
         """Wait for the session task after closing it."""
