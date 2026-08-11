@@ -74,8 +74,6 @@ class GeminiRuntime:
         self._latest_frame = None
         self._telemetry = Telemetry()
         self._dialogue = deque()
-        self._movement = "stop"
-        self._turn_direction = "stop"
         self._active_action: Optional[ActiveAction] = None
         self._last_action_result = ""
         self.latest_observation: Optional[VisualObservation] = None
@@ -149,6 +147,7 @@ class GeminiRuntime:
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
+        action = self._active_action
         if any(
             value is None or not math.isfinite(value)
             for value in (
@@ -157,35 +156,35 @@ class GeminiRuntime:
                 telemetry.down_velocity_m_s,
             )
         ):
-            command = VelocityCommand()
-        elif self._active_action is not None:
-            movement = movement_command(self._movement, telemetry.obstacle_distance_m)
-            yaw_rate = 0.0
-            if (
-                self._turn_direction != "stop"
-                and telemetry.obstacle_distance_m is not None
-                and math.isfinite(telemetry.obstacle_distance_m)
-                and telemetry.obstacle_distance_m > OBSTACLE_STOP_M
-            ):
-                yaw_rate = TURN_RATE_DEG_S * (
-                    1.0 if self._turn_direction == "right" else -1.0
-                )
-            command = VelocityCommand(
+            return VelocityCommand()
+        if action is None or action.phase != "running":
+            return VelocityCommand()
+        if action.kind == "move":
+            movement = movement_command(
+                action.direction,
+                telemetry.obstacle_distance_m,
+            )
+            return VelocityCommand(
                 movement.forward_m_s,
                 movement.right_m_s,
                 movement.down_m_s,
-                yaw_rate,
             )
-        else:
-            command = VelocityCommand()
-        return command
+        if (
+            action.kind == "turn"
+            and telemetry.obstacle_distance_m is not None
+            and math.isfinite(telemetry.obstacle_distance_m)
+            and telemetry.obstacle_distance_m > OBSTACLE_STOP_M
+        ):
+            yaw_rate = TURN_RATE_DEG_S * (
+                1.0 if action.direction == "right" else -1.0
+            )
+            return VelocityCommand(yaw_rate_deg_s=yaw_rate)
+        return VelocityCommand()
 
     def close(self):
         """Stop movement and end the streaming session."""
 
         self._cancel_action("brain closed")
-        self._movement = "stop"
-        self._turn_direction = "stop"
         self._closed.set()
         self._frame_ready.set()
 
@@ -403,8 +402,6 @@ class GeminiRuntime:
             return await self._turn(args)
         if name == "hover":
             cancelled = self._cancel_action("hover")
-            self._movement = "stop"
-            self._turn_direction = "stop"
             self._record_action("hover")
             return {
                 "status": "hovering",
@@ -451,8 +448,6 @@ class GeminiRuntime:
         )
         self._active_action = action
         self._last_action_result = ""
-        self._movement = direction
-        self._turn_direction = "stop"
         self._record_action(f"started {self._action_label(action)}")
         return {
             "status": "started",
@@ -496,8 +491,6 @@ class GeminiRuntime:
         )
         self._active_action = action
         self._last_action_result = ""
-        self._movement = "stop"
-        self._turn_direction = direction
         self._record_action(f"started {self._action_label(action)}")
         return {
             "status": "started",
@@ -530,6 +523,16 @@ class GeminiRuntime:
         if action.kind == "move":
             return f"move {action.direction} for {action.amount:.1f}s"
         return f"turn {action.direction} {action.amount:.0f} degrees"
+
+    def _movement_label(self) -> str:
+        action = self._active_action
+        if (
+            action is not None
+            and action.kind == "move"
+            and action.phase == "running"
+        ):
+            return action.direction
+        return "stop"
 
     def _action_state_text(self) -> str:
         self._refresh_action()
@@ -569,8 +572,6 @@ class GeminiRuntime:
                         action.deadline_s,
                         now + ACTION_SETTLE_S,
                     )
-                    self._movement = "stop"
-                    self._turn_direction = "stop"
                     return
             if action.phase == "settling":
                 heading = self._telemetry.heading_rad
@@ -619,8 +620,6 @@ class GeminiRuntime:
         self._last_action_result = result
         self._record_action(result)
         self._active_action = None
-        self._movement = "stop"
-        self._turn_direction = "stop"
 
     def _cancel_action(self, reason: str) -> str:
         action = self._active_action
@@ -633,8 +632,6 @@ class GeminiRuntime:
         self._last_action_result = result
         self._record_action(result)
         self._active_action = None
-        self._movement = "stop"
-        self._turn_direction = "stop"
         return self._action_label(action)
 
     def _record_action(self, action: str):
@@ -666,7 +663,7 @@ class GeminiRuntime:
         self.latest_observation = VisualObservation(
             timestamp_s=now,
             description=summary,
-            movement=self._movement,
+            movement=self._movement_label(),
             confidence=1.0,
         )
         self.latest_decision = ConsciousDecision(
