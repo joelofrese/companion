@@ -536,7 +536,6 @@ class GeminiRuntime:
             "remaining_s": max(0.0, action.deadline_s - time.monotonic()),
             "movement_tools": "unavailable until the active action completes",
             "telemetry": _telemetry_text(self._telemetry),
-            "scheduling": "SILENT",
         }
 
     def _action_label(self, action: Optional[ActiveAction] = None) -> str:
