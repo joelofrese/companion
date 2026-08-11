@@ -846,8 +846,9 @@ def _model_text(parts) -> str:
         "# no action chosen"
     ):
         return ""
-    if value.casefold() in {
+    if value.casefold().rstrip(".!?") in {
         "none",
+        "no action",
         "no tool call necessary",
         "no tool call is necessary",
     }:
