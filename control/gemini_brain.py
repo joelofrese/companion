@@ -87,6 +87,7 @@ class GeminiRuntime:
         self.latest_decision_duration_s: Optional[float] = None
         self.observation_count = 0
         self.decision_count = 0
+        self.dialogue_count = 0
         self.turn_count = 0
         self.video_frame_count = 0
         self._response_parts = []
@@ -321,6 +322,8 @@ class GeminiRuntime:
 
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue.popleft() if self._dialogue else ""
+        if dialogue:
+            self.dialogue_count += 1
         async with self._send_lock:
             await session.send_realtime_input(text=self._heartbeat_text(dialogue))
 

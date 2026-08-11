@@ -789,7 +789,14 @@ async def run(
                     raise RuntimeError("explicit hover dialogue commanded motion")
                 print("Explicit hover dialogue stop=verified.")
         elif dialogue_request is not None:
-            print("Scripted open-ended dialogue=delivered to the conscious mind.")
+            if gemini and control.dialogue_count == 0:
+                raise RuntimeError(
+                    "SITL did not consume the scripted Gemini dialogue"
+                )
+            print(
+                "Scripted open-ended dialogue="
+                f"{'verified' if gemini else 'delivered to the conscious mind'}."
+            )
         initial_focus = parse_focus(initial_intent)
         requested_focus = parse_focus(dialogue_request or "")
         if initial_focus and not requested_focus and not gemini:
