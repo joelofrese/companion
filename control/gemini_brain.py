@@ -92,7 +92,7 @@ class GeminiRuntime:
         self.video_frame_count = 0
         self._response_parts = []
         self._response_thoughts = []
-        self._action_summary = ""
+        self._actions = []
         self.thought_count = 0
         self.thought_token_count = 0
         self._memory_sent = False
@@ -406,7 +406,7 @@ class GeminiRuntime:
             if self._reconnect_requested:
                 self._response_parts.clear()
                 self._response_thoughts.clear()
-                self._action_summary = ""
+                self._actions.clear()
                 return
 
     async def _execute(self, name: str, args: dict) -> dict:
@@ -651,19 +651,16 @@ class GeminiRuntime:
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
         if action:
-            self._action_summary = (
-                f"{self._action_summary}; {action}"
-                if self._action_summary
-                else action
-            )
+            self._actions.append(action)
 
     def _finish_turn(self):
         thought = _model_text(self._response_thoughts)
         response = _model_text(self._response_parts)
-        action = self._action_summary or "none"
+        actions = tuple(self._actions)
+        action = "; ".join(actions) or "none"
         self._response_thoughts.clear()
         self._response_parts.clear()
-        self._action_summary = ""
+        self._actions.clear()
         self.latest_thought = thought
         self.latest_response = response
         self.latest_action = action
@@ -696,9 +693,7 @@ class GeminiRuntime:
             print(f"Gemini response: {response}", flush=True)
         if self.memory_store is not None:
             memory_action = "; ".join(
-                part
-                for part in action.split("; ")
-                if not part.startswith("started ")
+                event for event in actions if not event.startswith("started ")
             )
             action_outcome = any(
                 marker in action
@@ -842,6 +837,7 @@ def _model_text(parts) -> str:
     ):
         return ""
     if value.casefold() in {
+        "none",
         "no tool call necessary",
         "no tool call is necessary",
     }:
