@@ -24,6 +24,7 @@ VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
 RESPONSE_TIMEOUT_S = 10.0
 START_TIMEOUT_S = 20.0
+INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
@@ -202,6 +203,7 @@ class GeminiRuntime:
 
             client = genai.Client(api_key=self.api_key)
             connected = False
+            initial_connect_attempts = 0
             while not self._closed.is_set():
                 self._reconnect_requested = False
                 if self._session_handle is None:
@@ -267,11 +269,18 @@ class GeminiRuntime:
                 except asyncio.CancelledError:
                     raise
                 except Exception as error:
-                    if not connected:
-                        raise error
                     if self._closed.is_set():
                         return
-                    print(f"Gemini session reconnecting: {error}", flush=True)
+                    if not connected:
+                        if initial_connect_attempts >= INITIAL_CONNECT_RETRIES:
+                            raise error
+                        initial_connect_attempts += 1
+                        print(
+                            f"Gemini initial connection failed; retrying: {error}",
+                            flush=True,
+                        )
+                    else:
+                        print(f"Gemini session reconnecting: {error}", flush=True)
                 if self._closed.is_set():
                     return
                 self.session_reconnect_count += 1
@@ -802,6 +811,13 @@ def _model_text(parts) -> str:
         if value.startswith(prefix):
             value = value[len(prefix):].lstrip(" :")
             break
+    while value.endswith("---"):
+        value = value[:-3].rstrip()
+    if value.casefold() in {
+        "no tool call necessary",
+        "no tool call is necessary",
+    }:
+        return ""
     if value.replace("```json", "").replace("```", "").strip() in {
         "{}",
         "[]",
