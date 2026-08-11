@@ -798,6 +798,10 @@ def _model_text(parts) -> str:
     """Return useful model text without empty structured-output placeholders."""
 
     value = " ".join("".join(parts).split())
+    for prefix in ("```json", "```", "{}", "[]", "null"):
+        if value.startswith(prefix):
+            value = value[len(prefix):].lstrip(" :")
+            break
     if value.replace("```json", "").replace("```", "").strip() in {
         "{}",
         "[]",
