@@ -695,12 +695,29 @@ class GeminiRuntime:
         if response:
             print(f"Gemini response: {response}", flush=True)
         if self.memory_store is not None:
-            experience = _telemetry_text(self._telemetry)
-            if action != "none":
-                experience += f"; action={action}"
-            if summary not in ("", "none") and action not in summary:
-                experience += f"; summary={summary}"
-            self.memory_store.remember(experience)
+            memory_action = "; ".join(
+                part
+                for part in action.split("; ")
+                if not part.startswith("started ")
+            )
+            action_outcome = any(
+                marker in action
+                for marker in (
+                    " completed",
+                    " timed out",
+                    " cancelled ",
+                    "speak:",
+                    "hover",
+                )
+            )
+            useful_summary = summary not in ("", "none") and action not in summary
+            if action_outcome or useful_summary:
+                experience = _telemetry_text(self._telemetry)
+                if action_outcome and memory_action:
+                    experience += f"; action={memory_action}"
+                if useful_summary:
+                    experience += f"; summary={summary}"
+                self.memory_store.remember(experience)
 
 
 def _tools():
