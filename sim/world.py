@@ -57,6 +57,8 @@ from sim.world_fixture import (
     DEFAULT_EXPLORATORY_INTENT,
     DROPOUT_END_S,
     DROPOUT_START_S,
+    GEMINI_RECONNECT_END_S,
+    GEMINI_RECONNECT_START_S,
     HOVER_START_S,
     INVALID_COMMAND_END_S,
     INVALID_COMMAND_START_S,
@@ -188,6 +190,7 @@ async def run(
     control = None
     applied_dialogue_intent = None
     brain_shutdown = False
+    brain_reconnect_requested = False
     offboard_started = False
     armed = False
     landed = False
@@ -398,7 +401,7 @@ async def run(
 
         def send_packet(timestamp_s: float, step, intent=None):
             nonlocal brain_shutdown, camera_frames, snapshot_saved
-            nonlocal applied_dialogue_intent
+            nonlocal applied_dialogue_intent, brain_reconnect_requested
             frame = gazebo_camera.latest() if gazebo_camera else step
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
@@ -412,6 +415,14 @@ async def run(
                 control.close()
                 mind_stop.set()
                 brain_shutdown = True
+            if (
+                gemini
+                and step.brain_reconnect
+                and not brain_reconnect_requested
+            ):
+                print("Gemini session reconnect requested.", flush=True)
+                control.request_reconnect()
+                brain_reconnect_requested = True
             if gemini and dialogue_input is not None:
                 message = dialogue_input.next()
                 if message:
@@ -952,6 +963,18 @@ async def run(
                         "exploratory fault run did not observe brain shutdown zero"
                     )
                 print("Exploratory fault passed: brain shutdown zero.")
+            if gemini and duration_s >= GEMINI_RECONNECT_END_S + 0.2:
+                if (
+                    not brain_reconnect_requested
+                    or control.session_reconnect_count == 0
+                ):
+                    raise RuntimeError(
+                        "exploratory fault run did not observe Gemini session reconnect"
+                    )
+                print(
+                    "Exploratory fault passed: Gemini session reconnect "
+                    f"({control.session_reconnect_count})."
+                )
 
         checks = () if exploratory else (
             (0.0, 1.0, lambda command: command.forward_m_s > 0.0, "forward following"),

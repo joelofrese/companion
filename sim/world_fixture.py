@@ -40,6 +40,8 @@ STALE_SENSOR_END_S = 15.5
 VELOCITY_TELEMETRY_START_S = 13.1
 VELOCITY_TELEMETRY_END_S = 13.6
 HOVER_START_S = 6.0
+GEMINI_RECONNECT_START_S = 8.0
+GEMINI_RECONNECT_END_S = 8.5
 VISUAL_FAILURE_START_S = 12.2
 VISUAL_FAILURE_END_S = 12.6
 CONSCIOUS_FAILURE_START_S = 24.2
@@ -63,6 +65,7 @@ class WorldStep:
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
     brain_shutdown: bool = False
+    brain_reconnect: bool = False
 
 
 class SyntheticWorld:
@@ -119,6 +122,12 @@ class SyntheticWorld:
                     yaw_rate_deg_s=90.0,
                 )
             )
+        if (
+            self.exploratory
+            and self.faults
+            and GEMINI_RECONNECT_START_S <= elapsed_s < GEMINI_RECONNECT_END_S
+        ):
+            return WorldStep(brain_reconnect=True)
         return WorldStep()
 
 

@@ -154,8 +154,9 @@ rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
 situation or local intent, and persistent experience. Typed dialogue also works
 during an exploratory run.
 Add `--faults` to inject the normal obstacle,
-sensor, link, invalid-command, and brain-shutdown schedule into an exploratory
-run. Add `--headless` for unattended runs without the Gazebo GUI.
+sensor, link, invalid-command, brain-shutdown, and Gemini-reconnect schedule
+into an exploratory run. Add `--headless` for unattended runs without the
+Gazebo GUI.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
@@ -211,8 +212,9 @@ editable experience memory.
 With `GEMINI_API_KEY`, the brain uses one persistent Gemini Robotics ER 2
 Streaming session. Native context-window compression keeps the in-flight
 conversation bounded, and native session resumption reconnects it with the
-latest resumable handle when a connection ends. The editable memory file is
-only prior experience across runs. The session receives the newest 640-pixel
+latest resumable handle when a connection ends; a rejected handle starts a
+fresh session with the situation and memory. The editable memory file is only
+prior experience across runs. The session receives the newest 640-pixel
 JPEG once per second while model turns run. Movement and speech tools return
 without waiting for their duration, so the brain can continue receiving video,
 telemetry, and dialogue. One physical move or turn stays active until its
@@ -236,6 +238,8 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   actions remain separately visible. Move and turn actions are serialized
   while their live state, completion, and heading are reported. Local Ollama
   VLM and LLM sessions remain an explicit fallback.
+- Gemini faulted depth runs verify stale-action cancellation, session recovery,
+  bounded commands, safety intervention, landing, and disarm.
 - The brain sends only slow forward, lateral, and yaw-rate commands. CM5 limits
   commands and uses TOF safety; PX4 stabilizes, turns, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;

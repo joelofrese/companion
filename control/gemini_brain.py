@@ -98,6 +98,7 @@ class GeminiRuntime:
         self._memory_sent = False
         self._bootstrap_pending = True
         self._session_handle: Optional[str] = None
+        self._session = None
         self.session_reconnect_count = 0
         self._reconnect_requested = False
         self._closed = asyncio.Event()
@@ -133,6 +134,16 @@ class GeminiRuntime:
         if not isinstance(message, str) or not message.strip():
             return
         self._dialogue.append(message.strip())
+
+    def request_reconnect(self):
+        """Reconnect the live session while stopping any active movement."""
+
+        if self._closed.is_set():
+            return
+        self._cancel_action("Gemini session reconnecting")
+        self._reconnect_requested = True
+        if self._session is not None:
+            asyncio.create_task(self._session.close())
 
     def tick(
         self,
@@ -207,6 +218,7 @@ class GeminiRuntime:
             initial_connect_attempts = 0
             while not self._closed.is_set():
                 self._reconnect_requested = False
+                self._session = None
                 if self._session_handle is None:
                     self._memory_sent = False
                     self._bootstrap_pending = True
@@ -229,6 +241,7 @@ class GeminiRuntime:
                         model=self.model,
                         config=config,
                     ) as session:
+                        self._session = session
                         connected = True
                         self._ready.set()
                         await self._frame_ready.wait()
@@ -267,11 +280,21 @@ class GeminiRuntime:
                         finally:
                             video_task.cancel()
                             await asyncio.gather(video_task, return_exceptions=True)
+                        self._session = None
                 except asyncio.CancelledError:
                     raise
                 except Exception as error:
+                    self._session = None
                     if self._closed.is_set():
                         return
+                    if self._session_handle and _resume_rejected(error):
+                        self._session_handle = None
+                        self._memory_sent = False
+                        self._bootstrap_pending = True
+                        print(
+                            "Gemini session resumption rejected; starting a fresh session.",
+                            flush=True,
+                        )
                     if not connected:
                         if initial_connect_attempts >= INITIAL_CONNECT_RETRIES:
                             raise error
@@ -913,6 +936,11 @@ def _finite(value) -> bool:
         and not isinstance(value, bool)
         and math.isfinite(value)
     )
+
+
+def _resume_rejected(error: Exception) -> bool:
+    text = str(error).casefold()
+    return "1007" in text or "invalid frame payload" in text
 
 
 def _angle_delta_rad(start: float, end: float) -> float:
