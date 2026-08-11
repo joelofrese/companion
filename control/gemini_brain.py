@@ -390,12 +390,16 @@ class GeminiRuntime:
             if tool_call is not None:
                 responses = []
                 for call in tool_call.function_calls:
-                    result = await self._execute(call.name, call.args or {})
+                    result, scheduling = await self._execute(
+                        call.name,
+                        call.args or {},
+                    )
                     responses.append(
                         types.FunctionResponse(
                             name=call.name,
                             response=result,
                             id=call.id,
+                            scheduling=scheduling,
                         )
                     )
                 async with self._send_lock:
@@ -409,28 +413,33 @@ class GeminiRuntime:
                 self._actions.clear()
                 return
 
-    async def _execute(self, name: str, args: dict) -> dict:
+    async def _execute(self, name: str, args: dict) -> tuple[dict, str]:
         if name == "move":
-            return await self._move(args)
+            return await self._move(args), "SILENT"
         if name == "turn":
-            return await self._turn(args)
+            return await self._turn(args), "SILENT"
         if name == "hover":
             cancelled = self._cancel_action("hover")
             self._record_action("hover")
-            return {
-                "status": "hovering",
-                "cancelled_action": cancelled or "none",
-                "telemetry": _telemetry_text(self._telemetry),
-                "scheduling": "INTERRUPT",
-            }
+            return (
+                {
+                    "status": "hovering",
+                    "cancelled_action": cancelled or "none",
+                    "telemetry": _telemetry_text(self._telemetry),
+                },
+                "INTERRUPT",
+            )
         if name == "speak":
             message = str(args.get("message", "")).strip()
             if not message:
-                return {"status": "rejected", "reason": "message is required"}
+                return (
+                    {"status": "rejected", "reason": "message is required"},
+                    "SILENT",
+                )
             self._record_action(f"speak: {message}")
             print(f"Companion: {message}", flush=True)
-            return {"status": "spoken", "scheduling": "SILENT"}
-        return {"status": "rejected", "reason": "unknown tool"}
+            return {"status": "spoken"}, "SILENT"
+        return {"status": "rejected", "reason": "unknown tool"}, "SILENT"
 
     async def _move(self, args: dict) -> dict:
         direction = str(args.get("direction", "")).strip().lower()
@@ -468,7 +477,6 @@ class GeminiRuntime:
             "action": self._action_label(action),
             "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
-            "scheduling": "SILENT",
         }
 
     async def _turn(self, args: dict) -> dict:
@@ -511,7 +519,6 @@ class GeminiRuntime:
             "action": self._action_label(action),
             "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
-            "scheduling": "SILENT",
         }
 
     def _busy_response(self):
