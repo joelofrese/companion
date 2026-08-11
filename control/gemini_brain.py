@@ -326,6 +326,8 @@ class GeminiRuntime:
             await session.send_realtime_input(text=self._heartbeat_text(dialogue))
         if not self._memory_sent:
             self._memory_sent = True
+        if self._bootstrap_pending:
+            self._bootstrap_pending = False
         if dialogue:
             self._dialogue.popleft()
             self.dialogue_count += 1
@@ -337,7 +339,6 @@ class GeminiRuntime:
                 memory = self.memory_store.context()
         start = ""
         if self._bootstrap_pending:
-            self._bootstrap_pending = False
             start = f"[START]\nSituation: {self.situation}\n"
         state = (
             f"{start}[STATE]\n"
