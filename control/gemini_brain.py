@@ -771,6 +771,8 @@ def _system_instruction() -> str:
         "several, or use none; a heartbeat is not a requirement to act or speak. "
         "When you decide to act, call the matching tool; do not describe a tool "
         "call as JSON or in a code fence. Speak only when useful. "
+        "Do not repeat the [STATE] block or telemetry. Stay silent while a "
+        "physical action runs unless the nearby user needs an answer. "
         "The CM5 checks every physical action and may stop it. Physical movement "
         "is serialized: when the current state says a move or turn is in progress, "
         "do not call move or turn again. Keep observing and thinking until the "
@@ -798,7 +800,7 @@ def _model_text(parts) -> str:
     """Return useful model text without empty structured-output placeholders."""
 
     value = " ".join("".join(parts).split())
-    for prefix in ("```json", "```", "{}", "[]", "null"):
+    for prefix in ("```json", "```", "{}", "[]", "null", "---"):
         if value.startswith(prefix):
             value = value[len(prefix):].lstrip(" :")
             break
