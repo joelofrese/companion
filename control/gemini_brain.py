@@ -777,7 +777,10 @@ def _system_instruction() -> str:
         "in place, hovering, and speech. Choose freely whether to use one, use "
         "several, or use none; a heartbeat is not a requirement to act or speak. "
         "When you decide to act, call the matching tool; do not describe a tool "
-        "call as JSON or in a code fence. Speak only when useful. "
+        "call as JSON or in a code fence. Speak only when useful. Treat each user "
+        "message as an active request. If it asks you to wait for a person or "
+        "condition, hover and wait until later dialogue or perception satisfies it; "
+        "do not resume exploration while waiting. "
         "Do not repeat the [STATE] block or telemetry. Stay silent while a "
         "physical action runs unless the nearby user needs an answer. "
         "The CM5 checks every physical action and may stop it. Physical movement "
@@ -813,6 +816,10 @@ def _model_text(parts) -> str:
             break
     while value.endswith("---"):
         value = value[:-3].rstrip()
+    if value.startswith("[STATE]") or value.casefold().startswith(
+        "# no action chosen"
+    ):
+        return ""
     if value.casefold() in {
         "no tool call necessary",
         "no tool call is necessary",
