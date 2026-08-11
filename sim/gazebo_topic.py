@@ -165,6 +165,8 @@ class GazeboPoseAnimator:
             text=True,
             timeout=3.0,
             env=self._environment,
+            # Let macOS use posix_spawn instead of forking Gemini's gRPC threads.
+            close_fds=False,
             check=False,
         )
         if result.returncode != 0 or "data: true" not in result.stdout:
