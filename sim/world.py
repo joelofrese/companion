@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Optional
 
 from mavsdk import System
-from mavsdk.offboard import OffboardError
 
 from control.memory import CompanionMemory
 from control.mind import CompanionMind
@@ -201,6 +200,33 @@ async def run(
     current_heading_deg = None
     initial_yaw_deg = None
     max_heading_change_deg = 0.0
+
+    async def stop_flight_services():
+        """Stop flight services once, whether the run finished or failed."""
+
+        nonlocal offboard_started
+        if stack is not None:
+            await stack.stop()
+        mind_stop.set()
+        if mind_task is not None and not mind_task.done():
+            await mind_task
+        if control is not None:
+            control.close()
+            if gemini:
+                await control.wait_closed()
+        for task in (telemetry_task, attitude_task, offboard_task):
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        if offboard_started:
+            try:
+                await drone.offboard.stop()
+            except Exception:
+                pass
+            offboard_started = False
+        if person_motion is not None:
+            person_motion.close()
+
     try:
         world = SyntheticWorld(exploratory, faults)
         if camera or depth:
@@ -704,25 +730,7 @@ async def run(
             await asyncio.wait_for(offboard_task, timeout=5.0)
             print("Offboard telemetry=verified through synthetic world and CM5 safety.")
         finally:
-            await stack.stop()
-            mind_stop.set()
-            if mind_task is not None:
-                await mind_task
-            control.close()
-            if gemini:
-                await control.wait_closed()
-            telemetry_task.cancel()
-            await asyncio.gather(telemetry_task, return_exceptions=True)
-            attitude_task.cancel()
-            await asyncio.gather(attitude_task, return_exceptions=True)
-            if offboard_started:
-                try:
-                    await drone.offboard.stop()
-                except OffboardError:
-                    pass
-                offboard_started = False
-            if person_motion is not None:
-                person_motion.close()
+            await stop_flight_services()
 
         commands = safe_commands.commands
         if not commands or commands[-1][1] != VelocityCommand():
@@ -1210,25 +1218,7 @@ async def run(
             gazebo_camera.close()
         if gazebo_depth is not None:
             gazebo_depth.close()
-        if person_motion is not None:
-            person_motion.close()
-        if stack is not None:
-            await stack.stop()
-        mind_stop.set()
-        if mind_task is not None and not mind_task.done():
-            await mind_task
-        if control is not None:
-            control.close()
-            if gemini:
-                await control.wait_closed()
-        if offboard_task is not None and not offboard_task.done():
-            offboard_task.cancel()
-            await asyncio.gather(offboard_task, return_exceptions=True)
-        if offboard_started:
-            try:
-                await drone.offboard.stop()
-            except Exception:
-                pass
+        await stop_flight_services()
         if armed and not landed:
             try:
                 await land(drone)
