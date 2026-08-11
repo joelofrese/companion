@@ -180,17 +180,24 @@ When Gazebo depth reaches the obstacle limit, the run also requires observed
 CM5 backoff; runs that never reach it remain exploratory and only check bounded
 behavior.
 
-After installing Ollama and pulling local models:
+The default production commands use Gemini:
 
 ```sh
-ollama pull moondream
-ollama pull gemma3:4b
 .venv/bin/python -m control.companion <cm5-ip>
 .venv/bin/python -m control.companion <cm5-ip> --dialogue
+
+# Use the optional local Ollama fallback instead:
 .venv/bin/python -m control.companion <cm5-ip> --ollama
 
 # On the CM5, with onboard.ros2_bridge already running:
 .venv/bin/python -m control.companion --local --dialogue
+```
+
+For the local fallback, install Ollama and pull its models first:
+
+```sh
+ollama pull moondream
+ollama pull gemma3:4b
 ```
 
 Production defaults to one Gemini Robotics ER 2 Streaming session on the CM5.
