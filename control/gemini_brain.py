@@ -281,6 +281,7 @@ class GeminiRuntime:
                             flush=True,
                         )
                     else:
+                        self._cancel_action("Gemini session reconnecting")
                         print(f"Gemini session reconnecting: {error}", flush=True)
                 if self._closed.is_set():
                     return
@@ -365,6 +366,7 @@ class GeminiRuntime:
                 self._session_handle = update.new_handle
 
             if message.go_away is not None:
+                self._cancel_action("Gemini session reconnecting")
                 self._reconnect_requested = True
 
             usage = message.usage_metadata
