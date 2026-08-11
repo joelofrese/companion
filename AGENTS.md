@@ -65,10 +65,10 @@ merge and delete it.
   protects against obstacles, and is the final vehicle-side authority.
 - PX4 stabilizes the vehicle and controls the motors.
 
-The brain sends slow forward or lateral body-frame velocity and yaw rate only:
-never motor, attitude, altitude, or absolute-position commands. A fresh
-obstacle reading may override normal movement. Keep movement slow, deliberate,
-and easy to stop.
+The brain sends only slow body-frame translation or yaw-rate commands: never
+motor, attitude, altitude, or absolute-position commands. A fresh obstacle
+reading may override normal movement. Keep movement slow, deliberate, and easy
+to stop.
 
 ## Hardware boundary
 
@@ -240,8 +240,9 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
 - Faulted runs stop when camera input stalls and resume after fresh frames return.
-- The brain sends only slow forward, lateral, and yaw-rate commands. CM5 limits
-  commands and uses TOF safety; PX4 stabilizes, turns, lands, and disarms.
+- The brain sends only slow body-frame translation or yaw-rate commands. CM5
+  limits commands and uses TOF safety; PX4 stabilizes, turns, lands, and
+  disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
   hardware remains unverified. DEXI 3 has no lidar.
 
