@@ -17,7 +17,6 @@ BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
 BOOT_RETRIES = 1
 SHUTDOWN_TIMEOUT_S = 10.0
-OLLAMA_BOOT_TIMEOUT_S = 10.0
 # Keep the PX4 and Gazebo starting headings aligned.
 DEFAULT_MODEL_POSE = "0,0,0,0,0,0"
 
@@ -97,56 +96,6 @@ def _validate_pose(pose: Optional[str]) -> Optional[str]:
     return ",".join(str(value) for value in numbers)
 
 
-def _start_ollama_if_needed():
-    """Return a local Ollama process only when this run had to start it."""
-
-    from control.ollama_client import OllamaClient
-
-    client = OllamaClient(timeout_s=1.0)
-    try:
-        client.check()
-        return None
-    except RuntimeError:
-        pass
-    ollama = shutil.which("ollama")
-    if ollama is None:
-        raise RuntimeError("Ollama is unavailable and `ollama` is not installed")
-    process = subprocess.Popen(
-        [ollama, "serve"],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    deadline = time.monotonic() + OLLAMA_BOOT_TIMEOUT_S
-    while process.poll() is None and time.monotonic() < deadline:
-        try:
-            client.check()
-        except RuntimeError:
-            time.sleep(0.1)
-        else:
-            print("Started local Ollama for this simulation.")
-            return process
-    _stop_process(process)
-    raise RuntimeError("Ollama did not become ready")
-
-
-def _stop_ollama(process, *models):
-    """Release models and stop only a server started by this run."""
-
-    if process is None:
-        return
-    from control.ollama_client import OllamaClient
-
-    client = OllamaClient(timeout_s=1.0)
-    for model in set(models):
-        try:
-            client.unload(model)
-        except RuntimeError:
-            pass
-    _stop_process(process)
-
-
 def _run_once(
     px4_dir: Path,
     companion_dir: Path,
@@ -160,10 +109,6 @@ def _run_once(
     camera: bool,
     depth: bool,
     duration_s: Optional[float],
-    ollama: bool,
-    vlm_model: str,
-    llm_model: str,
-    ollama_timeout: float,
     gemini: bool,
     gemini_model: str,
     initial_intent: str,
@@ -297,16 +242,6 @@ def _run_once(
                 scenario.append("--moving-person")
             if exploratory:
                 scenario += ["--intent", initial_intent]
-            if ollama:
-                scenario += [
-                    "--ollama",
-                    "--vlm-model",
-                    vlm_model,
-                    "--llm-model",
-                    llm_model,
-                    "--ollama-timeout",
-                    str(ollama_timeout),
-                ]
             if gemini:
                 scenario += ["--gemini", "--gemini-model", gemini_model]
             if memory_path is not None:
@@ -338,10 +273,6 @@ def run(
     camera: bool = False,
     depth: bool = False,
     duration_s: Optional[float] = None,
-    ollama: bool = False,
-    vlm_model: str = "moondream",
-    llm_model: str = "moondream",
-    ollama_timeout: float = 60.0,
     gemini: bool = False,
     gemini_model: str = "gemini-robotics-er-2-streaming-preview",
     initial_intent: str = "explore the surroundings",
@@ -406,12 +337,8 @@ def run(
         raise RuntimeError("brain trace requires a synthetic world scenario")
     if dialogue_request is not None and not dialogue_request.strip():
         raise RuntimeError("dialogue request must not be empty")
-    if ollama and not (exploratory and (camera or depth)):
-        raise RuntimeError("Ollama simulation requires exploratory camera or depth mode")
     if gemini and not (exploratory and (camera or depth)):
         raise RuntimeError("Gemini simulation requires exploratory camera or depth mode")
-    if ollama and gemini:
-        raise RuntimeError("choose either Ollama or Gemini for one simulation")
     if duration_s is not None and image_path is not None:
         raise RuntimeError("simulation duration cannot use an RTP image scenario")
     if expect_person and image_path is None:
@@ -425,44 +352,36 @@ def run(
     if not world_file.is_file():
         raise RuntimeError(f"Gazebo world does not exist: {world_file}")
 
-    ollama_process = _start_ollama_if_needed() if ollama else None
-    try:
-        for attempt in range(BOOT_RETRIES + 1):
-            try:
-                return _run_once(
-                    px4_dir=px4_dir,
-                    companion_dir=companion_dir,
-                    world_file=world_file,
-                    image_path=image_path,
-                    expect_person=expect_person,
-                    world=world,
-                    stdbuf=stdbuf,
-                    exploratory=exploratory,
-                    faults=faults,
-                    camera=camera,
-                    depth=depth,
-                    duration_s=duration_s,
-                    ollama=ollama,
-                    vlm_model=vlm_model,
-                    llm_model=llm_model,
-                    ollama_timeout=ollama_timeout,
-                    gemini=gemini,
-                    gemini_model=gemini_model,
-                    initial_intent=initial_intent,
-                    model_pose=model_pose,
-                    memory_path=memory_path,
-                    snapshot_path=snapshot_path,
-                    dialogue_request=dialogue_request,
-                    trace=trace,
-                    moving_person=moving_person,
-                    headless=headless,
-                )
-            except _BootError:
-                if attempt == BOOT_RETRIES:
-                    raise
-                print("PX4 did not boot; retrying once.", file=sys.stderr)
-    finally:
-        _stop_ollama(ollama_process, vlm_model, llm_model)
+    for attempt in range(BOOT_RETRIES + 1):
+        try:
+            return _run_once(
+                px4_dir=px4_dir,
+                companion_dir=companion_dir,
+                world_file=world_file,
+                image_path=image_path,
+                expect_person=expect_person,
+                world=world,
+                stdbuf=stdbuf,
+                exploratory=exploratory,
+                faults=faults,
+                camera=camera,
+                depth=depth,
+                duration_s=duration_s,
+                gemini=gemini,
+                gemini_model=gemini_model,
+                initial_intent=initial_intent,
+                model_pose=model_pose,
+                memory_path=memory_path,
+                snapshot_path=snapshot_path,
+                dialogue_request=dialogue_request,
+                trace=trace,
+                moving_person=moving_person,
+                headless=headless,
+            )
+        except _BootError:
+            if attempt == BOOT_RETRIES:
+                raise
+            print("PX4 did not boot; retrying once.", file=sys.stderr)
 
 
 def main(argv=None):
@@ -510,24 +429,16 @@ def main(argv=None):
     parser.add_argument(
         "--intent",
         default="explore the surroundings",
-        help="initial situation for Gemini or intent for the local fallback",
+        help="initial situation for Gemini",
     )
     parser.add_argument(
         "--pose",
         help="PX4 spawn pose as x,y,z,roll,pitch,yaw",
     )
     parser.add_argument(
-        "--ollama",
-        action="store_true",
-        help="use local Ollama VLM and LLM for an exploratory camera or depth run",
-    )
-    parser.add_argument("--vlm-model", default="moondream")
-    parser.add_argument("--llm-model", default="moondream")
-    parser.add_argument("--ollama-timeout", type=float, default=60.0)
-    parser.add_argument(
         "--gemini",
         action="store_true",
-        help="use Gemini Robotics ER 2 Streaming for an exploratory camera or depth run",
+        help="use live Gemini ER 2 instead of the deterministic brain fixture",
     )
     parser.add_argument(
         "--gemini-model",
@@ -550,7 +461,7 @@ def main(argv=None):
     parser.add_argument(
         "--trace",
         action="store_true",
-        help="print meaningful VLM observations, conscious decisions, and command reasons",
+        help="print brain observations, decisions, and command reasons",
     )
     parser.add_argument(
         "--headless",
@@ -579,10 +490,6 @@ def main(argv=None):
             camera=args.camera,
             depth=args.depth,
             duration_s=args.duration,
-            ollama=args.ollama,
-            vlm_model=args.vlm_model,
-            llm_model=args.llm_model,
-            ollama_timeout=args.ollama_timeout,
             gemini=args.gemini,
             gemini_model=args.gemini_model,
             initial_intent=args.intent,

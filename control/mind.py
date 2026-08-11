@@ -1,4 +1,4 @@
-"""The companion's subconscious and conscious brain."""
+"""Shared brain data and the deterministic simulation mind."""
 
 from collections import deque
 from dataclasses import dataclass

@@ -1,4 +1,4 @@
-"""Run the companion brain beside the fixed-rate motion loop."""
+"""Run the deterministic simulation mind beside the motion loop."""
 
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor

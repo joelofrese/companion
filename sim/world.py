@@ -99,10 +99,6 @@ async def run(
     camera: bool = False,
     world_name: Optional[str] = None,
     duration_s: float = PROFILE_DURATION_S,
-    ollama: bool = False,
-    vlm_model: str = "moondream",
-    llm_model: str = "moondream",
-    ollama_timeout: float = 60.0,
     gemini: bool = False,
     gemini_model: str = "gemini-robotics-er-2-streaming-preview",
     initial_intent: str = DEFAULT_EXPLORATORY_INTENT,
@@ -142,12 +138,8 @@ async def run(
         )
     if faults and camera:
         raise ValueError("fault injection requires synthetic safety or depth mode")
-    if ollama and not (exploratory and (camera or depth)):
-        raise ValueError("Ollama simulation requires exploratory camera or depth mode")
     if gemini and not (exploratory and (camera or depth)):
         raise ValueError("Gemini simulation requires exploratory camera or depth mode")
-    if ollama and gemini:
-        raise ValueError("choose either Ollama or Gemini for one simulation")
     if memory_path is not None and not exploratory:
         raise ValueError("experience memory requires exploratory simulation")
     if snapshot_path is not None and not exploratory:
@@ -164,15 +156,6 @@ async def run(
         else None
     )
 
-    ollama_client = None
-    if ollama:
-        from control.ollama_brain import OllamaLanguageModel, OllamaVisionModel
-        from control.ollama_client import OllamaClient
-
-        ollama_client = OllamaClient(timeout_s=ollama_timeout)
-        await asyncio.to_thread(ollama_client.check)
-        await asyncio.to_thread(ollama_client.preload, vlm_model)
-        await asyncio.to_thread(ollama_client.preload, llm_model)
     memory_store = CompanionMemory(memory_path) if memory_path is not None else None
     memory_before = memory_store.context() if memory_store is not None else ""
 
@@ -311,17 +294,13 @@ async def run(
         safe_commands = stack.forwarder
         started_at = time.monotonic()
         if control is None:
-            if ollama_client is None:
-                visual_model = WorldVisualModel(
-                    world,
-                    started_at,
-                    synthetic_scene=not (camera or depth),
-                )
-                language_model = WorldLanguageModel(exploratory)
-                language_model.started_at_s = started_at
-            else:
-                visual_model = OllamaVisionModel(ollama_client, vlm_model)
-                language_model = OllamaLanguageModel(ollama_client, llm_model)
+            visual_model = WorldVisualModel(
+                world,
+                started_at,
+                synthetic_scene=not (camera or depth),
+            )
+            language_model = WorldLanguageModel(exploratory)
+            language_model.started_at_s = started_at
             control = MindRuntime(
                 CompanionMind(visual_model, language_model, memory=memory_store)
             )
@@ -472,7 +451,7 @@ async def run(
         offboard_started = True
         offboard_task = asyncio.create_task(wait_for_offboard(drone))
         started_at = time.monotonic()
-        if not gemini and ollama_client is None:
+        if not gemini:
             visual_model.started_at_s = started_at
             language_model.started_at_s = started_at
         dialogue_provider = None
@@ -866,11 +845,6 @@ async def run(
             )
         else:
             print(f"Conscious thoughts=verified ({control.decision_count}).")
-        if ollama:
-            print(
-                "Local Ollama brain=verified: "
-                f"VLM={vlm_model}, LLM={llm_model}."
-            )
         if gemini:
             print(f"Gemini ER 2 brain=verified: model={gemini_model}.")
             if control.turn_count == 0:
@@ -1296,14 +1270,10 @@ if __name__ == "__main__":
         action="store_true",
         help="move the visual mannequin through the objects world",
     )
-    parser.add_argument("--ollama", action="store_true")
-    parser.add_argument("--vlm-model", default="moondream")
-    parser.add_argument("--llm-model", default="moondream")
-    parser.add_argument("--ollama-timeout", type=float, default=60.0)
     parser.add_argument(
         "--gemini",
         action="store_true",
-        help="use Gemini Robotics ER 2 Streaming for an exploratory camera or depth run",
+        help="use live Gemini ER 2 instead of the deterministic brain fixture",
     )
     parser.add_argument(
         "--gemini-model",
@@ -1322,7 +1292,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--trace",
         action="store_true",
-        help="print meaningful VLM observations, conscious decisions, and command reasons",
+        help="print meaningful brain observations, decisions, and command reasons",
     )
     parser.add_argument(
         "--world",
@@ -1332,7 +1302,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--intent",
         default=DEFAULT_EXPLORATORY_INTENT,
-        help="initial situation for Gemini or intent for the local fallback",
+        help="initial situation for Gemini",
     )
     args = parser.parse_args()
     try:
@@ -1344,10 +1314,6 @@ if __name__ == "__main__":
                 depth=args.depth,
                 world_name=args.world,
                 duration_s=args.duration,
-                ollama=args.ollama,
-                vlm_model=args.vlm_model,
-                llm_model=args.llm_model,
-                ollama_timeout=args.ollama_timeout,
                 gemini=args.gemini,
                 gemini_model=args.gemini_model,
                 initial_intent=args.intent,
