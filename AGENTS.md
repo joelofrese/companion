@@ -44,8 +44,8 @@ merge and delete it.
 - The local LLM uses observations, dialogue, telemetry, and memory to choose
   intent.
 - A follow goal passes its subject to the VLM as visual focus.
-- The local fallback turns intent and visual suggestions into slow forward,
-  lateral, or yaw-rate body-frame commands; flight lifecycle owns altitude.
+- The local fallback turns intent and visual suggestions into slow forward or
+  lateral body-frame commands; flight lifecycle owns altitude.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
 - Gemini may keep thinking while one physical move or turn completes; movement
