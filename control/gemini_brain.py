@@ -337,7 +337,10 @@ class GeminiRuntime:
         if dialogue:
             state += f"\nUser: {dialogue}"
         if memory:
-            state += f"\nMemory:\n{memory}"
+            state += (
+                "\nMemory (prior experience; verify it against the current image "
+                f"and telemetry):\n{memory}"
+            )
         return state
 
     async def _receive(self, session, types):
@@ -681,9 +684,12 @@ class GeminiRuntime:
         if response:
             print(f"Gemini response: {response}", flush=True)
         if self.memory_store is not None:
-            self.memory_store.remember(
-                f"{_telemetry_text(self._telemetry)}; summary={summary}"
-            )
+            experience = _telemetry_text(self._telemetry)
+            if action != "none":
+                experience += f"; action={action}"
+            if summary not in ("", "none") and action not in summary:
+                experience += f"; summary={summary}"
+            self.memory_store.remember(experience)
 
 
 def _tools():
