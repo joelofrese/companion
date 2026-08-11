@@ -66,11 +66,17 @@ def _experience_outcome(telemetry: Telemetry) -> str:
         telemetry.right_velocity_m_s,
         telemetry.down_velocity_m_s,
     )
+    heading = (
+        "?"
+        if telemetry.heading_rad is None or not math.isfinite(telemetry.heading_rad)
+        else f"{math.degrees(telemetry.heading_rad):.1f}"
+    )
     return "; ".join(
         (
             f"obstacle={value(telemetry.obstacle_distance_m)}",
             f"command={','.join(value(number) for number in command_values)}",
             f"velocity={','.join(value(number) for number in velocity_values)}",
+            f"heading_deg={heading}",
         )
     )
 
