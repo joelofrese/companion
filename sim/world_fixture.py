@@ -42,6 +42,8 @@ VELOCITY_TELEMETRY_END_S = 13.6
 HOVER_START_S = 6.0
 GEMINI_RECONNECT_START_S = 8.0
 GEMINI_RECONNECT_END_S = 8.5
+CAMERA_STALL_START_S = 10.0
+CAMERA_STALL_END_S = 11.8
 VISUAL_FAILURE_START_S = 12.2
 VISUAL_FAILURE_END_S = 12.6
 CONSCIOUS_FAILURE_START_S = 24.2
@@ -62,6 +64,7 @@ class WorldStep:
     obstacle_distance_m: Optional[float] = NO_OBSTACLE_DISTANCE_M
     distance_fresh: bool = True
     velocity_fresh: bool = True
+    frame_fresh: bool = True
     transmit: bool = True
     command_override: Optional[VelocityCommand] = None
     brain_shutdown: bool = False
@@ -128,6 +131,12 @@ class SyntheticWorld:
             and GEMINI_RECONNECT_START_S <= elapsed_s < GEMINI_RECONNECT_END_S
         ):
             return WorldStep(brain_reconnect=True)
+        if (
+            self.exploratory
+            and self.faults
+            and CAMERA_STALL_START_S <= elapsed_s < CAMERA_STALL_END_S
+        ):
+            return WorldStep(frame_fresh=False)
         return WorldStep()
 
 

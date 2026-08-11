@@ -50,6 +50,8 @@ from sim.offboard_control import (
 from sim.safety_stack import SimulatedSafetyStack
 from sim.world_fixture import (
     BRAIN_SHUTDOWN_START_S,
+    CAMERA_STALL_END_S,
+    CAMERA_STALL_START_S,
     CONSCIOUS_FAILURE_END_S,
     CONSCIOUS_FAILURE_START_S,
     CONTROL_PAUSE_END_S,
@@ -191,6 +193,8 @@ async def run(
     applied_dialogue_intent = None
     brain_shutdown = False
     brain_reconnect_requested = False
+    camera_stall_seen = False
+    camera_recovered = False
     offboard_started = False
     armed = False
     landed = False
@@ -402,7 +406,14 @@ async def run(
         def send_packet(timestamp_s: float, step, intent=None):
             nonlocal brain_shutdown, camera_frames, snapshot_saved
             nonlocal applied_dialogue_intent, brain_reconnect_requested
-            frame = gazebo_camera.latest() if gazebo_camera else step
+            nonlocal camera_stall_seen, camera_recovered
+            frame = None
+            if step.frame_fresh:
+                frame = gazebo_camera.latest() if gazebo_camera else step
+            if not step.frame_fresh:
+                camera_stall_seen = True
+            elif camera_stall_seen and frame is not None:
+                camera_recovered = True
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
                 if snapshot_path is not None and not snapshot_saved:
@@ -963,6 +974,22 @@ async def run(
                         "exploratory fault run did not observe brain shutdown zero"
                     )
                 print("Exploratory fault passed: brain shutdown zero.")
+            if duration_s >= CAMERA_STALL_END_S + 0.2:
+                if (
+                    not camera_stall_seen
+                    or not camera_recovered
+                    or not observed(
+                        CAMERA_STALL_START_S + 0.5,
+                        CAMERA_STALL_END_S,
+                        lambda command: command == VelocityCommand(),
+                    )
+                ):
+                    raise RuntimeError(
+                        "exploratory fault run did not observe camera stall fail-safe"
+                    )
+                print(
+                    "Exploratory fault passed: camera stall fail-safe and recovery."
+                )
             if gemini and duration_s >= GEMINI_RECONNECT_END_S + 0.2:
                 if (
                     not brain_reconnect_requested

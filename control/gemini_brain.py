@@ -38,6 +38,7 @@ ACTION_SETTLE_S = 1.0
 ACTION_STABLE_S = 0.3
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(5.0)
+MAX_FRAME_AGE_S = 1.5
 
 
 @dataclass
@@ -73,6 +74,7 @@ class GeminiRuntime:
         self.memory_store = memory
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self._latest_frame = None
+        self._latest_frame_at_s: Optional[float] = None
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._active_action: Optional[ActiveAction] = None
@@ -157,9 +159,13 @@ class GeminiRuntime:
             return VelocityCommand()
         if frame is not None:
             self._latest_frame = frame
+            self._latest_frame_at_s = time.monotonic()
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
+        if not self._has_fresh_frame():
+            self._cancel_action("camera frame stale")
+            return VelocityCommand()
         action = self._active_action
         if any(
             value is None or not math.isfinite(value)
@@ -332,7 +338,7 @@ class GeminiRuntime:
         """Send one current JPEG without waiting for a model decision."""
 
         frame = self._latest_frame
-        if frame is None:
+        if frame is None or not self._has_fresh_frame():
             return
         image_bytes = await asyncio.to_thread(_jpeg, frame)
         async with self._send_lock:
@@ -364,8 +370,10 @@ class GeminiRuntime:
         start = ""
         if self._bootstrap_pending:
             start = f"[START]\nSituation: {self.situation}\n"
+        camera = "fresh" if self._has_fresh_frame() else "stale or missing"
         state = (
             f"{start}[STATE]\n"
+            f"Camera: {camera}\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
@@ -381,6 +389,12 @@ class GeminiRuntime:
                 f"and telemetry):\n{memory}"
             )
         return state
+
+    def _has_fresh_frame(self) -> bool:
+        return (
+            self._latest_frame_at_s is not None
+            and time.monotonic() - self._latest_frame_at_s <= MAX_FRAME_AGE_S
+        )
 
     async def _receive(self, session, types):
         async for message in session.receive():

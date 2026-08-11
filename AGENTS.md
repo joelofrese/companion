@@ -153,10 +153,9 @@ rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
 `--intent`, and `--memory` to vary the world, run length, dialogue, initial
 situation or local intent, and persistent experience. Typed dialogue also works
 during an exploratory run.
-Add `--faults` to inject the normal obstacle,
-sensor, link, invalid-command, brain-shutdown, and Gemini-reconnect schedule
-into an exploratory run. Add `--headless` for unattended runs without the
-Gazebo GUI.
+Add `--faults` to inject the normal obstacle, sensor, camera-frame, link,
+invalid-command, brain-shutdown, and Gemini-reconnect schedule into an
+exploratory run. Add `--headless` for unattended runs without the Gazebo GUI.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
 mannequin for visual exploration. The runner starts the vehicle at zero yaw
@@ -240,6 +239,7 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   VLM and LLM sessions remain an explicit fallback.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
+- Faulted runs stop when camera input stalls and resume after fresh frames return.
 - The brain sends only slow forward, lateral, and yaw-rate commands. CM5 limits
   commands and uses TOF safety; PX4 stabilizes, turns, lands, and disarms.
 - Rendered Gazebo video, RTP video, simulated depth, and ROS forwarding exist;
