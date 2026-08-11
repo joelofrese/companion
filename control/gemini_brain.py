@@ -14,7 +14,7 @@ from PIL import Image
 from control.memory import CompanionMemory
 from control.mind import ConsciousDecision, Telemetry, VisualObservation
 from control.mind_motion import movement_command
-from control.safety_limits import MAX_YAW_RATE_DEG_S, OBSTACLE_STOP_M
+from control.safety_limits import OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 
 
@@ -171,6 +171,7 @@ class GeminiRuntime:
             )
         if (
             action.kind == "turn"
+            and _finite(telemetry.heading_rad)
             and telemetry.obstacle_distance_m is not None
             and math.isfinite(telemetry.obstacle_distance_m)
             and telemetry.obstacle_distance_m > OBSTACLE_STOP_M
