@@ -52,6 +52,15 @@ class CompanionMemory:
 def _memory_key(entry: str) -> str:
     """Ignore changing telemetry when grouping one repeated experience."""
 
+    if entry.startswith("obstacle="):
+        _, separator, action = entry.partition("; action=")
+        if separator:
+            return "action=" + action.partition("; summary=")[0]
+        _, separator, summary = entry.partition("; summary=")
+        if separator:
+            return "summary=" + summary
+        return "telemetry"
+
     before, separator, after = entry.partition("; obstacle=")
     if not separator:
         return entry
