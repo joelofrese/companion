@@ -557,7 +557,6 @@ async def run(
                         )
                     last_traced_decision = control.decision_count
                     last_traced_observation = control.observation_count
-                return
 
             if control.observation_count != last_traced_observation:
                 observation = control.latest_observation
