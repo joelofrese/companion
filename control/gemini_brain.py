@@ -321,11 +321,12 @@ class GeminiRuntime:
         """Ask for one high-level decision while video keeps streaming."""
 
         self._last_heartbeat_at_s = time.monotonic()
-        dialogue = self._dialogue.popleft() if self._dialogue else ""
-        if dialogue:
-            self.dialogue_count += 1
+        dialogue = self._dialogue[0] if self._dialogue else ""
         async with self._send_lock:
             await session.send_realtime_input(text=self._heartbeat_text(dialogue))
+        if dialogue:
+            self._dialogue.popleft()
+            self.dialogue_count += 1
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
