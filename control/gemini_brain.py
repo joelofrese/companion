@@ -23,7 +23,7 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
 # Keep each control decision short enough for the next heartbeat.
-THINKING_BUDGET = 1024
+THINKING_BUDGET = 2048
 # Do not cancel a valid model turn just because it takes longer than one
 # heartbeat.  The video and body control continue while Gemini thinks.
 # A slow ER2 turn is safer to wait through than to discard and restart.
