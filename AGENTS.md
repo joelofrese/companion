@@ -40,7 +40,8 @@ merge and delete it.
 - Gemini may keep thinking while one physical move or turn completes; movement
   tools stay unavailable until its action state reports completion and a fresh
   camera frame arrives.
-- Hover interrupts an active action only for safety or an explicit stop request.
+- Hover interrupts an active action only for an explicit stop request; the CM5
+  handles safety overrides.
 - Stale, malformed, missing, or unsafe input becomes zero motion.
 - CM5 returns fresh TOF, velocity, and heading telemetry, rejects unsafe commands,
   protects against obstacles, and is the final vehicle-side authority.
@@ -189,9 +190,9 @@ without waiting for their duration, so the brain can continue receiving video,
 telemetry, and dialogue. One physical move or turn stays active until its
 duration or observed heading settles; movement waits for a fresh camera frame
 afterward; the action state reports the command, phase, remaining time, and
-heading. Hover interrupts it only for safety or an explicit stop request. The
-CM5 still
-expires, limits, and overrides every physical command. The trace reads
+heading. Hover interrupts it only for an explicit stop request. The CM5 handles
+safety overrides, expires commands, and limits every physical command.
+The trace reads
 Gemini's native `thought` parts separately from visible responses and tool
 calls; ER 2 may emit no thought summaries even when it reasons internally.
 
