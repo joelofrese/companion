@@ -63,6 +63,9 @@ class ActiveAction:
     right_m_s: float = 0.0
     call_id: Optional[str] = None
     last_update_s: Optional[float] = None
+    last_sample_s: Optional[float] = None
+    observed_forward_m: float = 0.0
+    observed_right_m: float = 0.0
 
 
 class GeminiRuntime:
@@ -626,6 +629,7 @@ class GeminiRuntime:
             forward_m_s=forward_m_s,
             right_m_s=right_m_s,
             last_update_s=now,
+            last_sample_s=now,
         )
         self._active_action = action
         self._last_action_result = ""
@@ -719,6 +723,13 @@ class GeminiRuntime:
             "telemetry": _telemetry_text(self._telemetry),
         }
 
+    def _translation_text(self, action: ActiveAction) -> str:
+        return (
+            "observed translation "
+            f"forward={action.observed_forward_m:+.2f}m "
+            f"right={action.observed_right_m:+.2f}m"
+        )
+
     def _action_label(self, action: Optional[ActiveAction] = None) -> str:
         action = action or self._active_action
         if action is None:
@@ -757,6 +768,8 @@ class GeminiRuntime:
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
         ]
+        if action.kind == "move":
+            details.append(self._translation_text(action))
         actual = self._heading_change_deg(action)
         if actual is not None:
             details.append(f"observed heading change={actual:+.1f} degrees")
@@ -770,8 +783,9 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             return
-        self._pause_action_if_blocked(action)
         now = time.monotonic()
+        self._record_translation(action, now)
+        self._pause_action_if_blocked(action, now)
         if action.kind == "turn":
             if action.start_heading_rad is None and _finite(self._telemetry.heading_rad):
                 action.start_heading_rad = self._telemetry.heading_rad
@@ -814,10 +828,25 @@ class GeminiRuntime:
             else:
                 self._complete_action("completed")
 
-    def _pause_action_if_blocked(self, action: ActiveAction):
+    def _record_translation(self, action: ActiveAction, now: float):
+        if action.kind != "move":
+            return
+        if action.last_sample_s is None:
+            action.last_sample_s = now
+            return
+        elapsed = max(0.0, now - action.last_sample_s)
+        if not self._action_is_blocked(action):
+            if _finite(self._telemetry.forward_velocity_m_s):
+                action.observed_forward_m += (
+                    self._telemetry.forward_velocity_m_s * elapsed
+                )
+            if _finite(self._telemetry.right_velocity_m_s):
+                action.observed_right_m += self._telemetry.right_velocity_m_s * elapsed
+        action.last_sample_s = now
+
+    def _pause_action_if_blocked(self, action: ActiveAction, now: float):
         """Do not spend an action's time while safety state holds it still."""
 
-        now = time.monotonic()
         if (
             action.last_update_s is not None
             and action.phase == "running"
@@ -858,6 +887,8 @@ class GeminiRuntime:
         result = f"{self._action_label(action)} {status}"
         if actual_heading_deg is not None:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
+        if action.kind == "move":
+            result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._needs_post_action_frame = True
         self._queue_action_feedback(action, status, result, actual_heading_deg)
@@ -872,6 +903,8 @@ class GeminiRuntime:
         actual = self._heading_change_deg(action)
         if actual is not None:
             result += f"; observed heading change {actual:+.1f} degrees"
+        if action.kind == "move":
+            result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._needs_post_action_frame = True
         if notify:
@@ -896,6 +929,11 @@ class GeminiRuntime:
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
+        if action.kind == "move":
+            response["observed_translation_m"] = {
+                "forward": action.observed_forward_m,
+                "right": action.observed_right_m,
+            }
         self._action_feedback.put_nowait((action.kind, action.call_id, response))
 
     def _record_action(self, action: str):
@@ -1089,7 +1127,9 @@ def _system_instruction() -> str:
         "do not call move or turn again. Keep observing and thinking until the "
         "state says the action completed and a fresh camera frame has arrived. "
         "A movement tool returns immediately and sends a separate completion response; "
-        "treat that response and the reported telemetry as authoritative. "
+        "treat that response and the reported telemetry as authoritative. Use the "
+        "observed heading or translation as feedback; never assume the requested "
+        "movement was achieved exactly. "
         "Do not use hover just to keep thinking, wait for another image, or end a "
         "turn early. During an active action, hover may interrupt only for an "
         "explicit stop request; otherwise the hover tool is unavailable and the "
