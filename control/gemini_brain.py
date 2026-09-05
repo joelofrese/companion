@@ -30,7 +30,7 @@ MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
-MIN_TURN_DEG = 15.0
+MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 90.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 12.0
@@ -39,7 +39,7 @@ ACTION_GRACE_S = 1.0
 ACTION_SETTLE_S = 1.0
 ACTION_STABLE_S = 0.3
 HEADING_STABILITY_RAD = math.radians(2.0)
-HEADING_TOLERANCE_RAD = math.radians(5.0)
+HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
 
 
@@ -200,6 +200,7 @@ class GeminiRuntime:
             return VelocityCommand()
         if (
             action.kind == "turn"
+            and action.phase == "running"
             and _finite(telemetry.heading_rad)
             and _obstacle_is_clear(telemetry.obstacle_distance_m)
         ):
@@ -955,7 +956,10 @@ def _tools():
                     },
                     "angle_deg": {
                         "type": "NUMBER",
-                        "description": "A turn from 15 through 90 degrees.",
+                        "description": (
+                            f"A turn from {MIN_TURN_DEG:.0f} through "
+                            f"{MAX_TURN_DEG:.0f} degrees."
+                        ),
                     },
                 },
                 "required": ["direction", "angle_deg"],
@@ -1025,7 +1029,9 @@ def _system_instruction() -> str:
         "A turn changes the view but does not approach an object. Once a requested "
         "object is visible, use one small turn to center it, then prefer a short "
         "translation and inspect the new image and telemetry again. Use larger turns "
-        "only when the target is not visible and a scan is needed. Do not repeat the "
+        "only when the target is not visible and a scan is needed. For a visible "
+        f"target, small corrective turns are usually {MIN_TURN_DEG:.0f}-15 degrees. "
+        "Do not repeat the "
         "same turn after it completes unless new visual evidence justifies it. For "
         "an approach task, make a short translation after turning toward the target "
         "unless the forward range is near the stop limit."
