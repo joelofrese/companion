@@ -13,7 +13,6 @@ from PIL import Image
 
 from control.memory import CompanionMemory
 from control.mind import ConsciousDecision, Telemetry, VisualObservation
-from control.mind_motion import movement_command
 from control.safety_limits import OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 
@@ -28,6 +27,8 @@ INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
+MAX_FORWARD_SPEED_M_S = 0.25
+MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 15.0
 MAX_TURN_DEG = 90.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
@@ -53,6 +54,8 @@ class ActiveAction:
     phase: str = "running"
     stable_since_s: Optional[float] = None
     last_heading_rad: Optional[float] = None
+    forward_m_s: float = 0.0
+    right_m_s: float = 0.0
 
 
 class GeminiRuntime:
@@ -178,21 +181,16 @@ class GeminiRuntime:
         if action is None or action.phase != "running":
             return VelocityCommand()
         if action.kind == "move":
-            movement = movement_command(
-                action.direction,
-                telemetry.obstacle_distance_m,
-            )
-            return VelocityCommand(
-                movement.forward_m_s,
-                movement.right_m_s,
-                movement.down_m_s,
-            )
+            if _obstacle_is_clear(telemetry.obstacle_distance_m):
+                return VelocityCommand(
+                    forward_m_s=action.forward_m_s,
+                    right_m_s=action.right_m_s,
+                )
+            return VelocityCommand()
         if (
             action.kind == "turn"
             and _finite(telemetry.heading_rad)
-            and telemetry.obstacle_distance_m is not None
-            and math.isfinite(telemetry.obstacle_distance_m)
-            and telemetry.obstacle_distance_m > OBSTACLE_STOP_M
+            and _obstacle_is_clear(telemetry.obstacle_distance_m)
         ):
             yaw_rate = TURN_RATE_DEG_S * (
                 1.0 if action.direction == "right" else -1.0
@@ -487,22 +485,27 @@ class GeminiRuntime:
         return {"status": "rejected", "reason": "unknown tool"}, "SILENT"
 
     async def _move(self, args: dict) -> dict:
-        direction = str(args.get("direction", "")).strip().lower()
-        duration_s = args.get("duration_s")
-        if direction not in ("forward", "left", "right"):
+        forward_m_s = _number_between(
+            args, "forward_m_s", 0.0, MAX_FORWARD_SPEED_M_S
+        )
+        right_m_s = _number_between(
+            args, "right_m_s", -MAX_RIGHT_SPEED_M_S, MAX_RIGHT_SPEED_M_S
+        )
+        duration_s = _number_between(args, "duration_s", MIN_MOVE_S, MAX_MOVE_S)
+        if forward_m_s is None or right_m_s is None or duration_s is None:
             return {
                 "status": "rejected",
-                "reason": "direction must be forward, left, or right",
+                "reason": (
+                    "forward_m_s must be 0 to "
+                    f"{MAX_FORWARD_SPEED_M_S}; right_m_s must be "
+                    f"-{MAX_RIGHT_SPEED_M_S} to {MAX_RIGHT_SPEED_M_S}; "
+                    f"duration_s must be {MIN_MOVE_S} to {MAX_MOVE_S}"
+                ),
             }
-        if (
-            isinstance(duration_s, bool)
-            or not isinstance(duration_s, (int, float))
-            or not math.isfinite(duration_s)
-            or not MIN_MOVE_S <= duration_s <= MAX_MOVE_S
-        ):
+        if forward_m_s == 0.0 and right_m_s == 0.0:
             return {
                 "status": "rejected",
-                "reason": f"duration_s must be {MIN_MOVE_S} to {MAX_MOVE_S}",
+                "reason": "at least one body-frame velocity must be non-zero",
             }
         busy = self._busy_response()
         if busy is not None:
@@ -510,9 +513,11 @@ class GeminiRuntime:
         now = time.monotonic()
         action = ActiveAction(
             "move",
-            direction,
-            float(duration_s),
-            now + float(duration_s),
+            _move_direction(forward_m_s, right_m_s),
+            duration_s,
+            now + duration_s,
+            forward_m_s=forward_m_s,
+            right_m_s=right_m_s,
         )
         self._active_action = action
         self._last_action_result = ""
@@ -520,6 +525,10 @@ class GeminiRuntime:
         return {
             "status": "started",
             "action": self._action_label(action),
+            "body_velocity": {
+                "forward_m_s": forward_m_s,
+                "right_m_s": right_m_s,
+            },
             "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
         }
@@ -586,7 +595,10 @@ class GeminiRuntime:
         if action is None:
             return "none"
         if action.kind == "move":
-            return f"move {action.direction} for {action.amount:.1f}s"
+            return (
+                f"move forward={action.forward_m_s:+.2f}m/s "
+                f"right={action.right_m_s:+.2f}m/s for {action.amount:.1f}s"
+            )
         return f"turn {action.direction} {action.amount:.0f} degrees"
 
     def _movement_label(self) -> str:
@@ -772,21 +784,41 @@ def _tools():
     return [{"function_declarations": [
         {
             "name": "move",
-            "description": "Move slowly in one body direction for a short time.",
+            "description": (
+                "Move slowly in the body frame for a short time. "
+                "Forward is positive and right is positive."
+            ),
             "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
-                    "direction": {
-                        "type": "STRING",
-                        "enum": ["forward", "left", "right"],
+                    "forward_m_s": {
+                        "type": "NUMBER",
+                        "description": (
+                            "Forward body velocity from 0 through "
+                            f"{MAX_FORWARD_SPEED_M_S} m/s."
+                        ),
+                        "minimum": 0.0,
+                        "maximum": MAX_FORWARD_SPEED_M_S,
+                    },
+                    "right_m_s": {
+                        "type": "NUMBER",
+                        "description": (
+                            "Right body velocity from "
+                            f"-{MAX_RIGHT_SPEED_M_S} through "
+                            f"{MAX_RIGHT_SPEED_M_S} m/s."
+                        ),
+                        "minimum": -MAX_RIGHT_SPEED_M_S,
+                        "maximum": MAX_RIGHT_SPEED_M_S,
                     },
                     "duration_s": {
                         "type": "NUMBER",
-                        "description": "A duration from 0.2 through 1.0 seconds.",
+                        "description": f"A duration from {MIN_MOVE_S} through {MAX_MOVE_S} seconds.",
+                        "minimum": MIN_MOVE_S,
+                        "maximum": MAX_MOVE_S,
                     },
                 },
-                "required": ["direction", "duration_s"],
+                "required": ["forward_m_s", "right_m_s", "duration_s"],
             },
         },
         {
@@ -840,8 +872,10 @@ def _system_instruction() -> str:
         "including its current heading and active action. After a movement, wait "
         "for it to complete and use the new image and telemetry before choosing "
         "the next movement. Think broadly, but move slowly and deliberately. "
-        "You have optional tools for brief forward or lateral translation, turning "
-        "in place, hovering, and speech. Choose freely whether to use one, use "
+        "You have optional tools for brief body-frame translation, turning in place, "
+        "hovering, and speech. The move tool accepts forward and right velocity "
+        "components; use the smallest useful correction and combine components when "
+        "that matches the scene. Choose freely whether to use one, use "
         "several, or use none; a heartbeat is not a requirement to act or speak. "
         "When you decide to act, call the matching tool; do not describe a tool "
         "call as JSON or in a code fence. Speak only when useful. Treat each user "
@@ -853,12 +887,19 @@ def _system_instruction() -> str:
         "The CM5 checks every physical action and may stop it. Physical movement "
         "is serialized: when the current state says a move or turn is in progress, "
         "do not call move or turn again. Keep observing and thinking until the "
-        "state says the action completed. Do not use hover just to keep thinking "
-        "or wait for another image; use it to stop for safety or an explicit need. "
+        "state says the action completed. Do not use hover just to keep thinking, "
+        "wait for another image, or end a turn early; use it to stop for safety or "
+        "an explicit need. "
         "Hover may interrupt the current action. "
         "Never request altitude, motors, attitude, position, or a long translation. "
         "Turn only through the turn tool. Use hover when stopping is appropriate or "
-        "the scene or telemetry is unclear."
+        "the scene or telemetry is unclear. "
+        "A turn changes the view but does not approach an object. Once a requested "
+        "object is centered or a path is clear, prefer a short translation and "
+        "inspect the new image and telemetry again. Do not repeat the same turn "
+        "after it completes unless new visual evidence justifies it. For an approach "
+        "task, make a short translation after turning toward the target unless the "
+        "forward range is near the stop limit."
     )
 
 
@@ -938,6 +979,36 @@ def _number(value) -> str:
     if isinstance(value, (int, float)) and math.isfinite(value):
         return f"{value:.2f}"
     return "?"
+
+
+def _number_between(args: dict, name: str, minimum: float, maximum: float):
+    """Return one finite numeric argument inside its allowed range."""
+
+    value = args.get(name)
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or not minimum <= value <= maximum
+    ):
+        return None
+    return float(value)
+
+
+def _move_direction(forward_m_s: float, right_m_s: float) -> str:
+    """Give a movement a compact label for trace output."""
+
+    if forward_m_s and right_m_s:
+        return "move"
+    if forward_m_s:
+        return "forward"
+    return "left" if right_m_s < 0.0 else "right"
+
+
+def _obstacle_is_clear(distance_m: Optional[float]) -> bool:
+    """Return whether the forward range reading permits movement."""
+
+    return _finite(distance_m) and distance_m > OBSTACLE_STOP_M
 
 
 def _heading_number(value) -> str:

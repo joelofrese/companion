@@ -15,7 +15,6 @@ MOVEMENT_COMMANDS = {
     "stop": VelocityCommand(),
     "hover": VelocityCommand(),
 }
-MOVEMENT_NAMES = frozenset(MOVEMENT_COMMANDS)
 
 
 def movement_command(
