@@ -22,6 +22,8 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
+# Keep each control decision short enough for the next heartbeat.
+THINKING_BUDGET = 1024
 # Do not cancel a valid model turn just because it takes longer than one
 # heartbeat.  The video and body control continue while Gemini thinks.
 # A slow ER2 turn is safer to wait through than to discard and restart.
@@ -257,7 +259,10 @@ class GeminiRuntime:
                         response_modalities=["TEXT"],
                         tools=_tools(),
                         system_instruction=_system_instruction(),
-                        thinking_config=types.ThinkingConfig(include_thoughts=True),
+                        thinking_config=types.ThinkingConfig(
+                            thinking_budget=THINKING_BUDGET,
+                            include_thoughts=True,
+                        ),
                         context_window_compression=(
                             types.ContextWindowCompressionConfig(
                                 sliding_window=types.SlidingWindow()
