@@ -56,6 +56,7 @@ class ActiveAction:
     last_heading_rad: Optional[float] = None
     forward_m_s: float = 0.0
     right_m_s: float = 0.0
+    call_id: Optional[str] = None
 
 
 class GeminiRuntime:
@@ -83,6 +84,7 @@ class GeminiRuntime:
         self._active_action: Optional[ActiveAction] = None
         self._needs_post_action_frame = False
         self._stop_requested = False
+        self._action_feedback = asyncio.Queue()
         self._last_action_result = ""
         self.latest_observation: Optional[VisualObservation] = None
         self.latest_decision: Optional[ConsciousDecision] = None
@@ -151,7 +153,7 @@ class GeminiRuntime:
         if self._closed.is_set():
             return
         self._stop_requested = False
-        self._cancel_action("Gemini session reconnecting")
+        self._cancel_action("Gemini session reconnecting", notify=False)
         self._reconnect_requested = True
         self._close_session()
 
@@ -210,7 +212,7 @@ class GeminiRuntime:
         """Stop movement and end the streaming session."""
 
         self._stop_requested = False
-        self._cancel_action("brain closed")
+        self._cancel_action("brain closed", notify=False)
         self._closed.set()
         self._frame_ready.set()
         self._close_session()
@@ -258,6 +260,7 @@ class GeminiRuntime:
                         model=self.model,
                         config=config,
                     ) as session:
+                        self._clear_action_feedback()
                         self._session = session
                         connected = True
                         self._ready.set()
@@ -267,6 +270,9 @@ class GeminiRuntime:
                         await self._send_frame(session, types)
                         video_task = asyncio.create_task(
                             self._stream_video(session, types)
+                        )
+                        action_feedback_task = asyncio.create_task(
+                            self._send_action_feedback(session, types)
                         )
                         try:
                             while (
@@ -284,6 +290,8 @@ class GeminiRuntime:
                                     pass
                                 if video_task.done():
                                     await video_task
+                                if action_feedback_task.done():
+                                    await action_feedback_task
                                 remaining_s = MIN_HEARTBEAT_PERIOD_S - (
                                     time.monotonic() - sent_at_s
                                 )
@@ -295,8 +303,14 @@ class GeminiRuntime:
                                     except asyncio.TimeoutError:
                                         pass
                         finally:
-                            video_task.cancel()
-                            await asyncio.gather(video_task, return_exceptions=True)
+                            for task in (video_task, action_feedback_task):
+                                task.cancel()
+                            await asyncio.gather(
+                                video_task,
+                                action_feedback_task,
+                                return_exceptions=True,
+                            )
+                            self._clear_action_feedback()
                         self._session = None
                 except asyncio.CancelledError:
                     raise
@@ -321,7 +335,10 @@ class GeminiRuntime:
                             flush=True,
                         )
                     else:
-                        self._cancel_action("Gemini session reconnecting")
+                        self._cancel_action(
+                            "Gemini session reconnecting",
+                            notify=False,
+                        )
                         print(f"Gemini session reconnecting: {error}", flush=True)
                 if self._closed.is_set():
                     return
@@ -357,6 +374,32 @@ class GeminiRuntime:
                 video=types.Blob(data=image_bytes, mime_type="image/jpeg")
             )
         self.video_frame_count += 1
+
+    async def _send_action_feedback(self, session, types):
+        """Send native completion responses for long-running actions."""
+
+        while not self._closed.is_set():
+            name, call_id, response = await self._action_feedback.get()
+            if call_id is None:
+                continue
+            completion = types.FunctionResponse(
+                name=name,
+                id=call_id,
+                response=response,
+                will_continue=False,
+                scheduling="WHEN_IDLE",
+            )
+            async with self._send_lock:
+                await session.send_tool_response(
+                    function_responses=completion
+                )
+
+    def _clear_action_feedback(self):
+        while True:
+            try:
+                self._action_feedback.get_nowait()
+            except asyncio.QueueEmpty:
+                return
 
     async def _heartbeat(self, session):
         """Ask for one high-level decision while video keeps streaming."""
@@ -414,7 +457,7 @@ class GeminiRuntime:
                 self._session_handle = update.new_handle
 
             if message.go_away is not None:
-                self._cancel_action("Gemini session reconnecting")
+                self._cancel_action("Gemini session reconnecting", notify=False)
                 self._reconnect_requested = True
 
             usage = message.usage_metadata
@@ -446,18 +489,25 @@ class GeminiRuntime:
                         call.name,
                         call.args or {},
                     )
+                    continues = (
+                        call.name in ("move", "turn")
+                        and result.get("status") == "started"
+                    )
+                    if continues and self._active_action is not None:
+                        self._active_action.call_id = call.id
                     responses.append(
                         types.FunctionResponse(
                             name=call.name,
                             response=result,
                             id=call.id,
+                            will_continue=continues,
                             scheduling=scheduling,
                         )
                     )
                 async with self._send_lock:
                     await session.send_tool_response(function_responses=responses)
             if message.tool_call_cancellation is not None:
-                self._cancel_action("Gemini cancelled it")
+                self._cancel_action("Gemini cancelled it", notify=False)
 
             if self._reconnect_requested:
                 self._response_parts.clear()
@@ -740,10 +790,11 @@ class GeminiRuntime:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
         self._last_action_result = result
         self._needs_post_action_frame = True
+        self._queue_action_feedback(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._active_action = None
 
-    def _cancel_action(self, reason: str) -> str:
+    def _cancel_action(self, reason: str, notify: bool = True) -> str:
         action = self._active_action
         if action is None:
             return ""
@@ -753,9 +804,29 @@ class GeminiRuntime:
             result += f"; observed heading change {actual:+.1f} degrees"
         self._last_action_result = result
         self._needs_post_action_frame = True
+        if notify:
+            self._queue_action_feedback(action, "cancelled", result, actual)
         self._record_action(result)
         self._active_action = None
         return self._action_label(action)
+
+    def _queue_action_feedback(
+        self,
+        action: ActiveAction,
+        status: str,
+        result: str,
+        actual_heading_deg: Optional[float],
+    ):
+        if action.call_id is None:
+            return
+        response = {
+            "status": status,
+            "action": result,
+            "telemetry": _telemetry_text(self._telemetry),
+        }
+        if actual_heading_deg is not None:
+            response["observed_heading_change_deg"] = actual_heading_deg
+        self._action_feedback.put_nowait((action.kind, action.call_id, response))
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
@@ -938,6 +1009,8 @@ def _system_instruction() -> str:
         "is serialized: when the current state says a move or turn is in progress, "
         "do not call move or turn again. Keep observing and thinking until the "
         "state says the action completed and a fresh camera frame has arrived. "
+        "A movement tool returns immediately and sends a separate completion response; "
+        "treat that response and the reported telemetry as authoritative. "
         "Do not use hover just to keep thinking, wait for another image, or end a "
         "turn early. During an active action, hover may interrupt only for an "
         "explicit stop request; otherwise the hover tool is unavailable and the "

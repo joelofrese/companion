@@ -190,7 +190,8 @@ without waiting for their duration, so the brain can continue receiving video,
 telemetry, and dialogue. One physical move or turn stays active until its
 duration or observed heading settles; movement waits for a fresh camera frame
 afterward; the action state reports the command, phase, remaining time, and
-heading. Hover interrupts it only for an explicit stop request. The CM5 handles
+heading. The movement tool also sends Gemini a native completion response.
+Hover interrupts it only for an explicit stop request. The CM5 handles
 safety overrides, expires commands, and limits every physical command.
 The trace reads
 Gemini's native `thought` parts separately from visible responses and tool
