@@ -33,7 +33,7 @@ MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 90.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
-TURN_RATE_DEG_S = 12.0
+TURN_RATE_DEG_S = 8.0
 MAX_IMAGE_WIDTH = 640
 ACTION_GRACE_S = 1.0
 ACTION_SETTLE_S = 1.0
@@ -1008,6 +1008,8 @@ def _system_instruction() -> str:
         "When you decide to act, call the matching tool; do not describe a tool "
         "call as JSON or in a code fence. Speak only when useful. Treat each user "
         "message as an active request and prioritize it over open-ended exploration. "
+        "If it asks for a physical action, begin it when the current state permits; "
+        "do not only describe a plan. "
         "If it asks you to wait for a person or "
         "condition, hover and wait until later dialogue or perception satisfies it; "
         "do not resume exploration while waiting. "
