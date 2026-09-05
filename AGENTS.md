@@ -185,7 +185,7 @@ conversation bounded, and native session resumption reconnects it with the
 latest resumable handle when a connection ends; a rejected handle starts a
 fresh session with the situation and memory. The editable memory file is only
 prior experience across runs. The session receives the newest 640-pixel
-JPEG twice per second while model turns run. Movement and speech tools return
+JPEG once per second while model turns run. Movement and speech tools return
 without waiting for their duration, so the brain can continue receiving video,
 telemetry, and dialogue. One physical move or turn stays active until its
 duration or observed heading settles; safety holds pause its timing; movement

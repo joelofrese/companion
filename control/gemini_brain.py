@@ -20,7 +20,7 @@ from control.velocity import VelocityCommand
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
-VIDEO_PERIOD_S = 0.5
+VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
 # Do not cancel a valid model turn just because it takes longer than one
 # heartbeat.  The video and body control continue while Gemini thinks.
@@ -412,7 +412,7 @@ class GeminiRuntime:
         self.video_frame_count += 1
 
     async def _send_action_feedback(self, session, types):
-        """Send native completion responses for long-running actions."""
+        """Interrupt the model with native completion responses."""
 
         while not self._closed.is_set():
             name, call_id, response = await self._action_feedback.get()
@@ -423,7 +423,7 @@ class GeminiRuntime:
                 id=call_id,
                 response=response,
                 will_continue=False,
-                scheduling="WHEN_IDLE",
+                scheduling="INTERRUPT",
             )
             async with self._send_lock:
                 await session.send_tool_response(
@@ -527,7 +527,9 @@ class GeminiRuntime:
                     transcript = content.output_transcription
                     if transcript is not None and transcript.text:
                         self._response_parts.append(transcript.text)
-                turn_complete = bool(content.turn_complete)
+                turn_complete = bool(
+                    content.turn_complete or content.generation_complete
+                )
             tool_call = message.tool_call
             if tool_call is not None:
                 responses = []
@@ -611,7 +613,10 @@ class GeminiRuntime:
 
     async def _move(self, args: dict) -> dict:
         forward_m_s = _number_between(
-            args, "forward_m_s", 0.0, MAX_FORWARD_SPEED_M_S
+            args,
+            "forward_m_s",
+            -MAX_FORWARD_SPEED_M_S,
+            MAX_FORWARD_SPEED_M_S,
         )
         right_m_s = _number_between(
             args, "right_m_s", -MAX_RIGHT_SPEED_M_S, MAX_RIGHT_SPEED_M_S
@@ -621,8 +626,9 @@ class GeminiRuntime:
             return {
                 "status": "rejected",
                 "reason": (
-                    "forward_m_s must be 0 to "
-                    f"{MAX_FORWARD_SPEED_M_S}; right_m_s must be "
+                    "forward_m_s must be -"
+                    f"{MAX_FORWARD_SPEED_M_S} to {MAX_FORWARD_SPEED_M_S}; "
+                    "right_m_s must be "
                     f"-{MAX_RIGHT_SPEED_M_S} to {MAX_RIGHT_SPEED_M_S}; "
                     f"duration_s must be {MIN_MOVE_S} to {MAX_MOVE_S}"
                 ),
@@ -1035,10 +1041,11 @@ def _tools():
                     "forward_m_s": {
                         "type": "NUMBER",
                         "description": (
-                            "Forward body velocity from 0 through "
+                            "Forward body velocity; negative is backward, from "
+                            f"-{MAX_FORWARD_SPEED_M_S} through "
                             f"{MAX_FORWARD_SPEED_M_S} m/s."
                         ),
-                        "minimum": 0.0,
+                        "minimum": -MAX_FORWARD_SPEED_M_S,
                         "maximum": MAX_FORWARD_SPEED_M_S,
                     },
                     "right_m_s": {
@@ -1119,8 +1126,9 @@ def _system_instruction() -> str:
         "for it to complete and use the new image and telemetry before choosing "
         "the next movement. Think broadly, but move slowly and deliberately. "
         "You have optional tools for brief body-frame translation, turning in place, "
-        "hovering, and speech. The move tool accepts forward and right velocity "
-        "components; use the smallest useful correction and combine components when "
+        "hovering, and speech. The move tool accepts signed forward/backward and "
+        "right/left velocity components; use the smallest useful correction and "
+        "combine components when "
         "that matches the scene. Choose freely whether to use one, use "
         "several, or use none; a heartbeat is not a requirement to act or speak. "
         "When you decide to act, call the matching tool; do not describe a tool "
@@ -1265,7 +1273,7 @@ def _move_direction(forward_m_s: float, right_m_s: float) -> str:
     if forward_m_s and right_m_s:
         return "move"
     if forward_m_s:
-        return "forward"
+        return "forward" if forward_m_s > 0.0 else "backward"
     return "left" if right_m_s < 0.0 else "right"
 
 

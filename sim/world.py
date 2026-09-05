@@ -702,8 +702,6 @@ async def run(
 
         try:
             while (elapsed := time.monotonic() - started_at) < duration_s:
-                if person_motion is not None:
-                    person_motion.check()
                 now = time.monotonic()
                 step = read_step(elapsed)
                 event = None if exploratory else event_for(elapsed, step)

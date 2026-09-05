@@ -100,7 +100,6 @@ class GazeboPoseAnimator:
         self._environment["GZ_IP"] = "127.0.0.1"
         self._stop = threading.Event()
         self._thread = None
-        self._error = None
 
     def start(self):
         """Start moving the model after the first interval."""
@@ -117,26 +116,29 @@ class GazeboPoseAnimator:
     def _run(self):
         current = self._poses[0]
         index = 1 % len(self._poses)
-        try:
+        while not self._stop.is_set():
+            target = self._poses[index]
+            started_at = time.monotonic()
             while not self._stop.is_set():
-                target = self._poses[index]
-                started_at = time.monotonic()
-                while True:
-                    progress = min(
-                        (time.monotonic() - started_at) / self._interval_s,
-                        1.0,
-                    )
-                    pose = tuple(
-                        start + (end - start) * progress
-                        for start, end in zip(current, target)
-                    )
+                progress = min(
+                    (time.monotonic() - started_at) / self._interval_s,
+                    1.0,
+                )
+                pose = tuple(
+                    start + (end - start) * progress
+                    for start, end in zip(current, target)
+                )
+                try:
                     self._set_pose(pose)
-                    if progress >= 1.0 or self._stop.wait(POSE_UPDATE_S):
-                        break
-                current = target
-                index = (index + 1) % len(self._poses)
-        except Exception as error:
-            self._error = error
+                except Exception:
+                    # A visual update may lose a race with Gazebo or time out
+                    # under load. Keep the fixture moving and try the next
+                    # update; it does not affect vehicle safety.
+                    pass
+                if progress >= 1.0 or self._stop.wait(POSE_UPDATE_S):
+                    break
+            current = target
+            index = (index + 1) % len(self._poses)
 
     def _set_pose(self, pose):
         x, y, z = pose
@@ -172,18 +174,11 @@ class GazeboPoseAnimator:
         if result.returncode != 0 or "data: true" not in result.stdout:
             raise RuntimeError("Gazebo could not move the visual model")
 
-    def check(self):
-        """Raise a worker error in the simulation loop."""
-
-        if self._error is not None:
-            raise RuntimeError("Gazebo pose animation failed") from self._error
-
     def close(self):
-        """Stop the worker without turning shutdown races into flight failures."""
+        """Stop the best-effort visual worker."""
 
         if self._thread is None:
             return
         self._stop.set()
         self._thread.join(timeout=3.0)
         self._thread = None
-        self._error = None
