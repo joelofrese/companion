@@ -453,6 +453,7 @@ class GeminiRuntime:
 
     async def _receive(self, session, types):
         async for message in session.receive():
+            turn_complete = False
             update = message.session_resumption_update
             if update is not None and update.resumable and update.new_handle:
                 self._session_handle = update.new_handle
@@ -479,9 +480,7 @@ class GeminiRuntime:
                     transcript = content.output_transcription
                     if transcript is not None and transcript.text:
                         self._response_parts.append(transcript.text)
-                if content.turn_complete:
-                    self.turn_count += 1
-                    self._finish_turn()
+                turn_complete = bool(content.turn_complete)
             tool_call = message.tool_call
             if tool_call is not None:
                 responses = []
@@ -514,6 +513,10 @@ class GeminiRuntime:
                 self._response_parts.clear()
                 self._response_thoughts.clear()
                 self._actions.clear()
+                return
+            if turn_complete:
+                self.turn_count += 1
+                self._finish_turn()
                 return
 
     async def _execute(self, name: str, args: dict) -> tuple[dict, str]:
