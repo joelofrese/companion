@@ -81,6 +81,8 @@ class GeminiRuntime:
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._active_action: Optional[ActiveAction] = None
+        self._needs_post_action_frame = False
+        self._stop_requested = False
         self._last_action_result = ""
         self.latest_observation: Optional[VisualObservation] = None
         self.latest_decision: Optional[ConsciousDecision] = None
@@ -138,13 +140,17 @@ class GeminiRuntime:
 
         if not isinstance(message, str) or not message.strip():
             return
-        self._dialogue.append(message.strip())
+        message = message.strip()
+        if _is_explicit_stop(message):
+            self._stop_requested = True
+        self._dialogue.append(message)
 
     def request_reconnect(self):
         """Reconnect the live session while stopping any active movement."""
 
         if self._closed.is_set():
             return
+        self._stop_requested = False
         self._cancel_action("Gemini session reconnecting")
         self._reconnect_requested = True
         self._close_session()
@@ -162,6 +168,8 @@ class GeminiRuntime:
         if frame is not None:
             self._latest_frame = frame
             self._latest_frame_at_s = time.monotonic()
+            if self._needs_post_action_frame:
+                self._needs_post_action_frame = False
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
@@ -201,6 +209,7 @@ class GeminiRuntime:
     def close(self):
         """Stop movement and end the streaming session."""
 
+        self._stop_requested = False
         self._cancel_action("brain closed")
         self._closed.set()
         self._frame_ready.set()
@@ -462,6 +471,21 @@ class GeminiRuntime:
         if name == "turn":
             return await self._turn(args), "SILENT"
         if name == "hover":
+            if self._active_action is not None and not self._stop_requested:
+                return (
+                    {
+                        "status": "unavailable",
+                        "reason": (
+                            "the physical action is still running; hover can "
+                            "interrupt it only for an explicit stop request"
+                        ),
+                        "active_action": self._action_label(),
+                        "movement_tools": "unavailable until the action completes",
+                        "telemetry": _telemetry_text(self._telemetry),
+                    },
+                    "SILENT",
+                )
+            self._stop_requested = False
             cancelled = self._cancel_action("hover")
             self._record_action("hover")
             return (
@@ -579,7 +603,21 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
-            return None
+            if self._stop_requested:
+                return {
+                    "status": "unavailable",
+                    "reason": "an explicit stop request is active; hover before moving again",
+                    "movement_tools": "unavailable until hovering is acknowledged",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
+            if not self._needs_post_action_frame:
+                return None
+            return {
+                "status": "unavailable",
+                "reason": "the last physical action finished; waiting for a fresh camera frame",
+                "movement_tools": "unavailable until a fresh camera frame arrives",
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         return {
             "status": "unavailable",
             "reason": "a physical movement action is still in progress",
@@ -615,6 +653,12 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
+            if self._needs_post_action_frame:
+                result = self._last_action_result or "last action finished"
+                return (
+                    f"{result}; waiting for a fresh camera frame; "
+                    "movement tools unavailable until then"
+                )
             if self._last_action_result:
                 return f"{self._last_action_result}; movement tools available"
             return "none; movement tools available"
@@ -695,6 +739,7 @@ class GeminiRuntime:
         if actual_heading_deg is not None:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
         self._last_action_result = result
+        self._needs_post_action_frame = True
         self._record_action(result)
         self._active_action = None
 
@@ -707,6 +752,7 @@ class GeminiRuntime:
         if actual is not None:
             result += f"; observed heading change {actual:+.1f} degrees"
         self._last_action_result = result
+        self._needs_post_action_frame = True
         self._record_action(result)
         self._active_action = None
         return self._action_label(action)
@@ -842,7 +888,10 @@ def _tools():
         },
         {
             "name": "hover",
-            "description": "Stop horizontal motion and hold position.",
+            "description": (
+                "Stop horizontal motion and hold position. It can interrupt a "
+                "movement only when the user explicitly asks to stop."
+            ),
             "behavior": "NON_BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
         },
@@ -879,7 +928,8 @@ def _system_instruction() -> str:
         "several, or use none; a heartbeat is not a requirement to act or speak. "
         "When you decide to act, call the matching tool; do not describe a tool "
         "call as JSON or in a code fence. Speak only when useful. Treat each user "
-        "message as an active request. If it asks you to wait for a person or "
+        "message as an active request and prioritize it over open-ended exploration. "
+        "If it asks you to wait for a person or "
         "condition, hover and wait until later dialogue or perception satisfies it; "
         "do not resume exploration while waiting. "
         "Do not repeat the [STATE] block or telemetry. Stay silent while a "
@@ -887,19 +937,22 @@ def _system_instruction() -> str:
         "The CM5 checks every physical action and may stop it. Physical movement "
         "is serialized: when the current state says a move or turn is in progress, "
         "do not call move or turn again. Keep observing and thinking until the "
-        "state says the action completed. Do not use hover just to keep thinking, "
+        "state says the action completed and a fresh camera frame has arrived. "
+        "Do not use hover just to keep thinking, "
         "wait for another image, or end a turn early; use it to stop for safety or "
         "an explicit need. "
-        "Hover may interrupt the current action. "
+        "Hover may interrupt the current action only for safety or an explicit stop "
+        "request; otherwise the hover tool is unavailable and the movement finishes. "
         "Never request altitude, motors, attitude, position, or a long translation. "
         "Turn only through the turn tool. Use hover when stopping is appropriate or "
         "the scene or telemetry is unclear. "
         "A turn changes the view but does not approach an object. Once a requested "
-        "object is centered or a path is clear, prefer a short translation and "
-        "inspect the new image and telemetry again. Do not repeat the same turn "
-        "after it completes unless new visual evidence justifies it. For an approach "
-        "task, make a short translation after turning toward the target unless the "
-        "forward range is near the stop limit."
+        "object is visible, use one small turn to center it, then prefer a short "
+        "translation and inspect the new image and telemetry again. Use larger turns "
+        "only when the target is not visible and a scan is needed. Do not repeat the "
+        "same turn after it completes unless new visual evidence justifies it. For "
+        "an approach task, make a short translation after turning toward the target "
+        "unless the forward range is near the stop limit."
     )
 
 
@@ -1025,6 +1078,22 @@ def _finite(value) -> bool:
         and not isinstance(value, bool)
         and math.isfinite(value)
     )
+
+
+def _is_explicit_stop(message: str) -> bool:
+    """Recognize the short dialogue commands that may interrupt movement."""
+
+    message = " ".join(message.casefold().split())
+    if message.startswith("please "):
+        message = message[7:]
+    return message in {
+        "stop",
+        "stop moving",
+        "hover",
+        "hold position",
+        "cancel",
+        "cancel movement",
+    }
 
 
 def _resume_rejected(error: Exception) -> bool:

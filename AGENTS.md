@@ -38,7 +38,9 @@ merge and delete it.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
 - Gemini may keep thinking while one physical move or turn completes; movement
-  tools stay unavailable until its action state reports completion.
+  tools stay unavailable until its action state reports completion and a fresh
+  camera frame arrives.
+- Hover interrupts an active action only for safety or an explicit stop request.
 - Stale, malformed, missing, or unsafe input becomes zero motion.
 - CM5 returns fresh TOF, velocity, and heading telemetry, rejects unsafe commands,
   protects against obstacles, and is the final vehicle-side authority.
@@ -185,8 +187,10 @@ prior experience across runs. The session receives the newest 640-pixel
 JPEG once per second while model turns run. Movement and speech tools return
 without waiting for their duration, so the brain can continue receiving video,
 telemetry, and dialogue. One physical move or turn stays active until its
-duration or observed heading settles; the action state reports the command,
-phase, remaining time, and heading. Hover may interrupt it. The CM5 still
+duration or observed heading settles; movement waits for a fresh camera frame
+afterward; the action state reports the command, phase, remaining time, and
+heading. Hover interrupts it only for safety or an explicit stop request. The
+CM5 still
 expires, limits, and overrides every physical command. The trace reads
 Gemini's native `thought` parts separately from visible responses and tool
 calls; ER 2 may emit no thought summaries even when it reasons internally.
