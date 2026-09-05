@@ -39,7 +39,7 @@ merge and delete it.
   the CM5 still limits every physical command.
 - Gemini may keep thinking while one physical move or turn completes; movement
   tools stay unavailable until its action state reports completion and a fresh
-  camera frame arrives.
+  camera frame arrives. Safety holds pause the action until movement is allowed.
 - Hover interrupts an active action only for an explicit stop request; the CM5
   handles safety overrides.
 - Stale, malformed, missing, or unsafe input becomes zero motion.
@@ -188,9 +188,10 @@ prior experience across runs. The session receives the newest 640-pixel
 JPEG twice per second while model turns run. Movement and speech tools return
 without waiting for their duration, so the brain can continue receiving video,
 telemetry, and dialogue. One physical move or turn stays active until its
-duration or observed heading settles; movement waits for a fresh camera frame
-afterward; the action state reports the command, phase, remaining time, and
-heading. The movement tool also sends Gemini a native completion response.
+duration or observed heading settles; safety holds pause its timing; movement
+waits for a fresh camera frame afterward; the action state reports the command,
+phase, remaining time, and heading. The movement tool also sends Gemini a native
+completion response.
 Hover interrupts it only for an explicit stop request. The CM5 handles
 safety overrides, expires commands, and limits every physical command.
 The trace reads

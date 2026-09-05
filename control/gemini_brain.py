@@ -58,6 +58,7 @@ class ActiveAction:
     forward_m_s: float = 0.0
     right_m_s: float = 0.0
     call_id: Optional[str] = None
+    last_update_s: Optional[float] = None
 
 
 class GeminiRuntime:
@@ -597,6 +598,7 @@ class GeminiRuntime:
             now + duration_s,
             forward_m_s=forward_m_s,
             right_m_s=right_m_s,
+            last_update_s=now,
         )
         self._active_action = action
         self._last_action_result = ""
@@ -643,6 +645,7 @@ class GeminiRuntime:
             self._telemetry.heading_rad
             if _finite(self._telemetry.heading_rad)
             else None,
+            last_update_s=now,
         )
         self._active_action = action
         self._last_action_result = ""
@@ -673,9 +676,15 @@ class GeminiRuntime:
                 "movement_tools": "unavailable until a fresh camera frame arrives",
                 "telemetry": _telemetry_text(self._telemetry),
             }
+        reason = (
+            "safety telemetry is currently holding the action; it will resume "
+            "when movement is permitted"
+            if self._action_is_blocked(action)
+            else "a physical movement action is still in progress"
+        )
         return {
             "status": "unavailable",
-            "reason": "a physical movement action is still in progress",
+            "reason": reason,
             "active_action": self._action_label(action),
             "phase": action.phase,
             "remaining_s": max(0.0, action.deadline_s - time.monotonic()),
@@ -724,6 +733,8 @@ class GeminiRuntime:
         actual = self._heading_change_deg(action)
         if actual is not None:
             details.append(f"observed heading change={actual:+.1f} degrees")
+        if self._action_is_blocked(action):
+            details.append("paused until safety telemetry permits movement")
         details.append("move and turn tools unavailable until completion")
         details.append("hover may interrupt")
         return "; ".join(details)
@@ -732,6 +743,7 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             return
+        self._pause_action_if_blocked(action)
         now = time.monotonic()
         if action.kind == "turn":
             if action.start_heading_rad is None and _finite(self._telemetry.heading_rad):
@@ -774,6 +786,32 @@ class GeminiRuntime:
                 self._complete_action(status, actual)
             else:
                 self._complete_action("completed")
+
+    def _pause_action_if_blocked(self, action: ActiveAction):
+        """Do not spend an action's time while safety state holds it still."""
+
+        now = time.monotonic()
+        if (
+            action.last_update_s is not None
+            and action.phase == "running"
+            and self._action_is_blocked(action)
+        ):
+            action.deadline_s += max(0.0, now - action.last_update_s)
+        action.last_update_s = now
+
+    def _action_is_blocked(self, action: ActiveAction) -> bool:
+        if not _obstacle_is_clear(self._telemetry.obstacle_distance_m):
+            return True
+        if any(
+            not _finite(value)
+            for value in (
+                self._telemetry.forward_velocity_m_s,
+                self._telemetry.right_velocity_m_s,
+                self._telemetry.down_velocity_m_s,
+            )
+        ):
+            return True
+        return action.kind == "turn" and not _finite(self._telemetry.heading_rad)
 
     def _heading_change_deg(self, action: ActiveAction) -> Optional[float]:
         if action.start_heading_rad is None or not _finite(self._telemetry.heading_rad):
