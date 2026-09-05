@@ -19,7 +19,8 @@ from control.velocity import VelocityCommand
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
-VIDEO_PERIOD_S = 1.0
+# Give the streaming model a fresh view often enough for short closed-loop moves.
+VIDEO_PERIOD_S = 0.5
 MIN_HEARTBEAT_PERIOD_S = 1.0
 RESPONSE_TIMEOUT_S = 10.0
 START_TIMEOUT_S = 20.0
