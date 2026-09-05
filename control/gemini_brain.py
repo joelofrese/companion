@@ -154,6 +154,7 @@ class GeminiRuntime:
         message = message.strip()
         if _is_explicit_stop(message):
             self._stop_requested = True
+            self._cancel_action("explicit stop request")
         self._dialogue.append(message)
 
     def request_reconnect(self):
@@ -297,6 +298,8 @@ class GeminiRuntime:
                                         self._receive(session, types)
                                     )
                                     response_started_s = time.monotonic()
+                                elif self._dialogue:
+                                    await self._send_pending_dialogue(session)
                                 sent_at_s = time.monotonic()
                                 try:
                                     await asyncio.wait_for(
@@ -448,6 +451,18 @@ class GeminiRuntime:
         if dialogue:
             self._dialogue.popleft()
             self.dialogue_count += 1
+
+    async def _send_pending_dialogue(self, session):
+        """Send new dialogue without waiting for an older model turn."""
+
+        if not self._dialogue:
+            return
+        dialogue = self._dialogue.popleft()
+        self.dialogue_count += 1
+        async with self._send_lock:
+            await session.send_realtime_input(
+                text=self._heartbeat_text(dialogue)
+            )
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
