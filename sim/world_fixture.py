@@ -209,11 +209,17 @@ class WorldVisualModel:
             else ""
         )
         alternate_movement = ""
+        detour_available = OBSTACLE_END_S <= elapsed_s < RECOVERY_END_S
         if (
             movement in ("forward", "stop")
-            and telemetry.obstacle_distance_m is not None
-            and math.isfinite(telemetry.obstacle_distance_m)
-            and telemetry.obstacle_distance_m <= OBSTACLE_STOP_M
+            and (
+                detour_available
+                or (
+                    telemetry.obstacle_distance_m is not None
+                    and math.isfinite(telemetry.obstacle_distance_m)
+                    and telemetry.obstacle_distance_m <= OBSTACLE_STOP_M
+                )
+            )
         ):
             alternate_movement = "right"
         return VisualObservation(

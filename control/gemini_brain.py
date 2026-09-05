@@ -22,8 +22,8 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 MIN_HEARTBEAT_PERIOD_S = 1.0
-# Balance visual reasoning with responsive control decisions.
-THINKING_BUDGET = 2048
+# Favor timely closed-loop control over long internal deliberation.
+THINKING_BUDGET = 1024
 # Do not cancel a valid model turn just because it takes longer than one
 # heartbeat.  The video and body control continue while Gemini thinks.
 # A slow ER2 turn is safer to wait through than to discard and restart.
@@ -1075,7 +1075,10 @@ def _tools():
         },
         {
             "name": "turn",
-            "description": "Turn in place slowly to look in another direction.",
+            "description": (
+                "Turn in place slowly by an angle relative to the current heading. "
+                "Use small corrections when aligning with something."
+            ),
             "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
@@ -1125,7 +1128,8 @@ def _system_instruction() -> str:
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, telemetry, active action, conversation, and previous "
         "action results. Telemetry includes forward TOF distance, body velocity, "
-        "and heading. You have no lidar or direct motor control; PX4 stabilizes "
+        "and heading. Turn angles are relative to the current heading. You have no "
+        "lidar or direct motor control; PX4 stabilizes "
         "the vehicle and holds altitude. "
         "Think broadly and choose whether to move, turn, hover, speak, or do nothing. "
         "Treat each user message as the active request and begin a physical action "
@@ -1133,16 +1137,20 @@ def _system_instruction() -> str:
         "smallest useful speed, direction, angle, and duration yourself. "
         "The camera image is not mirrored: an object on image-left needs a left turn, "
         "and an object on image-right needs a right turn. Use the current heading and "
-        "measured motion as feedback; never assume an action achieved its request. "
+        "measured motion as feedback. When an action reports completion, accept its "
+        "observed heading or translation as fact and choose the next action from the "
+        "new image and state; never repeat or extend an old action without new "
+        "evidence. "
         "Movement is a closed loop: start only one move or turn at a time, wait for "
         "the state to report completion and a fresh image, then reassess. Movement "
-        "tools are unavailable while an action is active. "
-        "Keep a requested target in view. If it is visible, use at most one small turn "
-        "to center it, then make a short translation or inspect it. Do not scan away "
-        "from a visible target or repeat a turn without new visual evidence. If it "
-        "disappears, make one small turn toward its last seen direction and reassess; "
-        "do not keep turning blindly. If the request says to wait, stop, or inspect "
-        "when close, hover and remain there when that condition is met. "
+        "tools are unavailable while an action is active. In an open-ended task, "
+        "continue with another small purposeful action after each fresh view unless "
+        "the task is complete, waiting, or the state is unclear. If you are aligning "
+        "with something, make a small correction and reassess instead of repeating "
+        "a turn without new visual evidence. When a requested thing is already "
+        "visible, act on that view before scanning elsewhere. If the request says to "
+        "wait, stop, or inspect when close, hover and remain there when that condition "
+        "is met. "
         "Use hover when the task is complete or the image or telemetry is unclear. "
         "Do not use hover merely to wait for a response or end a turn early. "
         "Speak only when useful. Do not repeat the state block or telemetry. "
