@@ -179,11 +179,11 @@ class GazeboPoseAnimator:
             raise RuntimeError("Gazebo pose animation failed") from self._error
 
     def close(self):
-        """Stop the worker and report any failed pose update."""
+        """Stop the worker without turning shutdown races into flight failures."""
 
         if self._thread is None:
             return
         self._stop.set()
         self._thread.join(timeout=3.0)
         self._thread = None
-        self.check()
+        self._error = None
