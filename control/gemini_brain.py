@@ -22,7 +22,10 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 0.5
 MIN_HEARTBEAT_PERIOD_S = 1.0
-RESPONSE_TIMEOUT_S = 10.0
+# Do not cancel a valid model turn just because it takes longer than one
+# heartbeat.  The video and body control continue while Gemini thinks.
+# A slow ER2 turn is safer to wait through than to discard and restart.
+RESPONSE_TIMEOUT_S = 60.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -35,7 +38,8 @@ MAX_TURN_DEG = 90.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MAX_IMAGE_WIDTH = 640
-ACTION_GRACE_S = 1.0
+# PX4 may take longer than the commanded yaw rate to settle on a heading.
+ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 ACTION_STABLE_S = 0.3
 HEADING_STABILITY_RAD = math.radians(2.0)
@@ -278,19 +282,40 @@ class GeminiRuntime:
                             self._send_action_feedback(session, types)
                         )
                         try:
+                            receive_task = None
+                            response_started_s = None
                             while (
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
+                                if receive_task is None:
+                                    await self._heartbeat(session)
+                                    receive_task = asyncio.create_task(
+                                        self._receive(session, types)
+                                    )
+                                    response_started_s = time.monotonic()
                                 sent_at_s = time.monotonic()
-                                await self._heartbeat(session)
                                 try:
                                     await asyncio.wait_for(
-                                        self._receive(session, types),
-                                        timeout=RESPONSE_TIMEOUT_S,
+                                        asyncio.shield(receive_task),
+                                        timeout=MIN_HEARTBEAT_PERIOD_S,
                                     )
                                 except asyncio.TimeoutError:
                                     pass
+                                if receive_task.done():
+                                    await receive_task
+                                    receive_task = None
+                                    response_started_s = None
+                                    if self._reconnect_requested:
+                                        break
+                                elif (
+                                    response_started_s is not None
+                                    and time.monotonic() - response_started_s
+                                    > RESPONSE_TIMEOUT_S
+                                ):
+                                    raise TimeoutError(
+                                        "Gemini did not complete its response"
+                                    )
                                 if video_task.done():
                                     await video_task
                                 if action_feedback_task.done():
@@ -306,11 +331,13 @@ class GeminiRuntime:
                                     except asyncio.TimeoutError:
                                         pass
                         finally:
-                            for task in (video_task, action_feedback_task):
+                            tasks = [video_task, action_feedback_task]
+                            if receive_task is not None:
+                                tasks.append(receive_task)
+                            for task in tasks:
                                 task.cancel()
                             await asyncio.gather(
-                                video_task,
-                                action_feedback_task,
+                                *tasks,
                                 return_exceptions=True,
                             )
                             self._clear_action_feedback()
@@ -1046,8 +1073,12 @@ def _system_instruction() -> str:
         "When you decide to act, call the matching tool; do not describe a tool "
         "call as JSON or in a code fence. Speak only when useful. Treat each user "
         "message as an active request and prioritize it over open-ended exploration. "
-        "If it asks for a physical action, begin it when the current state permits; "
-        "do not only describe a plan. "
+        "Do not ask the user to provide an exact turn angle, speed, or duration; "
+        "estimate a small action from the image and telemetry yourself. If it asks "
+        "for a physical action, begin it when the current state permits; do not "
+        "only describe a plan. A turn is an observation step, not task completion: "
+        "if the request also asks you to find, approach, or inspect something, "
+        "continue after the turn with a short translation when the new view supports it. "
         "If it asks you to wait for a person or "
         "condition, hover and wait until later dialogue or perception satisfies it; "
         "do not resume exploration while waiting. "
@@ -1070,8 +1101,11 @@ def _system_instruction() -> str:
         "object is visible, use one small turn to center it, then prefer a short "
         "translation and inspect the new image and telemetry again. Use larger turns "
         "only when the target is not visible and a scan is needed. For a visible "
-        f"target, small corrective turns are usually {MIN_TURN_DEG:.0f}-15 degrees. "
-        "Do not repeat the "
+        f"target, small corrective turns are usually {MIN_TURN_DEG:.0f}-15 degrees; "
+        "a target on the image left generally calls for a left turn and one on the "
+        "image right for a right turn. Do not keep turning to make a visible target "
+        "perfectly centered: make at most one small corrective turn, then try a "
+        "short translation and use the next image to correct it. Do not repeat the "
         "same turn after it completes unless new visual evidence justifies it. For "
         "an approach task, make a short translation after turning toward the target "
         "unless the forward range is near the stop limit."
