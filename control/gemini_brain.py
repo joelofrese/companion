@@ -92,6 +92,8 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._active_action: Optional[ActiveAction] = None
         self._needs_post_action_frame = False
+        self._frame_sequence = 0
+        self._action_finished_frame_sequence = 0
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -175,8 +177,7 @@ class GeminiRuntime:
         if frame is not None:
             self._latest_frame = frame
             self._latest_frame_at_s = time.monotonic()
-            if self._needs_post_action_frame:
-                self._needs_post_action_frame = False
+            self._frame_sequence += 1
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
@@ -410,6 +411,12 @@ class GeminiRuntime:
         """Send a fresh state prompt when Gemini is ready for a new turn."""
 
         await self._send_frame(session, types)
+        if (
+            self._needs_post_action_frame
+            and self._frame_sequence > self._action_finished_frame_sequence
+            and self._has_fresh_frame()
+        ):
+            self._needs_post_action_frame = False
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue[0] if self._dialogue else ""
         async with self._send_lock:
@@ -696,8 +703,8 @@ class GeminiRuntime:
                 return None
             return {
                 "status": "unavailable",
-                "reason": "the last physical action finished; waiting for a fresh camera frame",
-                "movement_tools": "unavailable until a fresh camera frame arrives",
+                "reason": "the last physical action finished; waiting for the next state heartbeat",
+                "movement_tools": "unavailable until the next state heartbeat",
                 "telemetry": _telemetry_text(self._telemetry),
             }
         reason = (
@@ -741,7 +748,7 @@ class GeminiRuntime:
             if self._needs_post_action_frame:
                 result = self._last_action_result or "last action finished"
                 return (
-                    f"{result}; waiting for a fresh camera frame; "
+                    f"{result}; waiting for the next state heartbeat; "
                     "movement tools unavailable until then"
                 )
             if self._last_action_result:
@@ -874,6 +881,7 @@ class GeminiRuntime:
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._needs_post_action_frame = True
+        self._action_finished_frame_sequence = self._frame_sequence
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -894,6 +902,7 @@ class GeminiRuntime:
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._needs_post_action_frame = True
+        self._action_finished_frame_sequence = self._frame_sequence
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
@@ -916,7 +925,7 @@ class GeminiRuntime:
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
             "movement_tools": (
-                "unavailable until a fresh camera frame arrives"
+                "unavailable until the next state heartbeat"
                 if self._needs_post_action_frame
                 else "available"
             ),
@@ -1102,12 +1111,13 @@ def _system_instruction() -> str:
         "Treat each user message as the active request and begin a physical action "
         "when the current state permits; do not only describe a plan. Estimate the "
         "smallest useful speed, direction, angle, and duration yourself. "
-        "The camera image is not mirrored: an object on image-left needs a left turn, "
-        "and an object on image-right needs a right turn. Use the current heading and "
-        "measured motion as feedback. When an action reports completion, accept its "
+        "Use the current heading and measured motion as feedback. After each turn, "
+        "check the next image to see whether the subject moved toward the center and "
+        "correct the direction if it did not. When an action reports completion, accept its "
         "observed heading or translation as fact and choose the next action from the "
         "new image and state; never repeat or extend an old action without new "
-        "evidence. "
+        "evidence. Requested velocity and duration are only setpoints; use the "
+        "observed translation to judge movement progress. "
         "Movement is a closed loop: start only one move or turn at a time, wait for "
         "the state to report completion and a fresh image, then reassess. Movement "
         "tools are unavailable while an action is active. A heartbeat may arrive "
