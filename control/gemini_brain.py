@@ -12,7 +12,7 @@ from typing import Optional
 from PIL import Image
 
 from control.memory import CompanionMemory
-from control.mind import ConsciousDecision, Telemetry, VisualObservation
+from control.mind import Telemetry
 from control.safety_limits import OBSTACLE_STOP_M
 from control.velocity import VelocityCommand
 
@@ -96,16 +96,11 @@ class GeminiRuntime:
         self._needs_post_action_frame = False
         self._stop_requested = False
         self._last_action_result = ""
-        self.latest_observation: Optional[VisualObservation] = None
-        self.latest_decision: Optional[ConsciousDecision] = None
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
         self._last_heartbeat_at_s: Optional[float] = None
-        self.latest_observation_duration_s: Optional[float] = None
-        self.latest_decision_duration_s: Optional[float] = None
-        self.observation_count = 0
-        self.decision_count = 0
+        self.latest_turn_duration_s: Optional[float] = None
         self.tool_call_count = 0
         self.dialogue_count = 0
         self.turn_count = 0
@@ -737,16 +732,6 @@ class GeminiRuntime:
             )
         return f"turn {action.direction} {action.amount:.0f} degrees"
 
-    def _movement_label(self) -> str:
-        action = self._active_action
-        if (
-            action is not None
-            and action.kind == "move"
-            and action.phase == "running"
-        ):
-            return action.direction
-        return "stop"
-
     def _action_state_text(self) -> str:
         self._refresh_action()
         action = self._active_action
@@ -962,26 +947,11 @@ class GeminiRuntime:
         self.latest_action = action
         summary = thought or response or action
         now = time.monotonic()
-        latency = (
+        self.latest_turn_duration_s = (
             max(0.0, now - self._last_heartbeat_at_s)
             if self._last_heartbeat_at_s is not None
             else None
         )
-        self.latest_observation = VisualObservation(
-            timestamp_s=now,
-            description=summary,
-            movement=self._movement_label(),
-            confidence=1.0,
-        )
-        self.latest_decision = ConsciousDecision(
-            intent="",
-            dialogue=response,
-            summary=summary,
-        )
-        self.latest_observation_duration_s = latency
-        self.latest_decision_duration_s = latency
-        self.observation_count += 1
-        self.decision_count += 1
         if thought:
             self.thought_count += 1
             print(f"Gemini thought: {thought}", flush=True)

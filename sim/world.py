@@ -570,63 +570,60 @@ async def run(
                 return " ".join(str(value).split()) or "none"
 
             if gemini:
+                if control.turn_count != last_traced_decision:
+                    print(
+                        f"[Gemini {elapsed_s:5.1f}s] "
+                        f"thought={clean(control.latest_thought)}; "
+                        f"response={clean(control.latest_response)}; "
+                        f"action={clean(control.latest_action)}; "
+                        f"latency={control.latest_turn_duration_s:.2f}s",
+                        flush=True,
+                    )
+                    last_traced_decision = control.turn_count
+            else:
+                if control.observation_count != last_traced_observation:
+                    observation = control.latest_observation
+                    if observation is not None:
+                        signature = (
+                            clean(observation.description),
+                            clean(observation.focused_answer),
+                            clean(observation.alternate_movement),
+                            clean(observation.next_focus),
+                            observation.movement,
+                            round(observation.confidence, 2),
+                        )
+                        if signature != last_observation_signature:
+                            print(
+                                f"[VLM {elapsed_s:5.1f}s] "
+                                f"{signature[0]}; answer={signature[1]}; "
+                                f"alternate={signature[2] or 'none'}; "
+                                f"next-focus={signature[3]}; movement={signature[4]}; "
+                                f"confidence={signature[5]:.2f}; "
+                                f"latency={control.latest_observation_duration_s:.2f}s",
+                                flush=True,
+                            )
+                            last_observation_signature = signature
+                    last_traced_observation = control.observation_count
+
                 if control.decision_count != last_traced_decision:
                     decision = control.latest_decision
                     if decision is not None:
-                        print(
-                            f"[Gemini {elapsed_s:5.1f}s] "
-                            f"thought={clean(control.latest_thought)}; "
-                            f"response={clean(control.latest_response)}; "
-                            f"action={clean(control.latest_action)}; "
-                            f"latency={control.latest_decision_duration_s:.2f}s",
-                            flush=True,
+                        signature = (
+                            clean(decision.intent),
+                            decision.intent_changed,
+                            clean(decision.focus),
+                            clean(decision.summary),
                         )
+                        if signature != last_decision_signature:
+                            print(
+                                f"[LLM {elapsed_s:5.1f}s] "
+                                f"intent={signature[0]}; changed={signature[1]}; "
+                                f"focus={signature[2]}; summary={signature[3]}; "
+                                f"latency={control.latest_decision_duration_s:.2f}s",
+                                flush=True,
+                            )
+                            last_decision_signature = signature
                     last_traced_decision = control.decision_count
-                    last_traced_observation = control.observation_count
-
-            if control.observation_count != last_traced_observation:
-                observation = control.latest_observation
-                if observation is not None:
-                    signature = (
-                        clean(observation.description),
-                        clean(observation.focused_answer),
-                        clean(observation.alternate_movement),
-                        clean(observation.next_focus),
-                        observation.movement,
-                        round(observation.confidence, 2),
-                    )
-                    if signature != last_observation_signature:
-                        print(
-                            f"[VLM {elapsed_s:5.1f}s] "
-                            f"{signature[0]}; answer={signature[1]}; "
-                            f"alternate={signature[2] or 'none'}; "
-                            f"next-focus={signature[3]}; movement={signature[4]}; "
-                            f"confidence={signature[5]:.2f}; "
-                            f"latency={control.latest_observation_duration_s:.2f}s",
-                            flush=True,
-                        )
-                        last_observation_signature = signature
-                last_traced_observation = control.observation_count
-
-            if control.decision_count != last_traced_decision:
-                decision = control.latest_decision
-                if decision is not None:
-                    signature = (
-                        clean(decision.intent),
-                        decision.intent_changed,
-                        clean(decision.focus),
-                        clean(decision.summary),
-                    )
-                    if signature != last_decision_signature:
-                        print(
-                            f"[LLM {elapsed_s:5.1f}s] "
-                            f"intent={signature[0]}; changed={signature[1]}; "
-                            f"focus={signature[2]}; summary={signature[3]}; "
-                            f"latency={control.latest_decision_duration_s:.2f}s",
-                            flush=True,
-                        )
-                        last_decision_signature = signature
-                last_traced_decision = control.decision_count
 
             distance = step.obstacle_distance_m
             if not step.transmit:
@@ -642,48 +639,50 @@ async def run(
             elif step.command_override is not None:
                 reason = "CM5 rejected the injected invalid command"
             elif brain_command == VelocityCommand():
-                decision = control.latest_decision
-                observation = control.latest_observation
-                if (
-                    not gemini
-                    and decision is not None
-                    and parse_intent(decision.intent) == "hover"
-                ):
-                    reason = "conscious intent is hover"
-                elif observation is None:
+                if gemini:
                     reason = (
-                        "waiting for the first Gemini decision"
-                        if gemini and control.observation_count == 0
-                        else "waiting for the first VLM observation"
-                        if control.observation_count == 0
-                        else "latest VLM observation failed"
+                        "waiting for the first Gemini action or turn"
+                        if control.tool_call_count == 0 and control.turn_count == 0
+                        else "Gemini chose to hover or its short action expired"
                     )
-                elif not gemini and (
-                    control.latest_observation_age_s is None
-                    or control.latest_observation_age_s > MAX_MOVEMENT_AGE_S
-                ):
-                    reason = "VLM movement lease expired"
-                elif not gemini and (
-                    control.latest_frame_age_s is None
-                    or control.latest_frame_age_s > MAX_FRAME_GAP_S
-                ):
-                    reason = "camera frame lease expired"
-                elif not gemini and observation.confidence < MIN_MOVEMENT_CONFIDENCE:
-                    reason = "VLM confidence is below the movement threshold"
-                elif not gemini and (
-                    observation.focused_answer
-                    and (
-                        control.mind.awaiting_focus_answer
-                        or parse_intent(control.mind.intent) is None
-                    )
-                ):
-                    reason = "visual focus confirmed"
-                elif gemini:
-                    reason = "Gemini chose to hover or its short action expired"
-                elif observation.movement in ("stop", "hover"):
-                    reason = f"VLM suggested {observation.movement}"
                 else:
-                    reason = "Brain timing or intent refresh held zero"
+                    decision = control.latest_decision
+                    observation = control.latest_observation
+                    if (
+                        decision is not None
+                        and parse_intent(decision.intent) == "hover"
+                    ):
+                        reason = "conscious intent is hover"
+                    elif observation is None:
+                        reason = (
+                            "waiting for the first VLM observation"
+                            if control.observation_count == 0
+                            else "latest VLM observation failed"
+                        )
+                    elif (
+                        control.latest_observation_age_s is None
+                        or control.latest_observation_age_s > MAX_MOVEMENT_AGE_S
+                    ):
+                        reason = "VLM movement lease expired"
+                    elif (
+                        control.latest_frame_age_s is None
+                        or control.latest_frame_age_s > MAX_FRAME_GAP_S
+                    ):
+                        reason = "camera frame lease expired"
+                    elif observation.confidence < MIN_MOVEMENT_CONFIDENCE:
+                        reason = "VLM confidence is below the movement threshold"
+                    elif (
+                        observation.focused_answer
+                        and (
+                            control.mind.awaiting_focus_answer
+                            or parse_intent(control.mind.intent) is None
+                        )
+                    ):
+                        reason = "visual focus confirmed"
+                    elif observation.movement in ("stop", "hover"):
+                        reason = f"VLM suggested {observation.movement}"
+                    else:
+                        reason = "Brain timing or intent refresh held zero"
             else:
                 reason = "Brain suggested movement or turn"
             last_forwarded = (
@@ -721,7 +720,8 @@ async def run(
                 command = send_packet(now, step)
                 trace_brain(elapsed, step, command)
                 if (
-                    dialogue_request is not None
+                    not gemini
+                    and dialogue_request is not None
                     and control.latest_observation is not None
                     and control.latest_observation.focused_answer
                 ):
@@ -744,11 +744,11 @@ async def run(
                 f"{minimum_forward_command:.2f}m/s"
             )
 
-        decision = control.latest_decision
         if gemini:
-            if control.turn_count == 0 and control.tool_call_count == 0:
+            if not faults and control.turn_count == 0 and control.tool_call_count == 0:
                 raise RuntimeError("SITL did not observe a Gemini model turn or action")
         else:
+            decision = control.latest_decision
             if decision is None:
                 raise RuntimeError("SITL did not observe a conscious brain decision")
             if not decision.summary:
@@ -831,7 +831,11 @@ async def run(
                 f"{requested_focus} ({'answered' if requested_focus_answered else 'active'})."
             )
         if gemini:
-            print("Gemini ER 2 activity=verified.")
+            print(
+                "Gemini ER 2 activity=verified."
+                if not faults
+                else "Gemini ER 2 fault handling=verified."
+            )
         else:
             print(
                 "Conscious brain decision=verified: "
@@ -849,14 +853,15 @@ async def run(
             print(f"Conscious thoughts=verified ({control.decision_count}).")
         if gemini:
             print(f"Gemini ER 2 brain=verified: model={gemini_model}.")
-            if control.turn_count == 0 and control.tool_call_count == 0:
+            if not faults and control.turn_count == 0 and control.tool_call_count == 0:
                 raise RuntimeError("SITL did not complete a Gemini model turn or action")
             if control.video_frame_count < 2:
                 raise RuntimeError("SITL did not stream Gemini video frames")
-            print(
-                "Gemini turns/actions=verified: "
-                f"{control.turn_count} turns, {control.tool_call_count} tool calls."
-            )
+            if not faults:
+                print(
+                    "Gemini turns/actions=verified: "
+                    f"{control.turn_count} turns, {control.tool_call_count} tool calls."
+                )
             print(f"Gemini live video frames=verified ({control.video_frame_count}).")
         if memory_store is not None:
             persisted_memory = CompanionMemory(memory_store.path).context()
