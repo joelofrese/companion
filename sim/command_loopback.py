@@ -44,8 +44,11 @@ async def run():
     frame_count = 0
     cm5_started_at = None
     obstacle_cleared = False
+    turn_obstacle = False
 
     def cm5_obstacle_distance():
+        if turn_obstacle:
+            return 0.5
         if obstacle_cleared:
             return 2.0
         elapsed_s = time.monotonic() - cm5_started_at
@@ -172,6 +175,21 @@ async def run():
                 f"{restarted_telemetry}"
             )
         print("CM5 restart=verified.")
+        while not forwarder.commands.empty():
+            forwarder.commands.get_nowait()
+        turn_obstacle = True
+        reconnect_sender.send(VelocityCommand(yaw_rate_deg_s=8.0))
+        await asyncio.sleep(0.1)
+        turn_commands = []
+        while not forwarder.commands.empty():
+            turn_commands.append(forwarder.commands.get_nowait())
+        if VelocityCommand(yaw_rate_deg_s=8.0) not in turn_commands:
+            raise RuntimeError(
+                "CM5 did not preserve an in-place turn near an obstacle: "
+                f"{turn_commands}"
+            )
+        print("CM5 in-place turn around obstacle=verified.")
+        turn_obstacle = False
         while not forwarder.commands.empty():
             forwarder.commands.get_nowait()
         cm5_stop_event.set()

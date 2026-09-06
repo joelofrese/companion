@@ -14,8 +14,8 @@ def _decode_frame(message):
     step = int(message["step"])
     image = np.frombuffer(frame, dtype=np.uint8).reshape(height, step)
     image = image[:, : width * 3]
-    # Gazebo already gives the forward camera a normal perspective. Only swap
-    # its BGR channels for the RGB image expected by the brain.
+    # Gazebo publishes RGB. Keep the shared frame format BGR, like GStreamer,
+    # so the brain's JPEG conversion handles both camera sources the same way.
     return image.reshape(height, width, 3)[:, :, ::-1]
 
 
