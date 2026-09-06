@@ -23,8 +23,8 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 # Favor timely closed-loop control over long internal deliberation.
 THINKING_BUDGET = 1024
-# Keep a slow model turn alive; the CM5 holds zero motion while it runs.
-RESPONSE_TIMEOUT_S = 60.0
+# Bound a slow model turn so a short flight can recover and try again.
+RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
