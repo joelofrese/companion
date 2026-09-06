@@ -40,6 +40,7 @@ MAX_IMAGE_WIDTH = 640
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
+MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 ACTION_FOLLOWUP_DELAY_S = 4.0
 HEADING_STABILITY_RAD = math.radians(2.0)
@@ -814,6 +815,16 @@ class GeminiRuntime:
                     ):
                         self._complete_action("completed", actual)
                         return
+        if (
+            action.kind == "move"
+            and action.phase == "running"
+            and now >= action.deadline_s
+        ):
+            # Stop commanding motion, then let telemetry catch up before
+            # reporting how far the vehicle actually moved.
+            action.phase = "settling"
+            action.deadline_s = now + MOVE_SETTLE_S
+            return
         if now >= action.deadline_s:
             actual = self._heading_change_deg(action)
             if action.kind == "turn" and actual is not None:
