@@ -294,9 +294,14 @@ class GeminiRuntime:
                             ):
                                 # A heartbeat is a user turn and interrupts model
                                 # generation. Start one only when the model is
-                                # idle; a queued dialogue message may interrupt
-                                # once so the user does not have to wait.
-                                if receive_task is None or self._dialogue:
+                                # idle, except during a physical action so the
+                                # model can observe its progress; queued dialogue
+                                # may interrupt once so the user does not wait.
+                                if (
+                                    receive_task is None
+                                    or self._dialogue
+                                    or self._active_action is not None
+                                ):
                                     await self._heartbeat(session, types)
                                     if receive_task is not None:
                                         response_started_s = time.monotonic()
@@ -481,7 +486,8 @@ class GeminiRuntime:
             "an action, call its tool now. Never write action JSON, a code block, or "
             "a prose description in place of a tool call. Never infer that a move or "
             "turn is safe from the image alone. On a routine heartbeat, do not repeat "
-            "status, speak, or call hover; if no action is needed, finish silently."
+            "status, speak, or call hover. Do not move, turn, or speak merely because "
+            "a heartbeat arrived; if the scene and goal are unchanged, finish silently."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -1191,16 +1197,17 @@ def _system_instruction() -> str:
         "stop, call `hover`; to talk, call `speak`. These tools are the only way to "
         "act. Never output action JSON or describe a tool call as text. Choose one tool "
         "call or do nothing. Keep a user request active until "
-        "it is complete or changed, and explore when asked. During exploration, if "
-        "the path is clear, prefer a short move or small turn after each fresh view; "
-        "do not remain still indefinitely unless waiting is intentional. For any "
+        "it is complete or changed, and explore when asked. During exploration, move "
+        "or turn when it helps inspect or make progress; do not move merely because "
+        "a heartbeat arrived. If the scene and goal are unchanged, do nothing. For any "
         "visual goal, use "
         "its current position in the image: if it is centered and the path is clear, "
         "take a short step; if it is off-center, turn toward it; if it is unclear, "
         "reobserve or make one small search turn. Choose movement amounts yourself; "
         "the user does not need to give exact angles or distances. After each move or "
         "turn, wait for its blocking result and a fresh image and telemetry. Use the "
-        "actual heading returned by telemetry, never an old intended heading. Use slow, "
+        "measured action result and current heading from telemetry to correct the next "
+        "action; never repeat a movement or turn without a fresh view. Use slow, "
         "short body-frame horizontal moves and relative yaw turns, normally 3 to 8 "
         "degrees and never more than the tool limit. A valid clear TOF reading is "
         "required before translation. CM5 and PX4 handle safety and stability; never "
