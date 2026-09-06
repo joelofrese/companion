@@ -1089,6 +1089,8 @@ class GeminiRuntime:
     def _finish_turn(self):
         thought = _model_text(self._response_thoughts)
         response = _model_text(self._response_parts)
+        if _parse_text_action(response) is not None:
+            response = ""
         actions = tuple(self._actions)
         action = "; ".join(actions) or "none"
         self._response_thoughts.clear()
@@ -1325,16 +1327,25 @@ def _model_text(parts) -> str:
 def _parse_text_action(text: str):
     """Return an existing tool call when ER2 writes it as a JSON object."""
 
-    start = text.find("{")
-    if start < 0:
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        newline = candidate.find("\n")
+        if newline < 0:
+            return None
+        candidate = candidate[newline + 1 :].strip()
+        if candidate.endswith("```"):
+            candidate = candidate[:-3].rstrip()
+    if not candidate.startswith("{"):
         return None
     try:
-        value, _ = json.JSONDecoder().raw_decode(text[start:])
+        value, end = json.JSONDecoder().raw_decode(candidate)
     except json.JSONDecodeError:
+        return None
+    if candidate[end:].strip() not in ("", "```"):
         return None
     if not isinstance(value, dict):
         return None
-    name = value.get("type", value.get("action"))
+    name = value.get("type") or value.get("action")
     if isinstance(name, str):
         name = name.strip().lower()
     if name == "ack":
