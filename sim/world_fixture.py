@@ -15,7 +15,7 @@ from sim.offboard_control import (
     THIRD_FOLLOW_END_S,
     THIRD_FOLLOW_START_S,
 )
-from voice.intent import parse_focus, parse_intent
+from sim.intent import parse_focus, parse_intent
 
 
 TARGET_RIGHT_START_S = 1.0

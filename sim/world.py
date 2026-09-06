@@ -90,7 +90,7 @@ from sim.world_fixture import (
     WorldLanguageModel,
     WorldVisualModel,
 )
-from voice.intent import parse_focus, parse_intent
+from sim.intent import parse_focus, parse_intent
 
 
 CAMERA_WARMUP_S = 2.0

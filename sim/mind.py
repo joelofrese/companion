@@ -8,7 +8,7 @@ from typing import Any, Optional, Protocol
 
 from control.memory import CompanionMemory
 from control.telemetry import Telemetry
-from voice.intent import parse_focus, parse_intent
+from sim.intent import parse_focus, parse_intent
 
 
 MAX_PENDING_OBSERVATIONS = 32

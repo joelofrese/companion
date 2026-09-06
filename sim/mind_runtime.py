@@ -10,7 +10,7 @@ from sim.mind import ConsciousDecision, CompanionMind, VisualObservation
 from sim.mind_motion import movement_command
 from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
-from voice.intent import parse_intent
+from sim.intent import parse_intent
 
 
 MIN_MOVEMENT_CONFIDENCE = 0.5
