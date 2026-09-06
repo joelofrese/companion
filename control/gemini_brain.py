@@ -568,6 +568,13 @@ class GeminiRuntime:
                 turn_complete = bool(
                     content.turn_complete or content.generation_complete
                 )
+                if content.interrupted:
+                    # A heartbeat intentionally interrupts unfinished model
+                    # text. Keep completed tool effects, but let the next
+                    # heartbeat start a clean decision cycle.
+                    self._response_parts.clear()
+                    self._response_thoughts.clear()
+                    return
             tool_call = message.tool_call
             if tool_call is not None:
                 saw_tool_call = True
