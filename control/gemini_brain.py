@@ -27,7 +27,7 @@ THINKING_BUDGET = 0
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 # Recover from a model turn that produces no result before it consumes a short
 # flight; physical actions have their own completion deadline.
-RESPONSE_TIMEOUT_S = 15.0
+RESPONSE_TIMEOUT_S = 20.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -255,6 +255,7 @@ class GeminiRuntime:
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
+                        temperature=0.2,
                         tools=_tools(),
                         system_instruction=_system_instruction(),
                         thinking_config=types.ThinkingConfig(
@@ -475,11 +476,12 @@ class GeminiRuntime:
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
-            "to move, turn, hover, speak, or do nothing. If you choose an action, "
-            "call its declared tool now; never write action JSON or describe a tool "
-            "call as text. Never infer that a move or turn is safe from the image "
-            "alone. On a routine heartbeat, do not repeat status, speak, or call "
-            "hover; if no action is needed, finish silently."
+            "to move, turn, hover, speak, or do nothing. To move, call `move`; to turn, "
+            "call `turn`; to stop, call `hover`; to talk, call `speak`. If you choose "
+            "an action, call its tool now. Never write action JSON, a code block, or "
+            "a prose description in place of a tool call. Never infer that a move or "
+            "turn is safe from the image alone. On a routine heartbeat, do not repeat "
+            "status, speak, or call hover; if no action is needed, finish silently."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -1184,37 +1186,25 @@ def _system_instruction() -> str:
 
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
-        "newest camera image, forward TOF distance, body velocity, heading, active "
-        "action, conversation, and action results. Your physical actions are calls to "
-        "the declared move, turn, hover, and speak tools; never output action JSON or "
-        "describe a tool call as text. Choose one tool call or do nothing. Keep a "
-        "direct user request active until it is "
-        "completed or changed. For explicit movement, act instead of only describing "
-        "it. During exploration, keep making small useful decisions unless told to "
-        "wait. "
-        "During a named-target request, prioritize that target over exploration. If "
-        "it is visible near the image center and the path is clear, do not turn "
-        "merely to search; take a short step toward it unless it is already close. "
-        "Use the image and telemetry together. A visible target that is centered and "
-        "aligned calls for a short forward step while the task is incomplete; a "
-        "target on the left or right calls for a small turn toward it. Choose the "
-        "turn amount yourself from the current image and heading; do not ask the "
-        "user for an exact angle. If the scene "
-        "is unclear, reobserve or make one small search turn. After every physical "
-        "action, use its result and a new image and telemetry before acting again. "
-        "Use body-frame horizontal movement and relative yaw turns. Turn by the "
-        "smallest useful amount, normally 3 to 8 degrees; use several fresh "
-        "corrections for a large reorientation. Each turn is relative to the actual "
-        "heading returned by telemetry; never add a new correction to an old intended "
-        "heading. Use short, slow translations. A clear "
-        "TOF reading permits forward movement but does not prove a target is far away. "
-        "PX4 handles stability and altitude, and the CM5 may stop any action. Never "
-        "request motors, attitude, altitude, position, or a long translation. "
-        "Choose at most one move or turn per state heartbeat. Its blocking result "
-        "ends the response; wait for the next heartbeat before another physical "
-        "action. Observed telemetry is the truth. Hover for unclear, stale, or unsafe "
-        "state, and do not repeat hover while already hovering. Speak only for the "
-        "user or a meaningful event."
+        "newest image, forward TOF distance, body velocity, heading, active action, "
+        "dialogue, and action result. To move, call `move`; to turn, call `turn`; to "
+        "stop, call `hover`; to talk, call `speak`. These tools are the only way to "
+        "act. Never output action JSON or describe a tool call as text. Choose one tool "
+        "call or do nothing. Keep a user request active until "
+        "it is complete or changed, and explore when asked. For any visual goal, use "
+        "its current position in the image: if it is centered and the path is clear, "
+        "take a short step; if it is off-center, turn toward it; if it is unclear, "
+        "reobserve or make one small search turn. Choose movement amounts yourself; "
+        "the user does not need to give exact angles or distances. After each move or "
+        "turn, wait for its blocking result and a fresh image and telemetry. Use the "
+        "actual heading returned by telemetry, never an old intended heading. Use slow, "
+        "short body-frame horizontal moves and relative yaw turns, normally 3 to 8 "
+        "degrees and never more than the tool limit. A valid clear TOF reading is "
+        "required before translation. CM5 and PX4 handle safety and stability; never "
+        "request motors, attitude, altitude, position, or long motion. Choose at most "
+        "one move or turn per heartbeat. Hover for explicit stop or stale, unclear, or "
+        "unsafe state, and do not repeat hover while already hovering. Speak only to "
+        "answer the user or report a meaningful event."
     )
 
 
