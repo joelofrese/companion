@@ -205,7 +205,7 @@ class GeminiRuntime:
             action.kind == "turn"
             and action.phase == "running"
             and _finite(telemetry.heading_rad)
-            and _obstacle_is_clear(telemetry.obstacle_distance_m)
+            and _obstacle_is_valid(telemetry.obstacle_distance_m)
         ):
             yaw_rate = TURN_RATE_DEG_S * (
                 1.0 if action.direction == "right" else -1.0
@@ -855,7 +855,11 @@ class GeminiRuntime:
         action.last_update_s = now
 
     def _action_is_blocked(self, action: ActiveAction) -> bool:
-        if not _obstacle_is_clear(self._telemetry.obstacle_distance_m):
+        if not _obstacle_is_valid(self._telemetry.obstacle_distance_m):
+            return True
+        if action.kind != "turn" and not _obstacle_is_clear(
+            self._telemetry.obstacle_distance_m
+        ):
             return True
         if any(
             not _finite(value)
@@ -1247,7 +1251,13 @@ def _move_direction(forward_m_s: float, right_m_s: float) -> str:
 def _obstacle_is_clear(distance_m: Optional[float]) -> bool:
     """Return whether the forward range reading permits movement."""
 
-    return _finite(distance_m) and distance_m > OBSTACLE_STOP_M
+    return _obstacle_is_valid(distance_m) and distance_m > OBSTACLE_STOP_M
+
+
+def _obstacle_is_valid(distance_m: Optional[float]) -> bool:
+    """Return whether a forward range reading is usable."""
+
+    return _finite(distance_m) and distance_m >= 0.0
 
 
 def _heading_number(value) -> str:

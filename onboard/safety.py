@@ -217,10 +217,12 @@ class OnboardSafetyEnvelope:
             return VelocityCommand()
         if not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0:
             return VelocityCommand()
-        if obstacle_distance_m <= OBSTACLE_STOP_M:
-            return VelocityCommand(forward_m_s=-BACKOFF_SPEED_M_S)
         if not self._command_is_safe(self._command):
             return VelocityCommand()
+        if obstacle_distance_m <= OBSTACLE_STOP_M:
+            if self._is_in_place_turn(self._command):
+                return VelocityCommand(yaw_rate_deg_s=self._command.yaw_rate_deg_s)
+            return VelocityCommand(forward_m_s=-BACKOFF_SPEED_M_S)
         return self._command
 
     @staticmethod
@@ -237,4 +239,13 @@ class OnboardSafetyEnvelope:
             and abs(command.right_m_s) <= MAX_HORIZONTAL_SPEED_M_S
             and abs(command.down_m_s) <= MAX_VERTICAL_SPEED_M_S
             and abs(command.yaw_rate_deg_s) <= MAX_YAW_RATE_DEG_S
+        )
+
+    @staticmethod
+    def _is_in_place_turn(command: VelocityCommand) -> bool:
+        return (
+            command.forward_m_s == 0.0
+            and command.right_m_s == 0.0
+            and command.down_m_s == 0.0
+            and command.yaw_rate_deg_s != 0.0
         )
