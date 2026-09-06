@@ -617,14 +617,19 @@ async def run(
                     last_traced_gemini_action = control.latest_action
                     last_traced_gemini_tool_calls = control.tool_call_count
                 if control.turn_count != last_traced_decision:
-                    print(
-                        f"[Gemini {elapsed_s:5.1f}s] "
-                        f"thought={clean(control.latest_thought)}; "
-                        f"response={clean(control.latest_response)}; "
-                        f"action={clean(control.latest_action)}; "
-                        f"latency={control.latest_turn_duration_s:.2f}s",
-                        flush=True,
-                    )
+                    if (
+                        control.latest_thought
+                        or control.latest_response
+                        or control.latest_action not in ("none", "stop")
+                    ):
+                        print(
+                            f"[Gemini {elapsed_s:5.1f}s] "
+                            f"thought={clean(control.latest_thought)}; "
+                            f"response={clean(control.latest_response)}; "
+                            f"action={clean(control.latest_action)}; "
+                            f"latency={control.latest_turn_duration_s:.2f}s",
+                            flush=True,
+                        )
                     last_traced_decision = control.turn_count
             else:
                 if control.observation_count != last_traced_observation:
