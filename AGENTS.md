@@ -37,9 +37,9 @@ merge and delete it.
   decides from images, dialogue, telemetry, memory, and previous outputs.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
-- Gemini keeps receiving fresh frames and telemetry while one physical move or
-  turn completes; movement tools stay unavailable until its action state reports
-  completion and a fresh camera frame arrives. Safety holds pause the action until
+- Gemini's physical tools use its blocking robotics contract. Camera frames keep
+  streaming while one move or turn completes; its measured result and fresh
+  telemetry arrive before the next movement. Safety holds pause the action until
   movement is allowed.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
   acknowledges the stop. The CM5 handles safety overrides.
