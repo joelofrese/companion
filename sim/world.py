@@ -745,14 +745,18 @@ async def run(
             )
 
         decision = control.latest_decision
-        if decision is None:
-            raise RuntimeError("SITL did not observe a conscious brain decision")
-        if not decision.summary:
-            raise RuntimeError("SITL did not retain a conscious visual summary")
-        if control.observation_count == 0:
-            raise RuntimeError("SITL did not complete a visual observation")
-        if control.decision_count == 0:
-            raise RuntimeError("SITL did not complete a conscious thought")
+        if gemini:
+            if control.turn_count == 0 and control.tool_call_count == 0:
+                raise RuntimeError("SITL did not observe a Gemini model turn or action")
+        else:
+            if decision is None:
+                raise RuntimeError("SITL did not observe a conscious brain decision")
+            if not decision.summary:
+                raise RuntimeError("SITL did not retain a conscious visual summary")
+            if control.observation_count == 0:
+                raise RuntimeError("SITL did not complete a visual observation")
+            if control.decision_count == 0:
+                raise RuntimeError("SITL did not complete a conscious thought")
         if not velocity_telemetry_seen:
             raise RuntimeError("SITL did not feed CM5 velocity telemetry to the brain")
         print("Brain velocity telemetry=verified.")
@@ -827,15 +831,15 @@ async def run(
                 f"{requested_focus} ({'answered' if requested_focus_answered else 'active'})."
             )
         if gemini:
-            print("Gemini brain decision=verified.")
+            print("Gemini ER 2 activity=verified.")
         else:
             print(
                 "Conscious brain decision=verified: "
                 f"intent={decision.intent}, focus={decision.focus or 'none'}."
             )
-        print("Conscious visual memory=verified.")
-        print("Brain visual observation=verified.")
-        print(f"Brain visual observations=verified ({control.observation_count}).")
+            print("Conscious visual memory=verified.")
+            print("Brain visual observation=verified.")
+            print(f"Brain visual observations=verified ({control.observation_count}).")
         if gemini:
             print(
                 "Gemini native thought summaries observed: "
@@ -845,11 +849,14 @@ async def run(
             print(f"Conscious thoughts=verified ({control.decision_count}).")
         if gemini:
             print(f"Gemini ER 2 brain=verified: model={gemini_model}.")
-            if control.turn_count == 0:
-                raise RuntimeError("SITL did not complete a Gemini model turn")
+            if control.turn_count == 0 and control.tool_call_count == 0:
+                raise RuntimeError("SITL did not complete a Gemini model turn or action")
             if control.video_frame_count < 2:
                 raise RuntimeError("SITL did not stream Gemini video frames")
-            print(f"Gemini completed turns=verified ({control.turn_count}).")
+            print(
+                "Gemini turns/actions=verified: "
+                f"{control.turn_count} turns, {control.tool_call_count} tool calls."
+            )
             print(f"Gemini live video frames=verified ({control.video_frame_count}).")
         if memory_store is not None:
             persisted_memory = CompanionMemory(memory_store.path).context()

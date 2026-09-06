@@ -37,9 +37,10 @@ merge and delete it.
   decides from images, dialogue, telemetry, memory, and previous outputs.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
-- Gemini may keep thinking while one physical move or turn completes; movement
-  tools stay unavailable until its action state reports completion and a fresh
-  camera frame arrives. Safety holds pause the action until movement is allowed.
+- Gemini keeps receiving fresh frames and telemetry while one physical move or
+  turn completes; movement tools stay unavailable until its action state reports
+  completion and a fresh camera frame arrives. Safety holds pause the action until
+  movement is allowed.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
   acknowledges the stop. The CM5 handles safety overrides.
 - Stale, malformed, missing, or unsafe input becomes zero motion.
@@ -185,13 +186,13 @@ conversation bounded, and native session resumption reconnects it with the
 latest resumable handle when a connection ends; a rejected handle starts a
 fresh session with the situation and memory. The editable memory file is only
 prior experience across runs. The session receives the newest 640-pixel
-JPEG once per second while model turns run. Movement and speech tools return
-without waiting for their duration, so the brain can continue receiving video,
-telemetry, and dialogue. One physical move or turn stays active until its
-duration or observed heading settles; safety holds pause its timing; movement
-waits for a fresh camera frame afterward; the action state reports the command,
-phase, remaining time, and heading. The movement tool also sends Gemini a native
-completion response.
+JPEG once per second while model turns run. Movement and turn tools return their
+observed completion before Gemini chooses another movement, while the brain keeps
+receiving video, telemetry, and dialogue. One physical move or turn stays active
+until its duration or observed heading settles; safety holds pause its timing;
+movement waits for a fresh camera frame afterward; the action state reports the
+command, phase, remaining time, and heading. The movement tool also sends Gemini
+a native completion response.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -208,11 +209,11 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It starts with one situation prompt, then uses
   native context compression and session resumption while continuously
-  choosing non-blocking move, turn, hover, and speech actions. Native
+  choosing bounded move, turn, hover, and speech actions. Native
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
-  actions remain separately visible. Move and turn actions are serialized
-  while their live state, completion, and heading are reported. Deterministic
-  in-process brain fixtures remain only for repeatable simulation checks.
+  actions remain separately visible. Move and turn actions are blocking and
+  serialized while their live state, completion, and heading are reported.
+  Deterministic in-process brain fixtures remain only for repeatable simulation checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
 - Faulted runs stop when camera input stalls and resume after fresh frames return.
