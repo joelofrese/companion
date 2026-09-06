@@ -475,9 +475,11 @@ class GeminiRuntime:
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
-            "to move, turn, hover, speak, or do nothing. Never infer that a move or "
-            "turn is safe from the image alone. On a routine heartbeat, do not repeat "
-            "status, speak, or call hover; if no action is needed, finish silently."
+            "to move, turn, hover, speak, or do nothing. If you choose an action, "
+            "call its declared tool now; never write action JSON or describe a tool "
+            "call as text. Never infer that a move or turn is safe from the image "
+            "alone. On a routine heartbeat, do not repeat status, speak, or call "
+            "hover; if no action is needed, finish silently."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -1183,8 +1185,10 @@ def _system_instruction() -> str:
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, forward TOF distance, body velocity, heading, active "
-        "action, conversation, and action results. Choose one action or do nothing: "
-        "move, turn, hover, or speak. Keep a direct user request active until it is "
+        "action, conversation, and action results. Your physical actions are calls to "
+        "the declared move, turn, hover, and speak tools; never output action JSON or "
+        "describe a tool call as text. Choose one tool call or do nothing. Keep a "
+        "direct user request active until it is "
         "completed or changed. For explicit movement, act instead of only describing "
         "it. During exploration, keep making small useful decisions unless told to "
         "wait. "
