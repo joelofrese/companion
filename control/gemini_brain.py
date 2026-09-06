@@ -27,7 +27,7 @@ THINKING_BUDGET = 128
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 # Recover from a turn that produces no result before it consumes a short flight;
 # physical actions have their own completion deadline.
-RESPONSE_TIMEOUT_S = 20.0
+RESPONSE_TIMEOUT_S = 45.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -96,6 +96,8 @@ class GeminiRuntime:
         self._last_frame_sent_at_s: Optional[float] = None
         self._telemetry = Telemetry()
         self._dialogue = deque()
+        self._dialogue_in_flight: Optional[str] = None
+        self._dialogue_send_complete = False
         self._latest_user_request = ""
         self._dialogue_generation = 0
         self._last_spoken_message = None
@@ -260,6 +262,8 @@ class GeminiRuntime:
                 if self._session_handle is None:
                     self._memory_sent = False
                     self._bootstrap_pending = True
+                    self._dialogue_in_flight = None
+                    self._dialogue_send_complete = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -308,7 +312,10 @@ class GeminiRuntime:
                                         break
                                 heartbeat_due = (
                                     receive_task is None
-                                    or self._dialogue
+                                    or (
+                                        self._dialogue
+                                        and self._dialogue_in_flight is None
+                                    )
                                     or (
                                         self._active_action is not None
                                         and not self._needs_state_heartbeat
@@ -456,12 +463,24 @@ class GeminiRuntime:
 
         await self._send_frame(session, types)
         self._last_heartbeat_at_s = time.monotonic()
-        dialogue = self._dialogue[0] if self._dialogue else ""
+        dialogue = ""
+        if self._dialogue and self._dialogue_in_flight is None:
+            dialogue = self._dialogue[0]
+            self._dialogue_in_flight = dialogue
+            self._dialogue_send_complete = False
         async with self._send_lock:
             action_result = self._last_action_result
-            await session.send_realtime_input(
-                text=self._heartbeat_text(dialogue)
-            )
+            try:
+                await session.send_realtime_input(
+                    text=self._heartbeat_text(dialogue)
+                )
+            except Exception:
+                if dialogue and self._dialogue_in_flight == dialogue:
+                    self._dialogue_in_flight = None
+                    self._dialogue_send_complete = False
+                raise
+        if dialogue and self._dialogue_in_flight == dialogue:
+            self._dialogue_send_complete = True
         # The tool response already keeps this result in the session. Repeat it
         # in one heartbeat so completion between heartbeats is easy to see, then
         # stop copying stale text into every later heartbeat.
@@ -473,9 +492,6 @@ class GeminiRuntime:
             self._memory_sent = True
         if self._bootstrap_pending:
             self._bootstrap_pending = False
-        if dialogue:
-            self._dialogue.popleft()
-            self.dialogue_count += 1
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -591,9 +607,21 @@ class GeminiRuntime:
             if turn_complete:
                 if not saw_tool_call:
                     await self._execute_text_action()
+                self._acknowledge_dialogue()
                 self.turn_count += 1
                 self._finish_turn()
                 return
+
+    def _acknowledge_dialogue(self):
+        """Remove a user message only after Gemini completes its turn."""
+
+        if not self._dialogue_send_complete or not self._dialogue_in_flight:
+            return
+        if self._dialogue and self._dialogue[0] == self._dialogue_in_flight:
+            self._dialogue.popleft()
+            self.dialogue_count += 1
+        self._dialogue_in_flight = None
+        self._dialogue_send_complete = False
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":
