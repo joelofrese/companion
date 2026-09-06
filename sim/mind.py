@@ -8,7 +8,6 @@ from typing import Any, Optional, Protocol
 
 from control.memory import CompanionMemory
 from control.telemetry import Telemetry
-from control.velocity import VelocityCommand
 from voice.intent import parse_focus, parse_intent
 
 
