@@ -22,7 +22,7 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Favor timely closed-loop control over long internal deliberation.
-THINKING_BUDGET = 1024
+THINKING_BUDGET = 512
 # Bound a slow model turn so a short flight can recover and try again.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
@@ -33,7 +33,7 @@ MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 90.0
+MAX_TURN_DEG = 30.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MAX_IMAGE_WIDTH = 640
@@ -1050,8 +1050,8 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
-                "Use small corrections when aligning with something; a broad scan "
-                "may use a larger angle."
+                "Use a small correction and reassess from the next image; repeat "
+                "the action for a broader scan."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1102,42 +1102,27 @@ def _system_instruction() -> str:
 
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
-        "newest camera image, telemetry, active action, conversation, and previous "
-        "action results. Telemetry includes forward TOF distance, body velocity, "
-        "and heading. Turn angles are relative to the current heading. You have no "
-        "lidar or direct motor control; PX4 stabilizes "
-        "the vehicle and holds altitude. "
-        "Think broadly and choose whether to move, turn, hover, speak, or do nothing. "
-        "Treat each user message as the active request and begin a physical action "
-        "when the current state permits; do not only describe a plan. Estimate the "
-        "smallest useful speed, direction, angle, and duration yourself. "
-        "Use the current heading and measured motion as feedback. After each turn, "
-        "check the next image to see whether the subject moved toward the center and "
-        "correct the direction if it did not. When an action reports completion, accept its "
-        "observed heading or translation as fact and choose the next action from the "
-        "new image and state; never repeat or extend an old action without new "
-        "evidence. Requested velocity and duration are only setpoints; use the "
-        "observed translation to judge movement progress. "
-        "Movement is a closed loop: start only one move or turn at a time, wait for "
-        "the state to report completion and a fresh image, then reassess. Movement "
-        "tools are unavailable while an action is active. A heartbeat may arrive "
-        "during an action; use it to observe progress, but wait for completion "
-        "before choosing another movement. In an open-ended task, "
-        "continue with another small purposeful action after each fresh view unless "
-        "the task is complete, waiting, or the state is unclear. If you are aligning "
-        "with something, make a small correction and reassess instead of repeating "
-        "a turn without new visual evidence. For searching or alignment, prefer "
-        "roughly 10 to 20 degree turns and request a larger turn only when the new "
-        "view shows it is needed. When a requested thing is already "
-        "visible, act on that view before scanning elsewhere. If the request says to "
-        "wait, stop, or inspect when close, hover and remain there when that condition "
-        "is met. "
-        "Use hover when the task is complete or the image or telemetry is unclear. "
-        "Do not use hover merely to wait for a response or end a turn early. "
-        "Speak only when useful. Do not repeat the state block or telemetry. "
-        "Never request altitude, motors, attitude, position, or a long translation. "
-        "The CM5 checks every physical action and may stop it; its safety result and "
-        "the reported action completion are authoritative."
+        "newest image, forward TOF distance, body velocity, heading, active action, "
+        "conversation, and previous action results. Choose freely whether to move, "
+        "turn, hover, speak, or do nothing. Start a physical action when the state "
+        "allows it and choose small speed, direction, angle, and duration yourself. "
+        "Honor a direct user movement or waiting request unless the state is unsafe; "
+        "do not replace it with exploration. Otherwise, the request is a goal, not a "
+        "script. If the requested thing is visible, act on it before scanning elsewhere. "
+        "Commands use the body frame: forward and right are horizontal, and turns are "
+        "relative to the current heading. PX4 handles stability and altitude; the CM5 "
+        "may stop any action. Never request motors, attitude, altitude, position, or "
+        "a long translation. "
+        "Use a closed loop. Start only one move or turn at a time. Wait for its "
+        "completion, observed heading or translation, and the next state heartbeat; "
+        "then reassess the new image and telemetry. Requested speed and duration are "
+        "only setpoints; observed motion is the truth. After a turn, check whether the "
+        "subject moved toward the center. If it moved away, reverse instead of repeating "
+        "the same turn. Once it is centered, move toward it briefly and reassess. "
+        "Use small turns for alignment and repeat them for a broad search. "
+        "Keep taking purposeful small actions during an open-ended task unless it is "
+        "complete, waiting, or unclear. Hover when the image, telemetry, or safety "
+        "state is unclear. Speak when useful, and do not repeat the state block."
     )
 
 
