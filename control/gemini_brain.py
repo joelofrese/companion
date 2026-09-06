@@ -21,8 +21,9 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Keep the reasoning budget small enough for responsive closed-loop turns.
-THINKING_BUDGET = 128
+# Keep the real-time loop responsive; ER2 still performs visual reasoning and
+# tool selection without reserving extra explicit thinking tokens.
+THINKING_BUDGET = 0
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 # Recover from a model turn that produces no result before it consumes a short
 # flight; physical actions have their own completion deadline.
