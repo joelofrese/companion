@@ -47,7 +47,7 @@ ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
-# Do not resume an action after safety telemetry has been missing for too long.
+# Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
@@ -831,7 +831,7 @@ class GeminiRuntime:
             if action.blocked_since_s is None:
                 action.blocked_since_s = now
             elif now - action.blocked_since_s >= ACTION_SAFETY_HOLD_S:
-                self._cancel_action("safety telemetry stale")
+                self._cancel_action("safety hold persisted")
                 return
         else:
             action.blocked_since_s = None
