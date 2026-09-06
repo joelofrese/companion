@@ -26,11 +26,9 @@ VIDEO_PERIOD_S = 1.0
 # tool selection without reserving extra explicit thinking tokens.
 THINKING_BUDGET = 0
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
-# Recover from a model turn that produces no result before it consumes a short
-# flight; physical actions have their own completion deadline.
+# Recover from a turn that produces no result before it consumes a short flight;
+# physical actions have their own completion deadline.
 RESPONSE_TIMEOUT_S = 20.0
-# Allow a normal model turn to finish before interrupting it with a new view.
-RESPONSE_NUDGE_S = 8.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -116,6 +114,7 @@ class GeminiRuntime:
         self._response_parts = []
         self._response_thoughts = []
         self._actions = []
+        self._native_tool_seen = False
         self.thought_count = 0
         self.thought_token_count = 0
         self._memory_sent = False
@@ -302,22 +301,19 @@ class GeminiRuntime:
                                     response_started_s = None
                                     if self._reconnect_requested:
                                         break
-                                now = time.monotonic()
                                 heartbeat_due = (
                                     receive_task is None
                                     or self._dialogue
-                                    or self._active_action is not None
-                                    or self._needs_state_heartbeat
                                     or (
-                                        self._last_heartbeat_at_s is not None
-                                        and now - self._last_heartbeat_at_s
-                                        >= RESPONSE_NUDGE_S
+                                        self._active_action is not None
+                                        and not self._needs_state_heartbeat
                                     )
                                 )
                                 if heartbeat_due:
-                                    # Heartbeats start reasoning and interrupt
-                                    # stale generation. Keep them frequent during
-                                    # actions, but give a normal response time to finish.
+                                    # Heartbeats start reasoning and interrupt a
+                                    # generation. Let a normal turn and its tool
+                                    # response finish; keep them available for
+                                    # dialogue and active actions.
                                     await self._heartbeat(session, types)
                                 if receive_task is None:
                                     receive_task = asyncio.create_task(
@@ -492,7 +488,7 @@ class GeminiRuntime:
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "[HEARTBEAT] Inspect the newest image and state now. Use one action "
-            "tool if useful; otherwise do nothing."
+            "tool if useful; if no physical action is useful, call `ack` or do nothing."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -551,6 +547,7 @@ class GeminiRuntime:
                 )
             tool_call = message.tool_call
             if tool_call is not None:
+                self._native_tool_seen = True
                 saw_tool_call = True
                 responses = []
                 for call in tool_call.function_calls:
@@ -598,6 +595,11 @@ class GeminiRuntime:
             result = await self._move(args)
         elif name == "turn":
             result = await self._turn(args)
+        elif name == "ack":
+            result = {
+                "status": "acknowledged",
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         elif name == "hover":
             if (
                 self._active_action is None
@@ -650,7 +652,10 @@ class GeminiRuntime:
         return result
 
     async def _execute_text_action(self):
-        """Run a valid action object when ER2 returns it as visible text."""
+        """Use visible action JSON only before native tools appear."""
+
+        if self._native_tool_seen:
+            return
 
         parsed = _parse_text_action(_model_text(self._response_parts))
         if parsed is None:
@@ -1193,6 +1198,15 @@ def _tools():
             },
         },
         {
+            "name": "ack",
+            "description": (
+                "Acknowledge the newest image and telemetry without moving or "
+                "speaking. Use this when no physical action is useful yet."
+            ),
+            "behavior": "BLOCKING",
+            "parameters": {"type": "OBJECT", "properties": {}},
+        },
+        {
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position. Use this when the "
@@ -1226,8 +1240,9 @@ def _system_instruction() -> str:
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest image, forward TOF distance, body velocity, heading, active action, "
         "dialogue, and action result. To move, call `move`; to turn, call `turn`; to "
-        "stop, call `hover`; to talk, call `speak`. These tools are the only way to "
-        "act. Never output action JSON or describe a tool call as text. Choose one tool "
+        "stop, call `hover`; to talk, call `speak`; to acknowledge state without "
+        "changing the vehicle, call `ack`. These tools are the only way to act. "
+        "Never output action JSON or describe a tool call as text. Choose one tool "
         "call or do nothing. Keep a user request active until "
         "it is complete or changed, and explore when asked. During exploration, move "
         "or turn when it helps inspect or make progress; do not move merely because "
@@ -1308,7 +1323,11 @@ def _parse_text_action(text: str):
         return None
     if not isinstance(value, dict):
         return None
-    name = value.get("type")
+    name = value.get("type", value.get("action"))
+    if isinstance(name, str):
+        name = name.strip().lower()
+    if name == "ack":
+        return "ack", {}
     if name == "hover":
         return "hover", {}
     if name == "speak" and isinstance(value.get("message"), str):
