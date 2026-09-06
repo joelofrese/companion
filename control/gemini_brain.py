@@ -22,7 +22,7 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Favor timely closed-loop control over long internal deliberation.
-THINKING_BUDGET = 512
+THINKING_BUDGET = 256
 # Bound a slow model turn so a short flight can recover and try again.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
@@ -453,7 +453,8 @@ class GeminiRuntime:
         camera = "fresh" if self._has_fresh_frame() else "stale or missing"
         state = (
             f"{start}[STATE]\n"
-            f"Camera: {camera}\n"
+            f"Camera: {camera}; forward-facing; image-left=body-left; "
+            "image-right=body-right; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
@@ -1020,7 +1021,8 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short time. "
-                "Forward is positive and right is positive."
+                "Forward is positive and right is positive. If a visible target is "
+                "centered and the range is clear, prefer a short forward move."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1060,8 +1062,8 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
-                "Use a small correction and reassess from the next image; repeat "
-                "the action for a broader scan."
+                "Use one small visual alignment correction and reassess from the next "
+                "image; repeat only when the new image calls for it."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1118,9 +1120,11 @@ def _system_instruction() -> str:
         "allows it and choose small speed, direction, angle, and duration yourself. "
         "Honor a direct user movement or waiting request unless the state is unsafe; "
         "do not replace it with exploration. Otherwise, the request is a goal, not a "
-        "script. If the requested thing is visible, use its current image position and "
-        "act toward it before scanning elsewhere. Image-left calls for a left turn and "
-        "image-right calls for a right turn. Commands use the body frame: forward and "
+        "script. If the requested thing is visible, act toward it before scanning "
+        "elsewhere. The forward camera's image-left is body-left and image-right is "
+        "body-right: make one small turn to align an off-center subject, then move "
+        "forward briefly when it is centered and the range is clear. "
+        "Commands use the body frame: forward and "
         "right are horizontal, and turns are relative to the current heading. PX4 handles "
         "stability and altitude; the CM5 "
         "may stop any action. Never request motors, attitude, altitude, position, or "
@@ -1128,12 +1132,8 @@ def _system_instruction() -> str:
         "Use a closed loop. Start only one move or turn at a time. Wait for its "
         "completion, observed heading or translation, and the next state heartbeat; "
         "then reassess the new image and telemetry. Requested speed and duration are "
-        "only setpoints; observed motion is the truth. Do not turn again just because "
-        "the last turn ended. Turn toward a visible subject only when its image position "
-        "calls for it; if it is centered, move toward it briefly or hover. After a turn, "
-        "check the new image. If the subject moved away, reverse instead of repeating the "
-        "same turn. Use small turns for alignment and repeat them only when the new image "
-        "still calls for a broader search. "
+        "only setpoints; observed motion is the truth. Do not repeat a turn without a "
+        "new image showing the subject off-center or a deliberate need to scan. "
         "Keep taking purposeful small actions during an open-ended task unless it is "
         "complete, waiting, or unclear. Hover when the image, telemetry, or safety "
         "state is unclear. Speak when useful, and do not repeat the state block."
