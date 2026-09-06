@@ -105,7 +105,6 @@ class GeminiRuntime:
         self._last_spoken_generation = -1
         self._last_spoken_at_s: Optional[float] = None
         self._active_action: Optional[ActiveAction] = None
-        self._holding = True
         self._needs_state_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
@@ -376,8 +375,6 @@ class GeminiRuntime:
                                     self._actions.clear()
                                     self._reconnect_requested = True
                                     break
-                                if self._active_action is not None:
-                                    response_started_s = time.monotonic()
                                 remaining_s = VIDEO_PERIOD_S - (
                                     time.monotonic() - sent_at_s
                                 )
@@ -649,7 +646,6 @@ class GeminiRuntime:
         elif name == "hover":
             if (
                 self._active_action is None
-                and self._holding
                 and not self._stop_requested
             ):
                 result = {
@@ -763,7 +759,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._holding = False
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -813,7 +808,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._holding = False
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -1063,7 +1057,6 @@ class GeminiRuntime:
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
-        self._holding = True
 
     def _cancel_action(self, reason: str) -> str:
         action = self._active_action
@@ -1085,7 +1078,6 @@ class GeminiRuntime:
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
-        self._holding = True
         return self._action_label(action)
 
     def _action_response(
