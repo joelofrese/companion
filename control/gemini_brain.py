@@ -631,6 +631,7 @@ class GeminiRuntime:
                 "forward_m_s": forward_m_s,
                 "right_m_s": right_m_s,
             },
+            "heading_deg": _heading_value(self._telemetry.heading_rad),
             "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
         }
@@ -675,6 +676,7 @@ class GeminiRuntime:
         return {
             "status": "started",
             "action": self._action_label(action),
+            "heading_deg": _heading_value(self._telemetry.heading_rad),
             "movement_tools": "unavailable until this action completes",
             "telemetry": _telemetry_text(self._telemetry),
         }
@@ -911,6 +913,7 @@ class GeminiRuntime:
         response = {
             "status": status,
             "action": result,
+            "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
             "movement_tools": (
                 "unavailable until a fresh camera frame arrives"
@@ -1244,6 +1247,12 @@ def _heading_number(value) -> str:
     if _finite(value):
         return f"{math.degrees(value):.1f}"
     return "?"
+
+
+def _heading_value(value):
+    """Return a numeric heading for structured tool feedback."""
+
+    return math.degrees(value) if _finite(value) else None
 
 
 def _finite(value) -> bool:
