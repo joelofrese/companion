@@ -23,8 +23,8 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 # Favor timely closed-loop control over long internal deliberation.
 THINKING_BUDGET = 256
-# Bound a slow model turn so a short flight can recover and try again.
-RESPONSE_TIMEOUT_S = 30.0
+# Let a short flight recover if a model turn stops producing output.
+RESPONSE_TIMEOUT_S = 8.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -41,6 +41,7 @@ MAX_IMAGE_WIDTH = 640
 ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 ACTION_STABLE_S = 0.3
+ACTION_FOLLOWUP_DELAY_S = 4.0
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -93,6 +94,7 @@ class GeminiRuntime:
         self._active_action: Optional[ActiveAction] = None
         self._stop_requested = False
         self._last_action_result = ""
+        self._last_action_completed_at_s: Optional[float] = None
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
@@ -273,24 +275,36 @@ class GeminiRuntime:
                         await self._frame_ready.wait()
                         if self._closed.is_set():
                             return
+                        video_task = asyncio.create_task(
+                            self._stream_video(session, types)
+                        )
                         try:
                             receive_task = None
                             response_started_s = None
+                            followup_action_at_s = None
                             while (
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
-                                if (
-                                    self._last_heartbeat_at_s is None
-                                    or time.monotonic() - self._last_heartbeat_at_s
-                                    >= VIDEO_PERIOD_S
+                                if receive_task is None or self._dialogue:
+                                    await self._heartbeat(session, types)
+                                    response_started_s = time.monotonic()
+                                    if receive_task is None:
+                                        receive_task = asyncio.create_task(
+                                            self._receive(session, types)
+                                        )
+                                elif (
+                                    self._last_action_completed_at_s is not None
+                                    and self._last_action_completed_at_s
+                                    != followup_action_at_s
+                                    and time.monotonic()
+                                    - self._last_action_completed_at_s
+                                    >= ACTION_FOLLOWUP_DELAY_S
                                 ):
                                     await self._heartbeat(session, types)
-                                    if response_started_s is None:
-                                        response_started_s = time.monotonic()
-                                if receive_task is None:
-                                    receive_task = asyncio.create_task(
-                                        self._receive(session, types)
+                                    response_started_s = time.monotonic()
+                                    followup_action_at_s = (
+                                        self._last_action_completed_at_s
                                     )
                                 sent_at_s = time.monotonic()
                                 try:
@@ -342,12 +356,15 @@ class GeminiRuntime:
                                     except asyncio.TimeoutError:
                                         pass
                         finally:
+                            tasks = [video_task]
                             if receive_task is not None:
-                                receive_task.cancel()
-                                await asyncio.gather(
-                                    receive_task,
-                                    return_exceptions=True,
-                                )
+                                tasks.append(receive_task)
+                            for task in tasks:
+                                task.cancel()
+                            await asyncio.gather(
+                                *tasks,
+                                return_exceptions=True,
+                            )
                         self._session = None
                 except asyncio.CancelledError:
                     raise
@@ -406,6 +423,17 @@ class GeminiRuntime:
             )
             self._last_frame_sent_at_s = now
         self.video_frame_count += 1
+
+    async def _stream_video(self, session, types):
+        """Keep the Live session supplied with the newest camera frame."""
+
+        while not self._closed.is_set():
+            try:
+                await asyncio.wait_for(
+                    self._closed.wait(), timeout=VIDEO_PERIOD_S
+                )
+            except asyncio.TimeoutError:
+                await self._send_frame(session, types)
 
     async def _heartbeat(self, session, types):
         """Send the current camera frame and state heartbeat."""
@@ -861,6 +889,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._last_action_completed_at_s = time.monotonic()
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -880,6 +909,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._last_action_completed_at_s = time.monotonic()
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
@@ -1081,6 +1111,9 @@ def _system_instruction() -> str:
         "whether to move, turn, hover, speak, or do nothing. Honor a direct user "
         "request unless the state is unsafe; otherwise treat the request as a goal, "
         "not a script. "
+        "When the user asks for autonomous exploration, keep making sensible small "
+        "decisions after each completed action instead of asking what to do next, "
+        "unless the user asked you to wait. "
         "When a requested target is visible, use its image position: centered means "
         "aligned, so move forward in a short step instead of turning; left or right "
         "means make a small turn toward it. Prefer 5 to 10 degree turns and use a "
