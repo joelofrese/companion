@@ -43,6 +43,7 @@ TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 8.0
 MAX_IMAGE_WIDTH = 640
+TEXT_ACTION_DUPLICATE_S = 5.0
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
@@ -114,7 +115,8 @@ class GeminiRuntime:
         self._response_parts = []
         self._response_thoughts = []
         self._actions = []
-        self._native_tool_seen = False
+        self._last_executed_action = None
+        self._last_executed_action_at_s: Optional[float] = None
         self.thought_count = 0
         self.thought_token_count = 0
         self._memory_sent = False
@@ -547,13 +549,13 @@ class GeminiRuntime:
                 )
             tool_call = message.tool_call
             if tool_call is not None:
-                self._native_tool_seen = True
                 saw_tool_call = True
                 responses = []
                 for call in tool_call.function_calls:
+                    args = call.args or {}
                     result = await self._execute(
                         call.name,
-                        call.args or {},
+                        args,
                     )
                     started = (
                         call.name in ("move", "turn")
@@ -643,6 +645,10 @@ class GeminiRuntime:
             result = {"status": "rejected", "reason": "unknown tool"}
         if result.get("status") in ("started", "hovering", "spoken"):
             self.action_count += 1
+            signature = _action_signature(name, args)
+            if signature is not None:
+                self._last_executed_action = signature
+                self._last_executed_action_at_s = time.monotonic()
         if result.get("status") in ("rejected", "unavailable"):
             reason = str(result.get("reason", "")).strip()
             action = f"{name} {result['status']}"
@@ -652,13 +658,18 @@ class GeminiRuntime:
         return result
 
     async def _execute_text_action(self):
-        """Use visible action JSON only before native tools appear."""
-
-        if self._native_tool_seen:
-            return
+        """Use visible action JSON when it is not a native-call echo."""
 
         parsed = _parse_text_action(_model_text(self._response_parts))
         if parsed is None:
+            return
+        if (
+            self._last_executed_action is not None
+            and self._last_executed_action_at_s is not None
+            and time.monotonic() - self._last_executed_action_at_s
+            <= TEXT_ACTION_DUPLICATE_S
+            and _action_signature(*parsed) == self._last_executed_action
+        ):
             return
         name, args = parsed
         result = await self._execute(name, args)
@@ -1343,6 +1354,30 @@ def _parse_text_action(text: str):
             "right_m_s": value.get("right_m_s"),
             "duration_s": value.get("duration_s"),
         }
+    return None
+
+
+def _action_signature(name: str, args: dict):
+    """Return comparable fields for one action in either ER2 format."""
+
+    if name in ("ack", "hover"):
+        return (name,)
+    if name == "speak":
+        message = args.get("message")
+        return (name, message) if isinstance(message, str) else None
+    if name == "turn":
+        return (
+            name,
+            str(args.get("direction", "")).strip().lower(),
+            args.get("angle_deg"),
+        )
+    if name == "move":
+        return (
+            name,
+            args.get("forward_m_s"),
+            args.get("right_m_s"),
+            args.get("duration_s"),
+        )
     return None
 
 
