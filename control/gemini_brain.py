@@ -21,8 +21,8 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Leave enough reasoning room for spatial decisions while keeping the loop responsive.
-THINKING_BUDGET = 1024
+# Keep enough reasoning room for spatial decisions without making each turn wait.
+THINKING_BUDGET = 512
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
@@ -33,7 +33,7 @@ MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 30.0
+MAX_TURN_DEG = 15.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MAX_IMAGE_WIDTH = 640
@@ -595,6 +595,7 @@ class GeminiRuntime:
             else:
                 self._stop_requested = False
                 cancelled = self._cancel_action("hover")
+                self._movement_used_since_heartbeat = True
                 self._record_action("hover")
                 result = {
                     "status": "hovering",
@@ -970,7 +971,8 @@ class GeminiRuntime:
             "action": result,
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
-            "movement_tools": "available",
+            "movement_tools": "unavailable until the next state heartbeat",
+            "next_state_required": True,
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
@@ -1093,8 +1095,8 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
-                "Prefer 5 to 10 degrees and use up to 30 only when clearly needed. "
-                "After one correction, reassess from a new image."
+                "Prefer the smallest correction, usually 5 to 10 degrees. "
+                "After one turn, reassess from a new image before turning again."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1171,7 +1173,10 @@ def _system_instruction() -> str:
         "Use at most one physical move or turn in each state heartbeat. After its "
         "blocking result, end the response and wait for the next state heartbeat "
         "before choosing another physical action. "
-        "Requested speed and duration are setpoints; observed motion is the truth. "
+        "Use the smallest turn that can align with what the image shows, usually 5 "
+        "to 10 degrees. Repeated turns must each wait for a fresh image and heading; "
+        "use several small corrections for a large reorientation. Requested speed "
+        "and duration are setpoints; observed motion is the truth. "
         "Keep taking purposeful small actions during an open-ended task unless it "
         "is complete, waiting, or unclear. Hover when the image, telemetry, or "
         "safety state is unclear. Speak only for the user or a meaningful event; "
