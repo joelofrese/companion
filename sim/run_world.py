@@ -110,7 +110,6 @@ def _run_once(
     depth: bool,
     duration_s: Optional[float],
     gemini: bool,
-    gemini_model: str,
     initial_intent: str,
     model_pose: Optional[str],
     memory_path: Optional[Path],
@@ -243,7 +242,7 @@ def _run_once(
             if exploratory:
                 scenario += ["--intent", initial_intent]
             if gemini:
-                scenario += ["--gemini", "--gemini-model", gemini_model]
+                scenario.append("--gemini")
             if memory_path is not None:
                 scenario += ["--memory", str(memory_path)]
             if snapshot_path is not None:
@@ -274,7 +273,6 @@ def run(
     depth: bool = False,
     duration_s: Optional[float] = None,
     gemini: bool = False,
-    gemini_model: str = "gemini-robotics-er-2-streaming-preview",
     initial_intent: str = "explore the surroundings",
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
@@ -368,7 +366,6 @@ def run(
                 depth=depth,
                 duration_s=duration_s,
                 gemini=gemini,
-                gemini_model=gemini_model,
                 initial_intent=initial_intent,
                 model_pose=model_pose,
                 memory_path=memory_path,
@@ -441,10 +438,6 @@ def main(argv=None):
         help="use live Gemini ER 2 instead of the deterministic brain fixture",
     )
     parser.add_argument(
-        "--gemini-model",
-        default="gemini-robotics-er-2-streaming-preview",
-    )
-    parser.add_argument(
         "--memory",
         type=Path,
         help="persist conscious experience across exploratory runs",
@@ -491,7 +484,6 @@ def main(argv=None):
             depth=args.depth,
             duration_s=args.duration,
             gemini=args.gemini,
-            gemini_model=args.gemini_model,
             initial_intent=args.intent,
             model_pose=args.pose,
             memory_path=args.memory.expanduser().resolve() if args.memory else None,

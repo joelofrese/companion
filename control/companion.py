@@ -49,10 +49,6 @@ def build_parser():
     parser.add_argument("--whisper-model", default="tiny.en")
     parser.add_argument("--record-duration", type=float, default=3.0)
     parser.add_argument(
-        "--gemini-model",
-        default="gemini-robotics-er-2-streaming-preview",
-    )
-    parser.add_argument(
         "--memory",
         default="~/.companion/memory.txt",
         help="editable experience-memory file",
@@ -96,7 +92,6 @@ async def run(args):
 
     control = GeminiRuntime(
         situation=args.intent,
-        model=args.gemini_model,
         memory=memory,
     )
     await control.start()
@@ -135,7 +130,7 @@ async def run(args):
         print(
             f"Companion ready: video :{video_config.port}, "
             f"commands {body_host}:{args.command_port}, "
-            f"situation={args.intent}, Gemini={args.gemini_model}."
+            f"situation={args.intent}, Gemini ER 2."
         )
         if args.dialogue:
             dialogue_input.start()

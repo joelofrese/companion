@@ -103,7 +103,6 @@ async def run(
     world_name: Optional[str] = None,
     duration_s: float = PROFILE_DURATION_S,
     gemini: bool = False,
-    gemini_model: str = "gemini-robotics-er-2-streaming-preview",
     initial_intent: str = DEFAULT_EXPLORATORY_INTENT,
     depth: bool = False,
     memory_path: Optional[Path] = None,
@@ -237,7 +236,6 @@ async def run(
 
             control = GeminiRuntime(
                 situation=initial_intent,
-                model=gemini_model,
                 memory=memory_store,
             )
             await control.start()
@@ -900,7 +898,7 @@ async def run(
         else:
             print(f"Conscious thoughts=verified ({control.decision_count}).")
         if gemini:
-            print(f"Gemini ER 2 brain=verified: model={gemini_model}.")
+            print("Gemini ER 2 brain=verified.")
             if control.video_frame_count < 2:
                 raise RuntimeError("SITL did not stream Gemini video frames")
             print(
@@ -1330,10 +1328,6 @@ if __name__ == "__main__":
         action="store_true",
         help="use live Gemini ER 2 instead of the deterministic brain fixture",
     )
-    parser.add_argument(
-        "--gemini-model",
-        default="gemini-robotics-er-2-streaming-preview",
-    )
     parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
     parser.add_argument(
         "--snapshot",
@@ -1370,7 +1364,6 @@ if __name__ == "__main__":
                 world_name=args.world,
                 duration_s=args.duration,
                 gemini=args.gemini,
-                gemini_model=args.gemini_model,
                 initial_intent=args.intent,
                 memory_path=args.memory,
                 snapshot_path=args.snapshot,

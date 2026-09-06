@@ -36,7 +36,7 @@ MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 15.0
+MAX_TURN_DEG = 10.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -82,16 +82,12 @@ class GeminiRuntime:
     def __init__(
         self,
         situation: str = DEFAULT_SITUATION,
-        model: str = DEFAULT_MODEL,
         memory: Optional[CompanionMemory] = None,
         api_key: Optional[str] = None,
     ):
         if not isinstance(situation, str) or not situation.strip():
             raise ValueError("situation must be a non-empty string")
-        if not isinstance(model, str) or not model.strip():
-            raise ValueError("Gemini model must be a non-empty string")
         self.situation = situation.strip()
-        self.model = model.strip()
         self.memory_store = memory
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self._latest_frame = None
@@ -275,7 +271,7 @@ class GeminiRuntime:
                         ),
                     )
                     async with client.aio.live.connect(
-                        model=self.model,
+                        model=DEFAULT_MODEL,
                         config=config,
                     ) as session:
                         self._session = session
@@ -1132,7 +1128,9 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
-                "Prefer the smallest correction, usually 5 to 10 degrees. "
+                "Choose the angle yourself from the current image and heading; "
+                "the user does not need to provide it. Prefer the smallest "
+                "correction, usually 3 to 8 degrees. "
                 "After one turn, reassess from a new image before turning again."
             ),
             "behavior": "BLOCKING",
@@ -1195,12 +1193,16 @@ def _system_instruction() -> str:
         "merely to search; take a short step toward it unless it is already close. "
         "Use the image and telemetry together. A visible target that is centered and "
         "aligned calls for a short forward step while the task is incomplete; a "
-        "target on the left or right calls for a small turn toward it. If the scene "
+        "target on the left or right calls for a small turn toward it. Choose the "
+        "turn amount yourself from the current image and heading; do not ask the "
+        "user for an exact angle. If the scene "
         "is unclear, reobserve or make one small search turn. After every physical "
         "action, use its result and a new image and telemetry before acting again. "
         "Use body-frame horizontal movement and relative yaw turns. Turn by the "
-        "smallest useful amount, normally 5 to 10 degrees; use several fresh "
-        "corrections for a large reorientation. Use short, slow translations. A clear "
+        "smallest useful amount, normally 3 to 8 degrees; use several fresh "
+        "corrections for a large reorientation. Each turn is relative to the actual "
+        "heading returned by telemetry; never add a new correction to an old intended "
+        "heading. Use short, slow translations. A clear "
         "TOF reading permits forward movement but does not prove a target is far away. "
         "PX4 handles stability and altitude, and the CM5 may stop any action. Never "
         "request motors, attitude, altitude, position, or a long translation. "
