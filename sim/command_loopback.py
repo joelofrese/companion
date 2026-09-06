@@ -18,9 +18,11 @@ class FixedCommandControl:
 
     def __init__(self):
         self.obstacle_distances = []
+        self.last_commands = []
 
     def tick(self, frame, timestamp_s, intent=None, telemetry=Telemetry()):
         self.obstacle_distances.append(telemetry.obstacle_distance_m)
+        self.last_commands.append(telemetry.last_command)
         return VelocityCommand(forward_m_s=0.25)
 
 
@@ -106,6 +108,11 @@ async def run():
             raise RuntimeError("CM5 did not stop when obstacle data was missing")
         if VelocityCommand(forward_m_s=-0.2) not in commands:
             raise RuntimeError(f"Brain control service did not produce obstacle backoff: {commands}")
+        if VelocityCommand(forward_m_s=0.25) not in control.last_commands:
+            raise RuntimeError(
+                "Brain did not receive its previous command through telemetry: "
+                f"{control.last_commands}"
+            )
         if not any(
             distance is not None
             and not (isinstance(distance, float) and math.isnan(distance))

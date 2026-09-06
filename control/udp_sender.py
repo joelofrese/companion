@@ -40,6 +40,7 @@ class UdpCommandSender:
         self._down_velocity_m_s = None
         self._heading_rad = None
         self._telemetry_received_at_s = None
+        self._last_command = None
 
     def start(self):
         """Open the sender socket once; repeated starts are harmless."""
@@ -47,6 +48,7 @@ class UdpCommandSender:
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._socket.setblocking(False)
+            self._last_command = None
 
     def send(self, command: VelocityCommand):
         """Send one packet and advance its sequence only after a successful send."""
@@ -55,6 +57,7 @@ class UdpCommandSender:
         payload = CommandPacket(self._sequence, command).encode()
         self._socket.sendto(payload, self.destination)
         self._sequence += 1
+        self._last_command = command
 
     def telemetry(self) -> Telemetry:
         """Return fresh CM5 sensor and PX4 velocity telemetry."""
@@ -64,13 +67,17 @@ class UdpCommandSender:
             self._telemetry_received_at_s is None
             or time.monotonic() - self._telemetry_received_at_s > TELEMETRY_TIMEOUT_S
         ):
-            return Telemetry(obstacle_distance_m=math.nan)
+            return Telemetry(
+                obstacle_distance_m=math.nan,
+                last_command=self._last_command,
+            )
         return Telemetry(
             obstacle_distance_m=(
                 self._obstacle_distance_m
                 if self._obstacle_distance_m is not None
                 else math.nan
             ),
+            last_command=self._last_command,
             forward_velocity_m_s=self._forward_velocity_m_s,
             right_velocity_m_s=self._right_velocity_m_s,
             down_velocity_m_s=self._down_velocity_m_s,
@@ -109,3 +116,4 @@ class UdpCommandSender:
             return
         self._socket.close()
         self._socket = None
+        self._last_command = None
