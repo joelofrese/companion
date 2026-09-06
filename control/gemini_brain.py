@@ -319,15 +319,15 @@ class GeminiRuntime:
                                         and self._dialogue_in_flight is None
                                     )
                                     or (
-                                        self._active_action is not None
-                                        and not self._needs_state_heartbeat
+                                        self._needs_state_heartbeat
+                                        and self._active_action is None
                                     )
                                 )
                                 if heartbeat_due:
                                     # Heartbeats start reasoning and interrupt a
                                     # generation. Let a normal turn and its tool
-                                    # response finish; keep them available for
-                                    # dialogue and active actions.
+                                    # response finish. The video task continues
+                                    # sending fresh frames while an action runs.
                                     await self._heartbeat(session, types)
                                 if receive_task is None:
                                     receive_task = asyncio.create_task(
