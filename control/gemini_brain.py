@@ -12,8 +12,8 @@ from typing import Optional
 from PIL import Image
 
 from control.memory import CompanionMemory
-from control.mind import Telemetry
 from control.safety_limits import OBSTACLE_STOP_M
+from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
 
 

@@ -1,4 +1,4 @@
-"""Shared brain data and the deterministic simulation mind."""
+"""Deterministic VLM and LLM brain used only by simulation."""
 
 from collections import deque
 from dataclasses import dataclass
@@ -7,6 +7,7 @@ import threading
 from typing import Any, Optional, Protocol
 
 from control.memory import CompanionMemory
+from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
 from voice.intent import parse_focus, parse_intent
 
@@ -28,18 +29,6 @@ FOCUS_PLACEHOLDER_TEXT = PLACEHOLDER_TEXT | frozenset(
         "visual observations",
     )
 )
-
-@dataclass(frozen=True)
-class Telemetry:
-    """The vehicle information the brain can use."""
-
-    obstacle_distance_m: Optional[float] = None
-    last_command: Optional[VelocityCommand] = None
-    forward_velocity_m_s: Optional[float] = None
-    right_velocity_m_s: Optional[float] = None
-    down_velocity_m_s: Optional[float] = None
-    heading_rad: Optional[float] = None
-
 
 def _experience_outcome(telemetry: Telemetry) -> str:
     """Return a short record of the last command and measured result."""

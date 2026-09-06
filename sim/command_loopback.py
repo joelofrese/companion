@@ -6,8 +6,8 @@ import time
 
 from control.udp_sender import UdpCommandSender
 from control.udp_control import UdpControlService
-from control.mind import Telemetry
 from control.safety_limits import OBSTACLE_STOP_M
+from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
 from onboard.command_receiver import UdpSafetyReceiver
 from onboard.command_service import SafetyCommandService

@@ -6,8 +6,9 @@ from dataclasses import replace
 import time
 from typing import Callable, Optional
 
-from control.mind import ConsciousDecision, CompanionMind, Telemetry, VisualObservation
+from control.mind import ConsciousDecision, CompanionMind, VisualObservation
 from control.mind_motion import movement_command
+from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
 from voice.intent import parse_intent
 

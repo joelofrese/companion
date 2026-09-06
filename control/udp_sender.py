@@ -5,7 +5,7 @@ import socket
 import time
 
 from control.command_packet import MAX_PACKET_BYTES, CommandPacket, TelemetryPacket
-from control.mind import Telemetry
+from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
 
 
