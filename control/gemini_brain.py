@@ -22,7 +22,7 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Keep enough reasoning room for spatial decisions without making each turn wait.
-THINKING_BUDGET = 512
+THINKING_BUDGET = 256
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
@@ -36,6 +36,8 @@ MIN_TURN_DEG = 2.0
 MAX_TURN_DEG = 15.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
+MIN_TURN_RATE_DEG_S = 1.5
+TURN_SLOW_THRESHOLD_DEG = 8.0
 MAX_IMAGE_WIDTH = 640
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 3.0
@@ -209,9 +211,9 @@ class GeminiRuntime:
             and _finite(telemetry.heading_rad)
             and _obstacle_is_valid(telemetry.obstacle_distance_m)
         ):
-            yaw_rate = TURN_RATE_DEG_S * (
-                1.0 if action.direction == "right" else -1.0
-            )
+            yaw_rate = self._turn_rate(action)
+            if action.direction == "left":
+                yaw_rate = -yaw_rate
             return VelocityCommand(yaw_rate_deg_s=yaw_rate)
         return VelocityCommand()
 
@@ -287,9 +289,14 @@ class GeminiRuntime:
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
-                                # Text heartbeats trigger fresh reasoning. Keep
-                                # them running while the model observes actions.
-                                await self._heartbeat(session, types)
+                                # A heartbeat is a user turn and interrupts model
+                                # generation. Start one only when the model is
+                                # idle; a queued dialogue message may interrupt
+                                # once so the user does not have to wait.
+                                if receive_task is None or self._dialogue:
+                                    await self._heartbeat(session, types)
+                                    if receive_task is not None:
+                                        response_started_s = time.monotonic()
                                 if receive_task is None:
                                     receive_task = asyncio.create_task(
                                         self._receive(session, types)
@@ -433,9 +440,15 @@ class GeminiRuntime:
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue[0] if self._dialogue else ""
         async with self._send_lock:
+            action_result = self._last_action_result
             await session.send_realtime_input(
                 text=self._heartbeat_text(dialogue)
             )
+        # The tool response already keeps this result in the session. Repeat it
+        # in one heartbeat so completion between heartbeats is easy to see, then
+        # stop copying stale text into every later heartbeat.
+        if action_result and self._last_action_result == action_result:
+            self._last_action_result = ""
         if not self._memory_sent:
             self._memory_sent = True
         if self._bootstrap_pending:
@@ -487,6 +500,7 @@ class GeminiRuntime:
     async def _receive(self, session, types):
         async for message in session.receive():
             turn_complete = False
+            next_state_required = False
             update = message.session_resumption_update
             if update is not None and update.resumable and update.new_handle:
                 self._session_handle = update.new_handle
@@ -527,6 +541,9 @@ class GeminiRuntime:
                         call.name,
                         call.args or {},
                     )
+                    next_state_required = (
+                        next_state_required or result.get("next_state_required", False)
+                    )
                     started = (
                         call.name in ("move", "turn")
                         and result.get("status") == "started"
@@ -535,6 +552,10 @@ class GeminiRuntime:
                         action = self._active_action
                         if action.completion is not None:
                             result = await asyncio.shield(action.completion)
+                            next_state_required = (
+                                next_state_required
+                                or result.get("next_state_required", False)
+                            )
                     responses.append(
                         types.FunctionResponse(
                             name=call.name,
@@ -547,6 +568,11 @@ class GeminiRuntime:
                         await session.send_tool_response(
                             function_responses=responses
                         )
+                if next_state_required:
+                    self._response_parts.clear()
+                    self._response_thoughts.clear()
+                    self._actions.clear()
+                    return
             if message.tool_call_cancellation is not None:
                 self._cancel_action("Gemini cancelled it")
 
@@ -904,6 +930,20 @@ class GeminiRuntime:
             change_rad = -change_rad
         return math.degrees(change_rad)
 
+    def _turn_rate(self, action: ActiveAction) -> float:
+        """Slow the turn as measured heading approaches its requested angle."""
+
+        actual = self._heading_change_deg(action)
+        if actual is None:
+            return TURN_RATE_DEG_S
+        remaining = max(0.0, action.amount - actual)
+        if remaining >= TURN_SLOW_THRESHOLD_DEG:
+            return TURN_RATE_DEG_S
+        return max(
+            MIN_TURN_RATE_DEG_S,
+            TURN_RATE_DEG_S * remaining / TURN_SLOW_THRESHOLD_DEG,
+        )
+
     def _complete_action(self, status: str, actual_heading_deg: Optional[float] = None):
         action = self._active_action
         if action is None:
@@ -1136,6 +1176,9 @@ def _system_instruction() -> str:
         "completed or changed. For explicit movement, act instead of only describing "
         "it. During exploration, keep making small useful decisions unless told to "
         "wait. "
+        "During a named-target request, prioritize that target over exploration. If "
+        "it is visible near the image center and the path is clear, do not turn "
+        "merely to search; take a short step toward it unless it is already close. "
         "Use the image and telemetry together. A visible target that is centered and "
         "aligned calls for a short forward step while the task is incomplete; a "
         "target on the left or right calls for a small turn toward it. If the scene "

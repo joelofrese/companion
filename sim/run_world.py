@@ -404,7 +404,7 @@ def main(argv=None):
     parser.add_argument(
         "--explore",
         action="store_true",
-        help="run the synthetic world with live dialogue and observation-only behavior",
+        help="run the synthetic world with live dialogue and open-ended behavior",
     )
     parser.add_argument(
         "--faults",
