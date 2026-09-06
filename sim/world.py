@@ -490,6 +490,10 @@ async def run(
         last_observation_signature = None
         last_decision_signature = None
         last_traced_command = None
+        last_traced_gemini_tool_calls = 0
+        last_traced_gemini_thought = ""
+        last_traced_gemini_response = ""
+        last_traced_gemini_action = "stop"
         requested_focus_answered = False
 
         async def observe_velocity():
@@ -563,6 +567,9 @@ async def run(
             nonlocal last_traced_observation, last_traced_decision
             nonlocal last_observation_signature, last_decision_signature
             nonlocal last_traced_command
+            nonlocal last_traced_gemini_tool_calls
+            nonlocal last_traced_gemini_thought, last_traced_gemini_response
+            nonlocal last_traced_gemini_action
             if not trace:
                 return
 
@@ -570,6 +577,38 @@ async def run(
                 return " ".join(str(value).split()) or "none"
 
             if gemini:
+                if (
+                    control.latest_thought
+                    and control.latest_thought != last_traced_gemini_thought
+                ):
+                    print(
+                        f"[Gemini {elapsed_s:5.1f}s] thought="
+                        f"{clean(control.latest_thought)}",
+                        flush=True,
+                    )
+                    last_traced_gemini_thought = control.latest_thought
+                if (
+                    control.latest_response
+                    and control.latest_response != last_traced_gemini_response
+                ):
+                    print(
+                        f"[Gemini {elapsed_s:5.1f}s] response="
+                        f"{clean(control.latest_response)}",
+                        flush=True,
+                    )
+                    last_traced_gemini_response = control.latest_response
+                if (
+                    control.latest_action != last_traced_gemini_action
+                    or control.tool_call_count != last_traced_gemini_tool_calls
+                ):
+                    print(
+                        f"[Gemini {elapsed_s:5.1f}s] action="
+                        f"{clean(control.latest_action)}; "
+                        f"tool-calls={control.tool_call_count}",
+                        flush=True,
+                    )
+                    last_traced_gemini_action = control.latest_action
+                    last_traced_gemini_tool_calls = control.tool_call_count
                 if control.turn_count != last_traced_decision:
                     print(
                         f"[Gemini {elapsed_s:5.1f}s] "

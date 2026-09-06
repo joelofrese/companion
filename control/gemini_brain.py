@@ -23,9 +23,9 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 # Favor timely closed-loop control over long internal deliberation.
 THINKING_BUDGET = 1024
-# Do not cancel a valid model turn just because it takes longer than one
-# heartbeat.  The video and body control continue while Gemini thinks.
-# A slow ER2 turn is safer to wait through than to discard and restart.
+# Give the first turn a short retry window so a transient startup stall does not
+# consume most of a short flight. Later turns may need to include an action.
+INITIAL_RESPONSE_TIMEOUT_S = 20.0
 RESPONSE_TIMEOUT_S = 60.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
@@ -313,7 +313,15 @@ class GeminiRuntime:
                                 elif (
                                     response_started_s is not None
                                     and time.monotonic() - response_started_s
-                                    > RESPONSE_TIMEOUT_S
+                                    > (
+                                        INITIAL_RESPONSE_TIMEOUT_S
+                                        if (
+                                            self.session_reconnect_count == 0
+                                            and self.turn_count == 0
+                                            and self.tool_call_count == 0
+                                        )
+                                        else RESPONSE_TIMEOUT_S
+                                    )
                                 ):
                                     raise TimeoutError(
                                         "Gemini did not complete its response"
@@ -494,8 +502,10 @@ class GeminiRuntime:
                             continue
                         if getattr(part, "thought", False):
                             self._response_thoughts.append(part.text)
+                            self.latest_thought = _model_text(self._response_thoughts)
                         else:
                             self._response_parts.append(part.text)
+                            self.latest_response = _model_text(self._response_parts)
                 else:
                     transcript = content.output_transcription
                     if transcript is not None and transcript.text:
@@ -877,6 +887,7 @@ class GeminiRuntime:
             self._action_response(action, status, result, actual_heading_deg),
         )
         self._record_action(result)
+        self._remember_action(result)
         self._active_action = None
 
     def _cancel_action(self, reason: str) -> str:
@@ -896,6 +907,7 @@ class GeminiRuntime:
             self._action_response(action, "cancelled", result, actual),
         )
         self._record_action(result)
+        self._remember_action(result)
         self._active_action = None
         return self._action_label(action)
 
@@ -933,6 +945,13 @@ class GeminiRuntime:
         action = " ".join(str(action).split())
         if action:
             self._actions.append(action)
+            self.latest_action = action
+
+    def _remember_action(self, action: str):
+        if self.memory_store is not None:
+            self.memory_store.remember(
+                f"{_telemetry_text(self._telemetry)}; action={action}"
+            )
 
     def _finish_turn(self):
         thought = _model_text(self._response_thoughts)
@@ -1046,6 +1065,8 @@ def _tools():
                             f"A turn from {MIN_TURN_DEG:.0f} through "
                             f"{MAX_TURN_DEG:.0f} degrees."
                         ),
+                        "minimum": MIN_TURN_DEG,
+                        "maximum": MAX_TURN_DEG,
                     },
                 },
                 "required": ["direction", "angle_deg"],
