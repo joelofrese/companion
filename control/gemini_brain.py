@@ -34,7 +34,7 @@ MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
-MIN_TURN_DEG = 5.0
+MIN_TURN_DEG = 2.0
 MAX_TURN_DEG = 90.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
@@ -1029,7 +1029,8 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
-                "Use small corrections when aligning with something."
+                "Use small corrections when aligning with something; a broad scan "
+                "may use a larger angle."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1101,7 +1102,9 @@ def _system_instruction() -> str:
         "continue with another small purposeful action after each fresh view unless "
         "the task is complete, waiting, or the state is unclear. If you are aligning "
         "with something, make a small correction and reassess instead of repeating "
-        "a turn without new visual evidence. When a requested thing is already "
+        "a turn without new visual evidence. For searching or alignment, prefer "
+        "roughly 10 to 20 degree turns and request a larger turn only when the new "
+        "view shows it is needed. When a requested thing is already "
         "visible, act on that view before scanning elsewhere. If the request says to "
         "wait, stop, or inspect when close, hover and remain there when that condition "
         "is met. "
