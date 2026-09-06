@@ -47,6 +47,8 @@ ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
+# Do not resume an action after safety telemetry has been missing for too long.
+ACTION_SAFETY_HOLD_S = 0.5
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -68,6 +70,7 @@ class ActiveAction:
     right_m_s: float = 0.0
     last_update_s: Optional[float] = None
     last_sample_s: Optional[float] = None
+    blocked_since_s: Optional[float] = None
     observed_forward_m: float = 0.0
     observed_right_m: float = 0.0
     completion: Optional[asyncio.Future] = None
@@ -824,6 +827,14 @@ class GeminiRuntime:
             return
         now = time.monotonic()
         self._record_translation(action, now)
+        if self._action_is_blocked(action):
+            if action.blocked_since_s is None:
+                action.blocked_since_s = now
+            elif now - action.blocked_since_s >= ACTION_SAFETY_HOLD_S:
+                self._cancel_action("safety telemetry stale")
+                return
+        else:
+            action.blocked_since_s = None
         self._pause_action_if_blocked(action, now)
         if action.kind == "turn":
             if action.start_heading_rad is None and _finite(self._telemetry.heading_rad):
