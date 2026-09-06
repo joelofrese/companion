@@ -42,7 +42,6 @@ ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
-ACTION_FOLLOWUP_DELAY_S = 4.0
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -97,7 +96,6 @@ class GeminiRuntime:
         self._movement_used_since_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
-        self._last_action_completed_at_s: Optional[float] = None
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
@@ -285,31 +283,18 @@ class GeminiRuntime:
                         try:
                             receive_task = None
                             response_started_s = None
-                            followup_action_at_s = None
                             while (
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
-                                if receive_task is None or self._dialogue:
-                                    await self._heartbeat(session, types)
-                                    response_started_s = time.monotonic()
-                                    if receive_task is None:
-                                        receive_task = asyncio.create_task(
-                                            self._receive(session, types)
-                                        )
-                                elif (
-                                    self._last_action_completed_at_s is not None
-                                    and self._last_action_completed_at_s
-                                    != followup_action_at_s
-                                    and time.monotonic()
-                                    - self._last_action_completed_at_s
-                                    >= ACTION_FOLLOWUP_DELAY_S
-                                ):
-                                    await self._heartbeat(session, types)
-                                    response_started_s = time.monotonic()
-                                    followup_action_at_s = (
-                                        self._last_action_completed_at_s
+                                # Text heartbeats trigger fresh reasoning. Keep
+                                # them running while the model observes actions.
+                                await self._heartbeat(session, types)
+                                if receive_task is None:
+                                    receive_task = asyncio.create_task(
+                                        self._receive(session, types)
                                     )
+                                    response_started_s = time.monotonic()
                                 sent_at_s = time.monotonic()
                                 try:
                                     await asyncio.wait_for(
@@ -929,7 +914,6 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
-        self._last_action_completed_at_s = time.monotonic()
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -949,7 +933,6 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
-        self._last_action_completed_at_s = time.monotonic()
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
