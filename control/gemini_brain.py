@@ -93,6 +93,7 @@ class GeminiRuntime:
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._active_action: Optional[ActiveAction] = None
+        self._movement_used_since_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
         self._last_action_completed_at_s: Optional[float] = None
@@ -439,6 +440,8 @@ class GeminiRuntime:
     async def _heartbeat(self, session, types):
         """Send the current camera frame and state heartbeat."""
 
+        if self._active_action is None:
+            self._movement_used_since_heartbeat = False
         await self._send_frame(session, types)
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue[0] if self._dialogue else ""
@@ -652,6 +655,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._movement_used_since_heartbeat = True
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -701,6 +705,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._movement_used_since_heartbeat = True
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -720,6 +725,16 @@ class GeminiRuntime:
                     "status": "unavailable",
                     "reason": "an explicit stop request is active; hover before moving again",
                     "movement_tools": "unavailable until hovering is acknowledged",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
+            if self._movement_used_since_heartbeat:
+                return {
+                    "status": "unavailable",
+                    "reason": (
+                        "one move or turn was already chosen for this state; wait "
+                        "for the next fresh image and telemetry"
+                    ),
+                    "movement_tools": "unavailable until the next state heartbeat",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
             return None
