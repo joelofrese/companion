@@ -97,7 +97,7 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._latest_user_request = ""
         self._active_action: Optional[ActiveAction] = None
-        self._movement_used_since_heartbeat = False
+        self._needs_state_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -301,6 +301,7 @@ class GeminiRuntime:
                                     receive_task is None
                                     or self._dialogue
                                     or self._active_action is not None
+                                    or self._needs_state_heartbeat
                                 ):
                                     await self._heartbeat(session, types)
                                     if receive_task is not None:
@@ -442,8 +443,6 @@ class GeminiRuntime:
     async def _heartbeat(self, session, types):
         """Send the current camera frame and state heartbeat."""
 
-        if self._active_action is None:
-            self._movement_used_since_heartbeat = False
         await self._send_frame(session, types)
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue[0] if self._dialogue else ""
@@ -457,6 +456,8 @@ class GeminiRuntime:
         # stop copying stale text into every later heartbeat.
         if action_result and self._last_action_result == action_result:
             self._last_action_result = ""
+        if self._active_action is None:
+            self._needs_state_heartbeat = False
         if not self._memory_sent:
             self._memory_sent = True
         if self._bootstrap_pending:
@@ -512,7 +513,6 @@ class GeminiRuntime:
     async def _receive(self, session, types):
         async for message in session.receive():
             turn_complete = False
-            next_state_required = False
             update = message.session_resumption_update
             if update is not None and update.resumable and update.new_handle:
                 self._session_handle = update.new_handle
@@ -553,9 +553,6 @@ class GeminiRuntime:
                         call.name,
                         call.args or {},
                     )
-                    next_state_required = (
-                        next_state_required or result.get("next_state_required", False)
-                    )
                     started = (
                         call.name in ("move", "turn")
                         and result.get("status") == "started"
@@ -564,10 +561,6 @@ class GeminiRuntime:
                         action = self._active_action
                         if action.completion is not None:
                             result = await asyncio.shield(action.completion)
-                            next_state_required = (
-                                next_state_required
-                                or result.get("next_state_required", False)
-                            )
                     responses.append(
                         types.FunctionResponse(
                             name=call.name,
@@ -580,11 +573,6 @@ class GeminiRuntime:
                         await session.send_tool_response(
                             function_responses=responses
                         )
-                if next_state_required:
-                    self._response_parts.clear()
-                    self._response_thoughts.clear()
-                    self._actions.clear()
-                    return
             if message.tool_call_cancellation is not None:
                 self._cancel_action("Gemini cancelled it")
 
@@ -618,7 +606,6 @@ class GeminiRuntime:
             else:
                 self._stop_requested = False
                 cancelled = self._cancel_action("hover")
-                self._movement_used_since_heartbeat = True
                 self._record_action("hover")
                 result = {
                     "status": "hovering",
@@ -686,7 +673,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._movement_used_since_heartbeat = True
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -736,7 +722,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._movement_used_since_heartbeat = True
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -758,16 +743,14 @@ class GeminiRuntime:
                     "movement_tools": "unavailable until hovering is acknowledged",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-            if self._movement_used_since_heartbeat:
+            if self._needs_state_heartbeat:
                 return {
                     "status": "unavailable",
                     "reason": (
-                        "end this response; one move or turn was already chosen. "
-                        "Wait for the next fresh image and telemetry before "
-                        "choosing another physical action"
+                        "the previous physical action is complete; wait for the "
+                        "next state heartbeat before choosing another"
                     ),
                     "movement_tools": "unavailable until the next state heartbeat",
-                    "next_state_required": True,
                     "telemetry": _telemetry_text(self._telemetry),
                 }
             return None
@@ -810,7 +793,12 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             if self._last_action_result:
-                return f"{self._last_action_result}; movement tools available"
+                availability = (
+                    "movement tools unavailable until the next state heartbeat"
+                    if self._needs_state_heartbeat
+                    else "movement tools available"
+                )
+                return f"{self._last_action_result}; {availability}"
             return "none; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
@@ -974,6 +962,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._needs_state_heartbeat = True
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -993,6 +982,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._needs_state_heartbeat = True
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
@@ -1014,8 +1004,7 @@ class GeminiRuntime:
             "action": result,
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
-            "movement_tools": "unavailable until the next state heartbeat",
-            "next_state_required": True,
+            "movement_tools": "available after the next state heartbeat",
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
@@ -1205,14 +1194,16 @@ def _system_instruction() -> str:
         "take a short step; if it is off-center, turn toward it; if it is unclear, "
         "reobserve or make one small search turn. Choose movement amounts yourself; "
         "the user does not need to give exact angles or distances. After each move or "
-        "turn, wait for its blocking result and a fresh image and telemetry. Use the "
-        "measured action result and current heading from telemetry to correct the next "
-        "action; never repeat a movement or turn without a fresh view. Use slow, "
+        "turn, wait for its blocking result; the next state heartbeat makes movement "
+        "available again. Then inspect the newest image and telemetry before choosing "
+        "another physical action. Use the measured action result and "
+        "current heading from telemetry to correct the next action; never repeat a "
+        "movement or turn without a fresh view. Use slow, "
         "short body-frame horizontal moves and relative yaw turns, normally 3 to 8 "
         "degrees and never more than the tool limit. A valid clear TOF reading is "
         "required before translation. CM5 and PX4 handle safety and stability; never "
-        "request motors, attitude, altitude, position, or long motion. Choose at most "
-        "one move or turn per heartbeat. Hover for explicit stop or stale, unclear, or "
+        "request motors, attitude, altitude, position, or long motion. Choose only one "
+        "physical action at a time. Hover for explicit stop or stale, unclear, or "
         "unsafe state, and do not repeat hover while already hovering. Speak only to "
         "answer the user or report a meaningful event."
     )

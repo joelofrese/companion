@@ -191,9 +191,9 @@ JPEG once per second while model turns run. Movement and turn tools return their
 observed completion before Gemini chooses another movement, while the brain keeps
 receiving video, telemetry, and dialogue. One physical move or turn stays active
 until its duration or observed heading settles; safety holds pause its timing;
-movement waits for a fresh camera frame afterward; the action state reports the
-command, phase, remaining time, and heading. The movement tool also sends Gemini
-a native completion response.
+the next movement becomes available after a fresh state heartbeat; the action
+state reports the command, phase, remaining time, and heading. The movement tool
+also sends Gemini a native completion response.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
