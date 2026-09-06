@@ -21,9 +21,9 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Favor timely closed-loop control over long internal deliberation.
-THINKING_BUDGET = 256
-# Keep a slow model turn alive; the CM5 holds zero motion while it runs.
+# Leave enough reasoning room for spatial decisions while keeping the loop responsive.
+THINKING_BUDGET = 1024
+# Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
@@ -92,6 +92,7 @@ class GeminiRuntime:
         self._last_frame_sent_at_s: Optional[float] = None
         self._telemetry = Telemetry()
         self._dialogue = deque()
+        self._latest_user_request = ""
         self._active_action: Optional[ActiveAction] = None
         self._movement_used_since_heartbeat = False
         self._stop_requested = False
@@ -150,6 +151,7 @@ class GeminiRuntime:
         if not isinstance(message, str) or not message.strip():
             return
         message = message.strip()
+        self._latest_user_request = message
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -479,6 +481,11 @@ class GeminiRuntime:
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
+        elif self._latest_user_request:
+            state += (
+                "\nActive user request (keep working on it until completed or changed): "
+                f"{self._latest_user_request}"
+            )
         if memory:
             state += (
                 "\nMemory (prior experience; verify it against the current image "
@@ -1140,21 +1147,21 @@ def _system_instruction() -> str:
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, forward TOF distance, body velocity, heading, active "
         "action, conversation, and previous action results. At each state, choose "
-        "whether to move, turn, hover, speak, or do nothing. Honor a direct user "
-        "request unless the state is unsafe; otherwise treat the request as a goal, "
-        "not a script. "
+        "whether to move, turn, hover, speak, or do nothing. A direct user request "
+        "stays active until it is completed or changed; treat it as a goal, not a "
+        "script, and do not replace it with unrelated exploration. "
         "When the user explicitly asks for movement, turn, or approach, make a safe "
         "first tool action instead of only planning or describing it. "
         "When the user asks for autonomous exploration, keep making sensible small "
         "decisions after each completed action instead of asking what to do next, "
         "unless the user asked you to wait. "
         "When a requested target is visible, use its image position: centered means "
-        "aligned, so move forward in a short step only while the task still appears "
-        "incomplete; left or right means make a small turn toward it. When the target "
-        "is centered and the visual task appears complete, hover instead of continuing "
-        "to approach. Prefer 5 to 10 degree turns and use a larger turn only when "
-        "clearly needed. After every action, inspect a new image and telemetry before "
-        "choosing another action. A clear TOF reading permits forward movement; it is "
+        "aligned, so move forward in a short step while the task is incomplete; left "
+        "or right means turn a small amount toward it. Continue until the requested "
+        "result is evident; do not call the task complete after one step. If the "
+        "target is lost, search with one small turn at a time. After every action, "
+        "inspect a new image and telemetry before choosing another action. A clear "
+        "TOF reading permits forward movement; it is "
         "a safety boundary, not proof that a target is far away or that the task is "
         "incomplete. "
         "Commands use the body frame: forward and right are horizontal, and turns "
