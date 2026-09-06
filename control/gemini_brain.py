@@ -4,7 +4,6 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass
 from io import BytesIO
-import json
 import math
 import os
 import time
@@ -42,13 +41,14 @@ TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 8.0
 MAX_IMAGE_WIDTH = 640
-TEXT_ACTION_DUPLICATE_S = 5.0
 SPEAK_COOLDOWN_S = 8.0
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
+# Give ER2's normal tool response time to finish before prompting again.
+ACTION_RESULT_HEARTBEAT_DELAY_S = 3.0
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
 HEADING_STABILITY_RAD = math.radians(2.0)
@@ -109,10 +109,10 @@ class GeminiRuntime:
         self._needs_state_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
+        self._last_action_result_at_s: Optional[float] = None
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
-        self._last_heartbeat_at_s: Optional[float] = None
         self.latest_turn_duration_s: Optional[float] = None
         self.action_count = 0
         self.dialogue_count = 0
@@ -121,8 +121,6 @@ class GeminiRuntime:
         self._response_parts = []
         self._response_thoughts = []
         self._actions = []
-        self._last_executed_action = None
-        self._last_executed_action_at_s: Optional[float] = None
         self.thought_count = 0
         self.thought_token_count = 0
         self._memory_sent = False
@@ -321,6 +319,12 @@ class GeminiRuntime:
                                     or (
                                         self._needs_state_heartbeat
                                         and self._active_action is None
+                                        and self._last_action_result_at_s is not None
+                                        and (
+                                            time.monotonic()
+                                            - self._last_action_result_at_s
+                                            >= ACTION_RESULT_HEARTBEAT_DELAY_S
+                                        )
                                     )
                                 )
                                 if heartbeat_due:
@@ -330,10 +334,14 @@ class GeminiRuntime:
                                     # sending fresh frames while an action runs.
                                     await self._heartbeat(session, types)
                                 if receive_task is None:
-                                    receive_task = asyncio.create_task(
-                                        self._receive(session, types)
-                                    )
                                     response_started_s = time.monotonic()
+                                    receive_task = asyncio.create_task(
+                                        self._receive(
+                                            session,
+                                            types,
+                                            response_started_s,
+                                        )
+                                    )
                                 sent_at_s = time.monotonic()
                                 try:
                                     await asyncio.wait_for(
@@ -464,7 +472,6 @@ class GeminiRuntime:
         """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
-        self._last_heartbeat_at_s = time.monotonic()
         dialogue = ""
         if self._dialogue and self._dialogue_in_flight is None:
             dialogue = self._dialogue[0]
@@ -490,6 +497,7 @@ class GeminiRuntime:
             self._last_action_result = ""
         if self._active_action is None:
             self._needs_state_heartbeat = False
+            self._last_action_result_at_s = None
         if not self._memory_sent:
             self._memory_sent = True
         if self._bootstrap_pending:
@@ -533,8 +541,7 @@ class GeminiRuntime:
             and time.monotonic() - self._latest_frame_at_s <= MAX_FRAME_AGE_S
         )
 
-    async def _receive(self, session, types):
-        saw_tool_call = False
+    async def _receive(self, session, types, response_started_s):
         async for message in session.receive():
             turn_complete = False
             update = message.session_resumption_update
@@ -577,7 +584,6 @@ class GeminiRuntime:
                     return
             tool_call = message.tool_call
             if tool_call is not None:
-                saw_tool_call = True
                 responses = []
                 for call in tool_call.function_calls:
                     args = call.args or {}
@@ -614,11 +620,9 @@ class GeminiRuntime:
                 self._actions.clear()
                 return
             if turn_complete:
-                if not saw_tool_call:
-                    await self._execute_text_action()
                 self._acknowledge_dialogue()
                 self.turn_count += 1
-                self._finish_turn()
+                self._finish_turn(response_started_s)
                 return
 
     def _acknowledge_dialogue(self):
@@ -708,10 +712,6 @@ class GeminiRuntime:
             result = {"status": "rejected", "reason": "unknown tool"}
         if result.get("status") in ("started", "hovering", "spoken"):
             self.action_count += 1
-            signature = _action_signature(name, args)
-            if signature is not None:
-                self._last_executed_action = signature
-                self._last_executed_action_at_s = time.monotonic()
         if result.get("status") in ("rejected", "unavailable", "already_spoken"):
             reason = str(result.get("reason", "")).strip()
             action = f"{name} {result['status']}"
@@ -719,30 +719,6 @@ class GeminiRuntime:
                 action += f": {reason}"
             self._record_action(action)
         return result
-
-    async def _execute_text_action(self):
-        """Use visible action JSON when it is not a native-call echo."""
-
-        parsed = _parse_text_action(_model_text(self._response_parts))
-        if parsed is None:
-            return
-        if (
-            self._last_executed_action is not None
-            and self._last_executed_action_at_s is not None
-            and time.monotonic() - self._last_executed_action_at_s
-            <= TEXT_ACTION_DUPLICATE_S
-            and _action_signature(*parsed) == self._last_executed_action
-        ):
-            return
-        name, args = parsed
-        result = await self._execute(name, args)
-        if (
-            name in ("move", "turn")
-            and result.get("status") == "started"
-            and self._active_action is not None
-            and self._active_action.completion is not None
-        ):
-            await asyncio.shield(self._active_action.completion)
 
     async def _move(self, args: dict) -> dict:
         forward_m_s = _number_between(
@@ -1078,6 +1054,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._last_action_result_at_s = time.monotonic()
         self._needs_state_heartbeat = True
         self._finish_action_waiter(
             action,
@@ -1099,6 +1076,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._last_action_result_at_s = time.monotonic()
         self._needs_state_heartbeat = True
         self._finish_action_waiter(
             action,
@@ -1149,11 +1127,9 @@ class GeminiRuntime:
                 f"{_telemetry_text(self._telemetry)}; action={action}"
             )
 
-    def _finish_turn(self):
+    def _finish_turn(self, response_started_s):
         thought = _model_text(self._response_thoughts)
         response = _model_text(self._response_parts)
-        if _parse_text_action(response) is not None:
-            response = ""
         actions = tuple(self._actions)
         action = "; ".join(actions) or "none"
         self._response_thoughts.clear()
@@ -1164,11 +1140,7 @@ class GeminiRuntime:
         self.latest_action = action
         summary = thought or response or action
         now = time.monotonic()
-        self.latest_turn_duration_s = (
-            max(0.0, now - self._last_heartbeat_at_s)
-            if self._last_heartbeat_at_s is not None
-            else None
-        )
+        self.latest_turn_duration_s = max(0.0, now - response_started_s)
         if thought:
             self.thought_count += 1
             print(f"Gemini thought: {thought}", flush=True)
@@ -1374,12 +1346,6 @@ def _model_text(parts) -> str:
     """Return useful model text without empty structured-output placeholders."""
 
     value = " ".join("".join(parts).split())
-    for prefix in ("```json", "```", "{}", "[]", "null", "---"):
-        if value.startswith(prefix):
-            value = value[len(prefix):].lstrip(" :")
-            break
-    while value.endswith("---"):
-        value = value[:-3].rstrip()
     if (
         value.startswith("[START]")
         or value.startswith("[STATE]")
@@ -1393,90 +1359,7 @@ def _model_text(parts) -> str:
         "no tool call is necessary",
     }:
         return ""
-    if value.replace("```json", "").replace("```", "").strip() in {
-        "{}",
-        "[]",
-        "null",
-    }:
-        return ""
     return value
-
-
-def _parse_text_action(text: str):
-    """Return an existing tool call when ER2 writes it as a JSON object."""
-
-    candidate = text.strip()
-    if candidate.startswith("```"):
-        newline = candidate.find("\n")
-        if newline < 0:
-            return None
-        candidate = candidate[newline + 1 :].strip()
-        if candidate.endswith("```"):
-            candidate = candidate[:-3].rstrip()
-    if not candidate.startswith("{"):
-        return None
-    try:
-        value, end = json.JSONDecoder().raw_decode(candidate)
-    except json.JSONDecodeError:
-        return None
-    if candidate[end:].strip() not in ("", "```"):
-        return None
-    if not isinstance(value, dict):
-        return None
-    tool = value
-    for key in ("tool_call", "function_call"):
-        nested = value.get(key)
-        if isinstance(nested, dict):
-            tool = nested
-            break
-    name = tool.get("name") or tool.get("type") or tool.get("action")
-    if isinstance(name, str):
-        name = name.strip().lower()
-    args = tool.get("parameters") or tool.get("args") or value
-    if not isinstance(args, dict):
-        return None
-    if name == "ack":
-        return "ack", {}
-    if name == "hover":
-        return "hover", {}
-    if name == "speak" and isinstance(args.get("message"), str):
-        return "speak", {"message": args["message"]}
-    if name == "turn":
-        return "turn", {
-            "direction": args.get("direction"),
-            "angle_deg": args.get("angle_deg"),
-        }
-    if name == "move":
-        return "move", {
-            "forward_m_s": args.get("forward_m_s"),
-            "right_m_s": args.get("right_m_s"),
-            "duration_s": args.get("duration_s"),
-        }
-    return None
-
-
-def _action_signature(name: str, args: dict):
-    """Return comparable fields for one action in either ER2 format."""
-
-    if name in ("ack", "hover"):
-        return (name,)
-    if name == "speak":
-        message = args.get("message")
-        return (name, message) if isinstance(message, str) else None
-    if name == "turn":
-        return (
-            name,
-            str(args.get("direction", "")).strip().lower(),
-            args.get("angle_deg"),
-        )
-    if name == "move":
-        return (
-            name,
-            args.get("forward_m_s"),
-            args.get("right_m_s"),
-            args.get("duration_s"),
-        )
-    return None
 
 
 def _telemetry_text(telemetry: Telemetry) -> str:
