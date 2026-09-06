@@ -10,8 +10,8 @@ import time
 from mavsdk import System
 
 from control.command_packet import CommandPacket
-from control.mind import CompanionMind
-from control.mind_runtime import MindRuntime
+from sim.mind import CompanionMind
+from sim.mind_runtime import MindRuntime
 from control.udp_control import UdpControlService
 from control.velocity import VelocityCommand, ned_to_body
 from onboard.safety import LatestDistanceSensor

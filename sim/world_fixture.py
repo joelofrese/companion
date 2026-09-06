@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from control.mind import ConsciousDecision, VisualObservation
+from sim.mind import ConsciousDecision, VisualObservation
 from control.safety_limits import OBSTACLE_STOP_M
 from control.telemetry import Telemetry
 from control.velocity import VelocityCommand

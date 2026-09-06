@@ -1,6 +1,6 @@
 """Keep deterministic brain behavior for simulation fixtures."""
 
-from control.mind import ConsciousDecision, VisualObservation
+from sim.mind import ConsciousDecision, VisualObservation
 from control.telemetry import Telemetry
 
 

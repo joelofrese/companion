@@ -14,9 +14,9 @@ from typing import Optional
 from mavsdk import System
 
 from control.memory import CompanionMemory
-from control.mind import CompanionMind
+from sim.mind import CompanionMind
 from control.dialogue import DialogueInput
-from control.mind_runtime import (
+from sim.mind_runtime import (
     MAX_FRAME_GAP_S,
     MAX_MOVEMENT_AGE_S,
     MIN_MOVEMENT_CONFIDENCE,
