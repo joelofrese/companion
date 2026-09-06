@@ -100,6 +100,7 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._latest_user_request = ""
         self._active_action: Optional[ActiveAction] = None
+        self._holding = True
         self._needs_state_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
@@ -490,8 +491,8 @@ class GeminiRuntime:
             "image-right=body-right; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
-            "Use the newest image and state to choose what to do. Use an action "
-            "tool only when useful; otherwise do nothing."
+            "[HEARTBEAT] Inspect the newest image and state now. Use one action "
+            "tool if useful; otherwise do nothing."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -551,7 +552,6 @@ class GeminiRuntime:
             tool_call = message.tool_call
             if tool_call is not None:
                 saw_tool_call = True
-                self.action_count += len(tool_call.function_calls)
                 responses = []
                 for call in tool_call.function_calls:
                     result = await self._execute(
@@ -601,7 +601,7 @@ class GeminiRuntime:
         elif name == "hover":
             if (
                 self._active_action is None
-                and self.latest_action == "hover"
+                and self._holding
                 and not self._stop_requested
             ):
                 result = {
@@ -609,7 +609,6 @@ class GeminiRuntime:
                     "reason": "the vehicle is already holding position",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-                self._record_action("hover")
             elif self._active_action is not None and not self._stop_requested:
                 result = {
                     "status": "unavailable",
@@ -640,6 +639,8 @@ class GeminiRuntime:
                 result = {"status": "spoken"}
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
+        if result.get("status") in ("started", "hovering", "spoken"):
+            self.action_count += 1
         if result.get("status") in ("rejected", "unavailable"):
             reason = str(result.get("reason", "")).strip()
             action = f"{name} {result['status']}"
@@ -654,7 +655,6 @@ class GeminiRuntime:
         parsed = _parse_text_action(_model_text(self._response_parts))
         if parsed is None:
             return
-        self.action_count += 1
         name, args = parsed
         result = await self._execute(name, args)
         if (
@@ -708,6 +708,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._holding = False
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -757,6 +758,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._holding = False
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -1005,6 +1007,7 @@ class GeminiRuntime:
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
+        self._holding = True
 
     def _cancel_action(self, reason: str) -> str:
         action = self._active_action
@@ -1025,6 +1028,7 @@ class GeminiRuntime:
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
+        self._holding = True
         return self._action_label(action)
 
     def _action_response(
