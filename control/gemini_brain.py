@@ -32,17 +32,18 @@ START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
-MAX_MOVE_S = 1.0
+MAX_MOVE_S = 2.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 10.0
+MAX_TURN_DEG = 20.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 8.0
 MAX_IMAGE_WIDTH = 640
 TEXT_ACTION_DUPLICATE_S = 5.0
+SPEAK_COOLDOWN_S = 8.0
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
@@ -102,6 +103,7 @@ class GeminiRuntime:
         self._dialogue_generation = 0
         self._last_spoken_message = None
         self._last_spoken_generation = -1
+        self._last_spoken_at_s: Optional[float] = None
         self._active_action: Optional[ActiveAction] = None
         self._holding = True
         self._needs_state_heartbeat = False
@@ -669,6 +671,18 @@ class GeminiRuntime:
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
             elif (
+                self._last_spoken_at_s is not None
+                and self._dialogue_generation == self._last_spoken_generation
+                and time.monotonic() - self._last_spoken_at_s < SPEAK_COOLDOWN_S
+            ):
+                result = {
+                    "status": "unavailable",
+                    "reason": (
+                        f"wait {SPEAK_COOLDOWN_S:.0f} seconds between autonomous "
+                        "messages unless the user speaks"
+                    ),
+                }
+            elif (
                 message == self._last_spoken_message
                 and self._dialogue_generation == self._last_spoken_generation
             ):
@@ -681,6 +695,7 @@ class GeminiRuntime:
                 print(f"Companion: {message}", flush=True)
                 self._last_spoken_message = message
                 self._last_spoken_generation = self._dialogue_generation
+                self._last_spoken_at_s = time.monotonic()
                 result = {"status": "spoken"}
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
@@ -1183,9 +1198,11 @@ def _tools():
         {
             "name": "move",
             "description": (
-                "Move slowly in the body frame for a short time. "
+                "Move slowly in the body frame for a short, chosen duration. "
                 "Forward is positive and right is positive. If a visible target is "
-                "centered and the range is clear, prefer a short forward move."
+                "centered and the range is clear, move toward it. Use a shorter "
+                "duration when close or uncertain and a longer one when the path "
+                "is clearly open."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1213,7 +1230,10 @@ def _tools():
                     },
                     "duration_s": {
                         "type": "NUMBER",
-                        "description": f"A duration from {MIN_MOVE_S} through {MAX_MOVE_S} seconds.",
+                        "description": (
+                            f"A duration from {MIN_MOVE_S} through {MAX_MOVE_S} "
+                            "seconds."
+                        ),
                         "minimum": MIN_MOVE_S,
                         "maximum": MAX_MOVE_S,
                     },
@@ -1226,8 +1246,9 @@ def _tools():
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
                 "Choose the angle yourself from the current image and heading; "
-                "the user does not need to provide it. Prefer the smallest "
-                "correction, usually 3 to 8 degrees. "
+                "the user does not need to provide it. Use a small correction when "
+                "nearly aligned and a larger deliberate turn when the view clearly "
+                "requires it. "
                 "After one turn, reassess from a new image before turning again."
             ),
             "behavior": "BLOCKING",
@@ -1275,7 +1296,9 @@ def _tools():
             "name": "speak",
             "description": (
                 "Say one short message to the nearby user. Do not repeat a greeting "
-                "or observation unless the user or scene gives a new reason."
+                "or observation unless the user or scene gives a new reason. Leave "
+                "a pause between autonomous messages; answer new user dialogue "
+                "without waiting."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1310,15 +1333,17 @@ def _system_instruction() -> str:
         "available again. Then inspect the newest image and telemetry before choosing "
         "another physical action. Use the measured action result and "
         "current heading from telemetry to correct the next action; never repeat a "
-        "movement or turn without a fresh view. Use slow, "
-        "short body-frame horizontal moves and relative yaw turns, normally 3 to 8 "
-        "degrees and never more than the tool limit. A valid clear TOF reading is "
-        "required before translation. CM5 and PX4 handle safety and stability; never "
+        "movement or turn without a fresh view. Use slow body-frame horizontal moves "
+        "and relative yaw turns; use a small correction when nearly aligned and a "
+        "larger deliberate turn when needed, never more than the tool limit. A "
+        "valid clear TOF reading is required before translation. CM5 and PX4 handle "
+        "safety and stability; never "
         "request motors, attitude, altitude, position, or long motion. Choose only one "
         "physical action at a time. Hover for explicit stop or stale, unclear, or "
         "unsafe state, and do not repeat hover while already hovering. Do not repeat "
         "a greeting or observation without a new user message or meaningful event. "
-        "Speak only to answer the user or report a meaningful event."
+        "Leave a pause between autonomous messages. Speak only to answer the user "
+        "or report a meaningful event."
     )
 
 
