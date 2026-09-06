@@ -23,9 +23,7 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 # Favor timely closed-loop control over long internal deliberation.
 THINKING_BUDGET = 1024
-# Give the first turn a short retry window so a transient startup stall does not
-# consume most of a short flight. Later turns may need to include an action.
-INITIAL_RESPONSE_TIMEOUT_S = 20.0
+# Keep a slow model turn alive; the CM5 holds zero motion while it runs.
 RESPONSE_TIMEOUT_S = 60.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
@@ -313,15 +311,7 @@ class GeminiRuntime:
                                 elif (
                                     response_started_s is not None
                                     and time.monotonic() - response_started_s
-                                    > (
-                                        INITIAL_RESPONSE_TIMEOUT_S
-                                        if (
-                                            self.session_reconnect_count == 0
-                                            and self.turn_count == 0
-                                            and self.tool_call_count == 0
-                                        )
-                                        else RESPONSE_TIMEOUT_S
-                                    )
+                                    > RESPONSE_TIMEOUT_S
                                 ):
                                     raise TimeoutError(
                                         "Gemini did not complete its response"
