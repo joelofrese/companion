@@ -731,10 +731,12 @@ class GeminiRuntime:
                 return {
                     "status": "unavailable",
                     "reason": (
-                        "one move or turn was already chosen for this state; wait "
-                        "for the next fresh image and telemetry"
+                        "end this response; one move or turn was already chosen. "
+                        "Wait for the next fresh image and telemetry before "
+                        "choosing another physical action"
                     ),
                     "movement_tools": "unavailable until the next state heartbeat",
+                    "next_state_required": True,
                     "telemetry": _telemetry_text(self._telemetry),
                 }
             return None
