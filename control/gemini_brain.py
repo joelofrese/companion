@@ -47,8 +47,6 @@ ACTION_GRACE_S = 3.0
 ACTION_SETTLE_S = 1.0
 MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
-# Give ER2's normal tool response time to finish before prompting again.
-ACTION_RESULT_HEARTBEAT_DELAY_S = 3.0
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
 HEADING_STABILITY_RAD = math.radians(2.0)
@@ -105,10 +103,8 @@ class GeminiRuntime:
         self._last_spoken_generation = -1
         self._last_spoken_at_s: Optional[float] = None
         self._active_action: Optional[ActiveAction] = None
-        self._needs_state_heartbeat = False
         self._stop_requested = False
         self._last_action_result = ""
-        self._last_action_result_at_s: Optional[float] = None
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
@@ -316,16 +312,6 @@ class GeminiRuntime:
                                         self._dialogue
                                         and self._dialogue_in_flight is None
                                     )
-                                    or (
-                                        self._needs_state_heartbeat
-                                        and self._active_action is None
-                                        and self._last_action_result_at_s is not None
-                                        and (
-                                            time.monotonic()
-                                            - self._last_action_result_at_s
-                                            >= ACTION_RESULT_HEARTBEAT_DELAY_S
-                                        )
-                                    )
                                 )
                                 if heartbeat_due:
                                     # Heartbeats start reasoning and interrupt a
@@ -489,14 +475,10 @@ class GeminiRuntime:
         if dialogue and self._dialogue_in_flight == dialogue:
             self._dialogue_send_complete = True
             self.dialogue_sent_count += 1
-        # The tool response already keeps this result in the session. Repeat it
-        # in one heartbeat so completion between heartbeats is easy to see, then
-        # stop copying stale text into every later heartbeat.
+        # Repeat a completed action once in the next heartbeat so the state is
+        # easy to see even when the model did not close its turn.
         if action_result and self._last_action_result == action_result:
             self._last_action_result = ""
-        if self._active_action is None:
-            self._needs_state_heartbeat = False
-            self._last_action_result_at_s = None
         if not self._memory_sent:
             self._memory_sent = True
         if self._bootstrap_pending:
@@ -831,16 +813,6 @@ class GeminiRuntime:
                     "movement_tools": "unavailable until hovering is acknowledged",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-            if self._needs_state_heartbeat:
-                return {
-                    "status": "unavailable",
-                    "reason": (
-                        "the previous physical action is complete; wait for the "
-                        "next state heartbeat before choosing another"
-                    ),
-                    "movement_tools": "unavailable until the next state heartbeat",
-                    "telemetry": _telemetry_text(self._telemetry),
-                }
             return None
         reason = (
             "safety telemetry is currently holding the action; it will resume "
@@ -881,12 +853,7 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             if self._last_action_result:
-                availability = (
-                    "movement tools unavailable until the next state heartbeat"
-                    if self._needs_state_heartbeat
-                    else "movement tools available"
-                )
-                return f"{self._last_action_result}; {availability}"
+                return f"{self._last_action_result}; movement tools available"
             return "none; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
@@ -1050,8 +1017,6 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
-        self._last_action_result_at_s = time.monotonic()
-        self._needs_state_heartbeat = True
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -1071,8 +1036,6 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
-        self._last_action_result_at_s = time.monotonic()
-        self._needs_state_heartbeat = True
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
@@ -1094,7 +1057,7 @@ class GeminiRuntime:
             "action": result,
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
-            "movement_tools": "available after the next state heartbeat",
+            "movement_tools": "available now",
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
