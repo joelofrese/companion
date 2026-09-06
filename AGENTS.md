@@ -142,9 +142,10 @@ invalid-command, brain-shutdown, and Gemini-reconnect schedule into an
 exploratory run. Add `--headless` for unattended runs without the Gazebo GUI.
 
 The companion-owned `objects` world adds simple colored shapes and a primitive
-mannequin for visual exploration. The runner starts the vehicle at zero yaw
-and leaves the Gazebo camera user-controlled. Camera and depth explorations
-default to this world; other exploratory runs use the empty stock world.
+mannequin for visual exploration. The runner starts the vehicle at zero yaw,
+warms the Gazebo camera after vehicle spawn, and leaves the camera
+user-controlled. Camera and depth explorations default to this world; other
+exploratory runs use the empty stock world.
 Oversized simulation frames are reduced to the real 640-pixel camera width
 before the brain sees them. Because `objects` contains collidable objects, use
 `--depth` for moving goals such as following. Camera-only runs have no forward

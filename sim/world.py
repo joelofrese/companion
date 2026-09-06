@@ -93,6 +93,9 @@ from sim.world_fixture import (
 from voice.intent import parse_focus, parse_intent
 
 
+CAMERA_WARMUP_S = 2.0
+
+
 async def run(
     exploratory: bool = False,
     faults: bool = False,
@@ -242,6 +245,10 @@ async def run(
         heading_deg = await prepare(drone)
         armed = True
         current_heading_deg = heading_deg
+        if gazebo_camera is not None:
+            # The first rendered frames can arrive while Gazebo is still
+            # spawning the vehicle. Give the brain a settled view.
+            await asyncio.sleep(CAMERA_WARMUP_S)
         if moving_person:
             person_motion = GazeboPoseAnimator(
                 world_name,

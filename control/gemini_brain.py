@@ -554,12 +554,12 @@ class GeminiRuntime:
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "move":
-            return await self._move(args)
-        if name == "turn":
-            return await self._turn(args)
-        if name == "hover":
+            result = await self._move(args)
+        elif name == "turn":
+            result = await self._turn(args)
+        elif name == "hover":
             if self._active_action is not None and not self._stop_requested:
-                return {
+                result = {
                     "status": "unavailable",
                     "reason": (
                         "the physical action is still running; hover can "
@@ -569,22 +569,32 @@ class GeminiRuntime:
                     "movement_tools": "unavailable until the action completes",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-            self._stop_requested = False
-            cancelled = self._cancel_action("hover")
-            self._record_action("hover")
-            return {
-                "status": "hovering",
-                "cancelled_action": cancelled or "none",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
-        if name == "speak":
+            else:
+                self._stop_requested = False
+                cancelled = self._cancel_action("hover")
+                self._record_action("hover")
+                result = {
+                    "status": "hovering",
+                    "cancelled_action": cancelled or "none",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
+        elif name == "speak":
             message = str(args.get("message", "")).strip()
             if not message:
-                return {"status": "rejected", "reason": "message is required"}
-            self._record_action(f"speak: {message}")
-            print(f"Companion: {message}", flush=True)
-            return {"status": "spoken"}
-        return {"status": "rejected", "reason": "unknown tool"}
+                result = {"status": "rejected", "reason": "message is required"}
+            else:
+                self._record_action(f"speak: {message}")
+                print(f"Companion: {message}", flush=True)
+                result = {"status": "spoken"}
+        else:
+            result = {"status": "rejected", "reason": "unknown tool"}
+        if result.get("status") in ("rejected", "unavailable"):
+            reason = str(result.get("reason", "")).strip()
+            action = f"{name} {result['status']}"
+            if reason:
+                action += f": {reason}"
+            self._record_action(action)
+        return result
 
     async def _move(self, args: dict) -> dict:
         forward_m_s = _number_between(
@@ -1108,18 +1118,22 @@ def _system_instruction() -> str:
         "allows it and choose small speed, direction, angle, and duration yourself. "
         "Honor a direct user movement or waiting request unless the state is unsafe; "
         "do not replace it with exploration. Otherwise, the request is a goal, not a "
-        "script. If the requested thing is visible, act on it before scanning elsewhere. "
-        "Commands use the body frame: forward and right are horizontal, and turns are "
-        "relative to the current heading. PX4 handles stability and altitude; the CM5 "
+        "script. If the requested thing is visible, use its current image position and "
+        "act toward it before scanning elsewhere. Image-left calls for a left turn and "
+        "image-right calls for a right turn. Commands use the body frame: forward and "
+        "right are horizontal, and turns are relative to the current heading. PX4 handles "
+        "stability and altitude; the CM5 "
         "may stop any action. Never request motors, attitude, altitude, position, or "
         "a long translation. "
         "Use a closed loop. Start only one move or turn at a time. Wait for its "
         "completion, observed heading or translation, and the next state heartbeat; "
         "then reassess the new image and telemetry. Requested speed and duration are "
-        "only setpoints; observed motion is the truth. After a turn, check whether the "
-        "subject moved toward the center. If it moved away, reverse instead of repeating "
-        "the same turn. Once it is centered, move toward it briefly and reassess. "
-        "Use small turns for alignment and repeat them for a broad search. "
+        "only setpoints; observed motion is the truth. Do not turn again just because "
+        "the last turn ended. Turn toward a visible subject only when its image position "
+        "calls for it; if it is centered, move toward it briefly or hover. After a turn, "
+        "check the new image. If the subject moved away, reverse instead of repeating the "
+        "same turn. Use small turns for alignment and repeat them only when the new image "
+        "still calls for a broader search. "
         "Keep taking purposeful small actions during an open-ended task unless it is "
         "complete, waiting, or unclear. Hover when the image, telemetry, or safety "
         "state is unclear. Speak when useful, and do not repeat the state block."
