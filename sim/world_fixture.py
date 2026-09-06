@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from sim.mind import ConsciousDecision, VisualObservation
-from control.safety_limits import OBSTACLE_STOP_M
+from control.safety_limits import BACKOFF_SPEED_M_S, OBSTACLE_STOP_M
 from control.telemetry import Telemetry
 from control.velocity import VelocityCommand
 from sim.offboard_control import (
@@ -108,6 +108,13 @@ class SyntheticWorld:
         if VELOCITY_TELEMETRY_START_S <= elapsed_s < VELOCITY_TELEMETRY_END_S:
             return WorldStep(velocity_fresh=False)
         if OBSTACLE_START_S <= elapsed_s < OBSTACLE_END_S:
+            if self.exploratory and self.faults:
+                return WorldStep(
+                    obstacle_distance_m=0.3,
+                    command_override=VelocityCommand(
+                        forward_m_s=BACKOFF_SPEED_M_S + 0.05
+                    ),
+                )
             return WorldStep(obstacle_distance_m=0.3)
         if OBSTACLE_END_S <= elapsed_s < RECOVERY_END_S:
             return WorldStep()
