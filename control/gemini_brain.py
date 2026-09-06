@@ -22,9 +22,8 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Keep the streaming loop responsive; ER2 still performs visual reasoning and
-# tool selection without reserving extra explicit thinking tokens.
-THINKING_BUDGET = 0
+# Reserve a small native budget for reasoning without making actions too slow.
+THINKING_BUDGET = 128
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 # Recover from a turn that produces no result before it consumes a short flight;
 # physical actions have their own completion deadline.
@@ -1359,25 +1358,34 @@ def _parse_text_action(text: str):
         return None
     if not isinstance(value, dict):
         return None
-    name = value.get("type") or value.get("action")
+    tool = value
+    for key in ("tool_call", "function_call"):
+        nested = value.get(key)
+        if isinstance(nested, dict):
+            tool = nested
+            break
+    name = tool.get("name") or tool.get("type") or tool.get("action")
     if isinstance(name, str):
         name = name.strip().lower()
+    args = tool.get("parameters") or tool.get("args") or value
+    if not isinstance(args, dict):
+        return None
     if name == "ack":
         return "ack", {}
     if name == "hover":
         return "hover", {}
-    if name == "speak" and isinstance(value.get("message"), str):
-        return "speak", {"message": value["message"]}
+    if name == "speak" and isinstance(args.get("message"), str):
+        return "speak", {"message": args["message"]}
     if name == "turn":
         return "turn", {
-            "direction": value.get("direction"),
-            "angle_deg": value.get("angle_deg"),
+            "direction": args.get("direction"),
+            "angle_deg": args.get("angle_deg"),
         }
     if name == "move":
         return "move", {
-            "forward_m_s": value.get("forward_m_s"),
-            "right_m_s": value.get("right_m_s"),
-            "duration_s": value.get("duration_s"),
+            "forward_m_s": args.get("forward_m_s"),
+            "right_m_s": args.get("right_m_s"),
+            "duration_s": args.get("duration_s"),
         }
     return None
 
