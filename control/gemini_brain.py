@@ -91,9 +91,6 @@ class GeminiRuntime:
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._active_action: Optional[ActiveAction] = None
-        self._needs_post_action_frame = False
-        self._frame_sequence = 0
-        self._action_finished_frame_sequence = 0
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -177,7 +174,6 @@ class GeminiRuntime:
         if frame is not None:
             self._latest_frame = frame
             self._latest_frame_at_s = time.monotonic()
-            self._frame_sequence += 1
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
@@ -277,9 +273,6 @@ class GeminiRuntime:
                         await self._frame_ready.wait()
                         if self._closed.is_set():
                             return
-                        video_task = asyncio.create_task(
-                            self._stream_video(session, types)
-                        )
                         try:
                             receive_task = None
                             response_started_s = None
@@ -287,14 +280,18 @@ class GeminiRuntime:
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
-                                if receive_task is None:
+                                if (
+                                    self._last_heartbeat_at_s is None
+                                    or time.monotonic() - self._last_heartbeat_at_s
+                                    >= VIDEO_PERIOD_S
+                                ):
                                     await self._heartbeat(session, types)
+                                    if response_started_s is None:
+                                        response_started_s = time.monotonic()
+                                if receive_task is None:
                                     receive_task = asyncio.create_task(
                                         self._receive(session, types)
                                     )
-                                    response_started_s = time.monotonic()
-                                elif self._dialogue:
-                                    await self._send_pending_dialogue(session, types)
                                 sent_at_s = time.monotonic()
                                 try:
                                     await asyncio.wait_for(
@@ -311,14 +308,29 @@ class GeminiRuntime:
                                         break
                                 elif (
                                     response_started_s is not None
+                                    and self._active_action is None
                                     and time.monotonic() - response_started_s
                                     > RESPONSE_TIMEOUT_S
                                 ):
-                                    raise TimeoutError(
-                                        "Gemini did not complete its response"
+                                    print(
+                                        "Gemini response stalled; requesting a fresh state turn.",
+                                        flush=True,
                                     )
-                                if video_task.done():
-                                    await video_task
+                                    receive_task.cancel()
+                                    await asyncio.gather(
+                                        receive_task,
+                                        return_exceptions=True,
+                                    )
+                                    self._response_parts.clear()
+                                    self._response_thoughts.clear()
+                                    self._actions.clear()
+                                    await self._heartbeat(session, types)
+                                    receive_task = asyncio.create_task(
+                                        self._receive(session, types)
+                                    )
+                                    response_started_s = time.monotonic()
+                                if self._active_action is not None:
+                                    response_started_s = time.monotonic()
                                 remaining_s = VIDEO_PERIOD_S - (
                                     time.monotonic() - sent_at_s
                                 )
@@ -330,15 +342,12 @@ class GeminiRuntime:
                                     except asyncio.TimeoutError:
                                         pass
                         finally:
-                            tasks = [video_task]
                             if receive_task is not None:
-                                tasks.append(receive_task)
-                            for task in tasks:
-                                task.cancel()
-                            await asyncio.gather(
-                                *tasks,
-                                return_exceptions=True,
-                            )
+                                receive_task.cancel()
+                                await asyncio.gather(
+                                    receive_task,
+                                    return_exceptions=True,
+                                )
                         self._session = None
                 except asyncio.CancelledError:
                     raise
@@ -378,15 +387,6 @@ class GeminiRuntime:
             self._error = error
             self._ready.set()
 
-    async def _stream_video(self, session, types):
-        """Keep the Live session supplied with the newest camera frame."""
-
-        while not self._closed.is_set():
-            try:
-                await asyncio.wait_for(self._closed.wait(), timeout=VIDEO_PERIOD_S)
-            except asyncio.TimeoutError:
-                await self._send_frame(session, types)
-
     async def _send_frame(self, session, types):
         """Send one current JPEG without waiting for a model decision."""
 
@@ -408,19 +408,15 @@ class GeminiRuntime:
         self.video_frame_count += 1
 
     async def _heartbeat(self, session, types):
-        """Send a fresh state prompt when Gemini is ready for a new turn."""
+        """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
-        if (
-            self._needs_post_action_frame
-            and self._frame_sequence > self._action_finished_frame_sequence
-            and self._has_fresh_frame()
-        ):
-            self._needs_post_action_frame = False
         self._last_heartbeat_at_s = time.monotonic()
         dialogue = self._dialogue[0] if self._dialogue else ""
         async with self._send_lock:
-            await session.send_realtime_input(text=self._heartbeat_text(dialogue))
+            await session.send_realtime_input(
+                text=self._heartbeat_text(dialogue)
+            )
         if not self._memory_sent:
             self._memory_sent = True
         if self._bootstrap_pending:
@@ -428,19 +424,6 @@ class GeminiRuntime:
         if dialogue:
             self._dialogue.popleft()
             self.dialogue_count += 1
-
-    async def _send_pending_dialogue(self, session, types):
-        """Interrupt the current turn with one new user message."""
-
-        if not self._dialogue:
-            return
-        await self._send_frame(session, types)
-        dialogue = self._dialogue.popleft()
-        self.dialogue_count += 1
-        async with self._send_lock:
-            await session.send_realtime_input(
-                text=self._heartbeat_text(dialogue)
-            )
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -459,8 +442,8 @@ class GeminiRuntime:
             f"Action: {self._action_state_text()}\n"
             "Inspect the latest image and current state. Decide for yourself whether "
             "to move, turn, hover, speak, or do nothing. Never infer that a move or "
-            "turn is safe from the image alone. A heartbeat does not require a tool "
-            "or a visible response."
+            "turn is safe from the image alone. On a routine heartbeat, do not repeat "
+            "status, speak, or call hover; if no action is needed, finish silently."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -710,14 +693,7 @@ class GeminiRuntime:
                     "movement_tools": "unavailable until hovering is acknowledged",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-            if not self._needs_post_action_frame:
-                return None
-            return {
-                "status": "unavailable",
-                "reason": "the last physical action finished; waiting for the next state heartbeat",
-                "movement_tools": "unavailable until the next state heartbeat",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
+            return None
         reason = (
             "safety telemetry is currently holding the action; it will resume "
             "when movement is permitted"
@@ -756,12 +732,6 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
-            if self._needs_post_action_frame:
-                result = self._last_action_result or "last action finished"
-                return (
-                    f"{result}; waiting for the next state heartbeat; "
-                    "movement tools unavailable until then"
-                )
             if self._last_action_result:
                 return f"{self._last_action_result}; movement tools available"
             return "none; movement tools available"
@@ -891,8 +861,6 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
-        self._needs_post_action_frame = True
-        self._action_finished_frame_sequence = self._frame_sequence
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -912,8 +880,6 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
-        self._needs_post_action_frame = True
-        self._action_finished_frame_sequence = self._frame_sequence
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
@@ -935,11 +901,7 @@ class GeminiRuntime:
             "action": result,
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
-            "movement_tools": (
-                "unavailable until the next state heartbeat"
-                if self._needs_post_action_frame
-                else "available"
-            ),
+            "movement_tools": "available",
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
@@ -1062,8 +1024,8 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by an angle relative to the current heading. "
-                "Use one small visual alignment correction and reassess from the next "
-                "image; repeat only when the new image calls for it."
+                "Prefer 5 to 10 degrees and use up to 30 only when clearly needed. "
+                "After one correction, reassess from a new image."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1114,29 +1076,30 @@ def _system_instruction() -> str:
 
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
-        "newest image, forward TOF distance, body velocity, heading, active action, "
-        "conversation, and previous action results. Choose freely whether to move, "
-        "turn, hover, speak, or do nothing. Start a physical action when the state "
-        "allows it and choose small speed, direction, angle, and duration yourself. "
-        "Honor a direct user movement or waiting request unless the state is unsafe; "
-        "do not replace it with exploration. Otherwise, the request is a goal, not a "
-        "script. If the requested thing is visible, act toward it before scanning "
-        "elsewhere. The forward camera's image-left is body-left and image-right is "
-        "body-right: make one small turn to align an off-center subject, then move "
-        "forward briefly when it is centered and the range is clear. "
-        "Commands use the body frame: forward and "
-        "right are horizontal, and turns are relative to the current heading. PX4 handles "
-        "stability and altitude; the CM5 "
-        "may stop any action. Never request motors, attitude, altitude, position, or "
-        "a long translation. "
-        "Use a closed loop. Start only one move or turn at a time. Wait for its "
-        "completion, observed heading or translation, and the next state heartbeat; "
-        "then reassess the new image and telemetry. Requested speed and duration are "
-        "only setpoints; observed motion is the truth. Do not repeat a turn without a "
-        "new image showing the subject off-center or a deliberate need to scan. "
-        "Keep taking purposeful small actions during an open-ended task unless it is "
-        "complete, waiting, or unclear. Hover when the image, telemetry, or safety "
-        "state is unclear. Speak when useful, and do not repeat the state block."
+        "newest camera image, forward TOF distance, body velocity, heading, active "
+        "action, conversation, and previous action results. At each state, choose "
+        "whether to move, turn, hover, speak, or do nothing. Honor a direct user "
+        "request unless the state is unsafe; otherwise treat the request as a goal, "
+        "not a script. "
+        "When a requested target is visible, use its image position: centered means "
+        "aligned, so move forward in a short step instead of turning; left or right "
+        "means make a small turn toward it. Prefer 5 to 10 degree turns and use a "
+        "larger turn only when clearly needed. After every action, inspect a new "
+        "image and telemetry before choosing another action. "
+        "A clear TOF reading permits forward movement toward a requested target; "
+        "it is a safety boundary, not a reason to avoid the target. "
+        "Commands use the body frame: forward and right are horizontal, and turns "
+        "are relative to the current heading. PX4 handles stability and altitude; "
+        "the CM5 may stop any action. Never request motors, attitude, altitude, "
+        "position, or a long translation. "
+        "Start only one move or turn at a time and wait for its blocking result, "
+        "observed heading or translation, and a fresh state before moving again. "
+        "Requested speed and duration are setpoints; observed motion is the truth. "
+        "Keep taking purposeful small actions during an open-ended task unless it "
+        "is complete, waiting, or unclear. Hover when the image, telemetry, or "
+        "safety state is unclear. Speak only for the user or a meaningful event; "
+        "do not repeat idle status. Hover is the default no-action state, so do "
+        "not call it repeatedly while already hovering."
     )
 
 
