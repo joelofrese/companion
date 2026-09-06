@@ -22,6 +22,9 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
+# Keep the streaming loop responsive; ER2 still performs visual reasoning and
+# tool selection without reserving extra explicit thinking tokens.
+THINKING_BUDGET = 0
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 # Recover from a turn that produces no result before it consumes a short flight;
 # physical actions have their own completion deadline.
@@ -95,6 +98,9 @@ class GeminiRuntime:
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._latest_user_request = ""
+        self._dialogue_generation = 0
+        self._last_spoken_message = None
+        self._last_spoken_generation = -1
         self._active_action: Optional[ActiveAction] = None
         self._holding = True
         self._needs_state_heartbeat = False
@@ -156,6 +162,7 @@ class GeminiRuntime:
             return
         message = message.strip()
         self._latest_user_request = message
+        self._dialogue_generation += 1
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -261,6 +268,7 @@ class GeminiRuntime:
                         tools=_tools(),
                         system_instruction=_system_instruction(),
                         thinking_config=types.ThinkingConfig(
+                            thinking_budget=THINKING_BUDGET,
                             include_thoughts=True,
                         ),
                         context_window_compression=(
@@ -633,9 +641,19 @@ class GeminiRuntime:
             message = str(args.get("message", "")).strip()
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
+            elif (
+                message == self._last_spoken_message
+                and self._dialogue_generation == self._last_spoken_generation
+            ):
+                result = {
+                    "status": "already_spoken",
+                    "reason": "wait for new dialogue or a meaningful new event",
+                }
             else:
                 self._record_action(f"speak: {message}")
                 print(f"Companion: {message}", flush=True)
+                self._last_spoken_message = message
+                self._last_spoken_generation = self._dialogue_generation
                 result = {"status": "spoken"}
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
@@ -645,7 +663,7 @@ class GeminiRuntime:
             if signature is not None:
                 self._last_executed_action = signature
                 self._last_executed_action_at_s = time.monotonic()
-        if result.get("status") in ("rejected", "unavailable"):
+        if result.get("status") in ("rejected", "unavailable", "already_spoken"):
             reason = str(result.get("reason", "")).strip()
             action = f"{name} {result['status']}"
             if reason:
