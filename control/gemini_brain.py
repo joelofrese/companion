@@ -21,10 +21,12 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Keep enough reasoning room for spatial decisions without making each turn wait.
-THINKING_BUDGET = 256
+# Keep the reasoning budget small enough for responsive closed-loop turns.
+THINKING_BUDGET = 128
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
-RESPONSE_TIMEOUT_S = 30.0
+# Recover from a model turn that produces no result before it consumes a short
+# flight; physical actions have their own completion deadline.
+RESPONSE_TIMEOUT_S = 15.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
