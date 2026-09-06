@@ -22,9 +22,6 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Keep the real-time loop responsive; ER2 still performs visual reasoning and
-# tool selection without reserving extra explicit thinking tokens.
-THINKING_BUDGET = 0
 # Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
 # Recover from a turn that produces no result before it consumes a short flight;
 # physical actions have their own completion deadline.
@@ -264,7 +261,6 @@ class GeminiRuntime:
                         tools=_tools(),
                         system_instruction=_system_instruction(),
                         thinking_config=types.ThinkingConfig(
-                            thinking_budget=THINKING_BUDGET,
                             include_thoughts=True,
                         ),
                         context_window_compression=(
@@ -343,7 +339,7 @@ class GeminiRuntime:
                                     > RESPONSE_TIMEOUT_S
                                 ):
                                     print(
-                                        "Gemini response stalled; requesting a fresh state turn.",
+                                        "Gemini response stalled; reconnecting the session.",
                                         flush=True,
                                     )
                                     receive_task.cancel()
@@ -354,8 +350,8 @@ class GeminiRuntime:
                                     self._response_parts.clear()
                                     self._response_thoughts.clear()
                                     self._actions.clear()
-                                    receive_task = None
-                                    response_started_s = None
+                                    self._reconnect_requested = True
+                                    break
                                 if self._active_action is not None:
                                     response_started_s = time.monotonic()
                                 remaining_s = VIDEO_PERIOD_S - (
