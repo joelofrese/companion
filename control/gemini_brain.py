@@ -114,6 +114,7 @@ class GeminiRuntime:
         self.latest_action = "stop"
         self.latest_turn_duration_s: Optional[float] = None
         self.action_count = 0
+        self.dialogue_sent_count = 0
         self.dialogue_count = 0
         self.turn_count = 0
         self.video_frame_count = 0
@@ -487,6 +488,7 @@ class GeminiRuntime:
                 raise
         if dialogue and self._dialogue_in_flight == dialogue:
             self._dialogue_send_complete = True
+            self.dialogue_sent_count += 1
         # The tool response already keeps this result in the session. Repeat it
         # in one heartbeat so completion between heartbeats is easy to see, then
         # stop copying stale text into every later heartbeat.
