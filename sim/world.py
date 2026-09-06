@@ -495,7 +495,7 @@ async def run(
         last_observation_signature = None
         last_decision_signature = None
         last_traced_command = None
-        last_traced_gemini_tool_calls = 0
+        last_traced_gemini_actions = 0
         last_traced_gemini_thought = ""
         last_traced_gemini_response = ""
         last_traced_gemini_action = "stop"
@@ -572,7 +572,7 @@ async def run(
             nonlocal last_traced_observation, last_traced_decision
             nonlocal last_observation_signature, last_decision_signature
             nonlocal last_traced_command
-            nonlocal last_traced_gemini_tool_calls
+            nonlocal last_traced_gemini_actions
             nonlocal last_traced_gemini_thought, last_traced_gemini_response
             nonlocal last_traced_gemini_action
             if not trace:
@@ -604,16 +604,16 @@ async def run(
                     last_traced_gemini_response = control.latest_response
                 if (
                     control.latest_action != last_traced_gemini_action
-                    or control.tool_call_count != last_traced_gemini_tool_calls
+                    or control.action_count != last_traced_gemini_actions
                 ):
                     print(
                         f"[Gemini {elapsed_s:5.1f}s] action="
                         f"{clean(control.latest_action)}; "
-                        f"tool-calls={control.tool_call_count}",
+                        f"actions={control.action_count}",
                         flush=True,
                     )
                     last_traced_gemini_action = control.latest_action
-                    last_traced_gemini_tool_calls = control.tool_call_count
+                    last_traced_gemini_actions = control.action_count
                 if control.turn_count != last_traced_decision:
                     if (
                         control.latest_thought
@@ -691,7 +691,7 @@ async def run(
                 if gemini:
                     reason = (
                         "waiting for the first Gemini action or turn"
-                        if control.tool_call_count == 0 and control.turn_count == 0
+                        if control.action_count == 0 and control.turn_count == 0
                         else "Gemini chose to hover or its short action expired"
                     )
                 else:
@@ -903,7 +903,7 @@ async def run(
                 raise RuntimeError("SITL did not stream Gemini video frames")
             print(
                 "Gemini turns/actions observed: "
-                f"{control.turn_count} turns, {control.tool_call_count} tool calls."
+                f"{control.turn_count} turns, {control.action_count} actions."
             )
             print(f"Gemini live video frames=verified ({control.video_frame_count}).")
         if memory_store is not None:

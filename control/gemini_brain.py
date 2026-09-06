@@ -4,6 +4,7 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass
 from io import BytesIO
+import json
 import math
 import os
 import time
@@ -105,7 +106,7 @@ class GeminiRuntime:
         self.latest_action = "stop"
         self._last_heartbeat_at_s: Optional[float] = None
         self.latest_turn_duration_s: Optional[float] = None
-        self.tool_call_count = 0
+        self.action_count = 0
         self.dialogue_count = 0
         self.turn_count = 0
         self.video_frame_count = 0
@@ -511,6 +512,7 @@ class GeminiRuntime:
         )
 
     async def _receive(self, session, types):
+        saw_tool_call = False
         async for message in session.receive():
             turn_complete = False
             update = message.session_resumption_update
@@ -546,7 +548,8 @@ class GeminiRuntime:
                 )
             tool_call = message.tool_call
             if tool_call is not None:
-                self.tool_call_count += len(tool_call.function_calls)
+                saw_tool_call = True
+                self.action_count += len(tool_call.function_calls)
                 responses = []
                 for call in tool_call.function_calls:
                     result = await self._execute(
@@ -582,6 +585,8 @@ class GeminiRuntime:
                 self._actions.clear()
                 return
             if turn_complete:
+                if not saw_tool_call:
+                    await self._execute_text_action()
                 self.turn_count += 1
                 self._finish_turn()
                 return
@@ -629,6 +634,23 @@ class GeminiRuntime:
                 action += f": {reason}"
             self._record_action(action)
         return result
+
+    async def _execute_text_action(self):
+        """Run a valid action object when ER2 returns it as visible text."""
+
+        parsed = _parse_text_action(_model_text(self._response_parts))
+        if parsed is None:
+            return
+        self.action_count += 1
+        name, args = parsed
+        result = await self._execute(name, args)
+        if (
+            name in ("move", "turn")
+            and result.get("status") == "started"
+            and self._active_action is not None
+            and self._active_action.completion is not None
+        ):
+            await asyncio.shield(self._active_action.completion)
 
     async def _move(self, args: dict) -> dict:
         forward_m_s = _number_between(
@@ -1250,6 +1272,37 @@ def _model_text(parts) -> str:
     }:
         return ""
     return value
+
+
+def _parse_text_action(text: str):
+    """Return an existing tool call when ER2 writes it as a JSON object."""
+
+    start = text.find("{")
+    if start < 0:
+        return None
+    try:
+        value, _ = json.JSONDecoder().raw_decode(text[start:])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    name = value.get("type")
+    if name == "hover":
+        return "hover", {}
+    if name == "speak" and isinstance(value.get("message"), str):
+        return "speak", {"message": value["message"]}
+    if name == "turn":
+        return "turn", {
+            "direction": value.get("direction"),
+            "angle_deg": value.get("angle_deg"),
+        }
+    if name == "move":
+        return "move", {
+            "forward_m_s": value.get("forward_m_s"),
+            "right_m_s": value.get("right_m_s"),
+            "duration_s": value.get("duration_s"),
+        }
+    return None
 
 
 def _telemetry_text(telemetry: Telemetry) -> str:
