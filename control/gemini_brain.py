@@ -29,6 +29,8 @@ THINKING_BUDGET = 0
 # Recover from a model turn that produces no result before it consumes a short
 # flight; physical actions have their own completion deadline.
 RESPONSE_TIMEOUT_S = 20.0
+# Allow a normal model turn to finish before interrupting it with a new view.
+RESPONSE_NUDGE_S = 8.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -293,20 +295,29 @@ class GeminiRuntime:
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
-                                # A heartbeat is a user turn and interrupts model
-                                # generation. Start one only when the model is
-                                # idle, except during a physical action so the
-                                # model can observe its progress; queued dialogue
-                                # may interrupt once so the user does not wait.
-                                if (
+                                if receive_task is not None and receive_task.done():
+                                    await receive_task
+                                    receive_task = None
+                                    response_started_s = None
+                                    if self._reconnect_requested:
+                                        break
+                                now = time.monotonic()
+                                heartbeat_due = (
                                     receive_task is None
                                     or self._dialogue
                                     or self._active_action is not None
                                     or self._needs_state_heartbeat
-                                ):
+                                    or (
+                                        self._last_heartbeat_at_s is not None
+                                        and now - self._last_heartbeat_at_s
+                                        >= RESPONSE_NUDGE_S
+                                    )
+                                )
+                                if heartbeat_due:
+                                    # Heartbeats start reasoning and interrupt
+                                    # stale generation. Keep them frequent during
+                                    # actions, but give a normal response time to finish.
                                     await self._heartbeat(session, types)
-                                    if receive_task is not None:
-                                        response_started_s = time.monotonic()
                                 if receive_task is None:
                                     receive_task = asyncio.create_task(
                                         self._receive(session, types)
@@ -344,11 +355,8 @@ class GeminiRuntime:
                                     self._response_parts.clear()
                                     self._response_thoughts.clear()
                                     self._actions.clear()
-                                    await self._heartbeat(session, types)
-                                    receive_task = asyncio.create_task(
-                                        self._receive(session, types)
-                                    )
-                                    response_started_s = time.monotonic()
+                                    receive_task = None
+                                    response_started_s = None
                                 if self._active_action is not None:
                                     response_started_s = time.monotonic()
                                 remaining_s = VIDEO_PERIOD_S - (
@@ -482,20 +490,14 @@ class GeminiRuntime:
             "image-right=body-right; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
-            "Inspect the latest image and current state. Decide for yourself whether "
-            "to move, turn, hover, speak, or do nothing. To move, call `move`; to turn, "
-            "call `turn`; to stop, call `hover`; to talk, call `speak`. If you choose "
-            "an action, call its tool now. Never write action JSON, a code block, or "
-            "a prose description in place of a tool call. Never infer that a move or "
-            "turn is safe from the image alone. On a routine heartbeat, do not repeat "
-            "status, speak, or call hover. Do not move, turn, or speak merely because "
-            "a heartbeat arrived; if the scene and goal are unchanged, finish silently."
+            "Use the newest image and state to choose what to do. Use an action "
+            "tool only when useful; otherwise do nothing."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
-        elif self._latest_user_request:
+        elif self._bootstrap_pending and self._latest_user_request:
             state += (
-                "\nActive user request (keep working on it until completed or changed): "
+                "\nPrevious user request from before this session restarted: "
                 f"{self._latest_user_request}"
             )
         if memory:
@@ -597,7 +599,18 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "hover":
-            if self._active_action is not None and not self._stop_requested:
+            if (
+                self._active_action is None
+                and self.latest_action == "hover"
+                and not self._stop_requested
+            ):
+                result = {
+                    "status": "already_hovering",
+                    "reason": "the vehicle is already holding position",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
+                self._record_action("hover")
+            elif self._active_action is not None and not self._stop_requested:
                 result = {
                     "status": "unavailable",
                     "reason": (
@@ -1180,14 +1193,18 @@ def _tools():
             "description": (
                 "Stop horizontal motion and hold position. Use this when the "
                 "task is complete, while waiting, or when the scene is unclear. "
-                "It can interrupt a movement only for an explicit stop."
+                "If already holding position, do nothing instead. It can interrupt "
+                "a movement only for an explicit stop."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
         },
         {
             "name": "speak",
-            "description": "Say one short message to the nearby user.",
+            "description": (
+                "Say one short message to the nearby user. Do not repeat a greeting "
+                "or observation unless the user or scene gives a new reason."
+            ),
             "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
@@ -1226,8 +1243,9 @@ def _system_instruction() -> str:
         "required before translation. CM5 and PX4 handle safety and stability; never "
         "request motors, attitude, altitude, position, or long motion. Choose only one "
         "physical action at a time. Hover for explicit stop or stale, unclear, or "
-        "unsafe state, and do not repeat hover while already hovering. Speak only to "
-        "answer the user or report a meaningful event."
+        "unsafe state, and do not repeat hover while already hovering. Do not repeat "
+        "a greeting or observation without a new user message or meaningful event. "
+        "Speak only to answer the user or report a meaningful event."
     )
 
 
