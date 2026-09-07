@@ -23,8 +23,8 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
 THINKING_BUDGET = 32
-# Give ER2 one fresh state only when it does not continue after a physical result.
-POST_ACTION_NUDGE_S = 8.0
+# Prompt the next decision as soon as a blocking action has returned its result.
+POST_ACTION_NUDGE_S = 0.0
 # Let one native reasoning turn finish before treating the session as stalled.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
