@@ -1258,6 +1258,11 @@ def _tools():
                     "direction": {
                         "type": "STRING",
                         "enum": ["left", "right"],
+                        "description": (
+                            "Choose left when the target is on image-left and "
+                            "right when it is on image-right. This is relative "
+                            "to the current nose, not the room."
+                        ),
                     },
                     "angle_deg": {
                         "type": "NUMBER",
@@ -1335,7 +1340,9 @@ def _system_instruction() -> str:
         "the center third of the image, stop turning and reassess whether to move or "
         "acknowledge. After a turn, only turn the same direction again if the newest "
         "image still shows the target outside that center third, and make the correction "
-        "smaller. Choose angles, speeds, and durations yourself; the user does not need "
+        "smaller. Before each turn, use the newest image: image-left means `left`, "
+        "image-right means `right`; do not reuse the opposite direction from an older "
+        "image. Choose angles, speeds, and durations yourself; the user does not need "
         "to provide them.\n\n"
         "After every move or turn, wait for its measured result and then a fresh camera "
         "frame before choosing another physical action. Use the new heading and result to "
