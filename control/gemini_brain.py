@@ -503,8 +503,11 @@ class GeminiRuntime:
             "image-right=body-right; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
-            "[HEARTBEAT] Inspect the newest image and state now. Use one action "
-            "tool if useful; if no physical action is useful, call `ack` or do nothing."
+            "[HEARTBEAT] Inspect the newest image and state now. If the task is "
+            "active and the scene is clear, choose one small safe physical action. "
+            "Do not use `ack` merely because this heartbeat arrived; use `ack` "
+            "only while waiting, when no safe progress is clear, or when no action "
+            "is needed."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -1338,7 +1341,9 @@ def _tools():
             "name": "ack",
             "description": (
                 "Acknowledge the newest image and telemetry without moving or "
-                "speaking. Use this when no physical action is useful yet."
+                "speaking. Use this only while waiting, when no safe progress is "
+                "clear, or when no action is needed; do not use it merely because "
+                "a heartbeat arrived during an active task."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
@@ -1382,7 +1387,8 @@ def _system_instruction() -> str:
         "autonomously with the tools: `move`, "
         "`turn`, `hover`, `speak`, or `ack`. Choose at most one tool per decision. "
         "When a small safe action is clear, act promptly rather than waiting for "
-        "perfect certainty. "
+        "perfect certainty. When a task is active and the scene is clear, do not "
+        "choose `ack` merely to defer the next action. "
         "Keep the user's request active until it is complete or changed, and describe "
         "only what the newest image supports. Use measured past motion to calibrate "
         "future commands, but trust current telemetry and the newest image first.\n\n"
