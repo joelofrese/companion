@@ -94,6 +94,7 @@ from sim.intent import parse_focus, parse_intent
 
 
 CAMERA_WARMUP_S = 2.0
+SNAPSHOT_AFTER_FRAMES = 10
 
 
 async def run(
@@ -251,7 +252,7 @@ async def run(
             person_motion = GazeboPoseAnimator(
                 world_name,
                 "person",
-                ((6.5, -1.6, 0.0), (6.5, -0.8, 0.0), (6.5, -2.4, 0.0)),
+                ((7.2, 3.0, 0.0), (7.2, 2.0, 0.0), (7.2, 4.0, 0.0)),
             )
             person_motion.start()
 
@@ -399,7 +400,11 @@ async def run(
                 camera_recovered = True
             if gazebo_camera is not None and frame is not None:
                 camera_frames += 1
-                if snapshot_path is not None and not snapshot_saved:
+                if (
+                    snapshot_path is not None
+                    and not snapshot_saved
+                    and camera_frames >= SNAPSHOT_AFTER_FRAMES
+                ):
                     from PIL import Image
 
                     snapshot_path.parent.mkdir(parents=True, exist_ok=True)

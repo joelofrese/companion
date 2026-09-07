@@ -45,7 +45,7 @@
     <model name="objects">
       <static>true</static>
       <link name="red_box">
-        <pose>6 0 0.9 0 0 0</pose>
+        <pose>7 0 0.9 0 0 0</pose>
         <collision name="collision">
           <geometry>
             <box><size>0.8 0.8 1.5</size></box>
@@ -63,7 +63,7 @@
       </link>
 
       <link name="blue_cylinder">
-        <pose>8 -2 0.6 0 0 0</pose>
+        <pose>8 -2.5 0.6 0 0 0</pose>
         <collision name="collision">
           <geometry>
             <cylinder><radius>0.45</radius><length>1.2</length></cylinder>
@@ -81,7 +81,7 @@
       </link>
 
       <link name="yellow_box">
-        <pose>8 2 0.4 0 0 0</pose>
+        <pose>8 1.5 0.4 0 0 0</pose>
         <collision name="collision">
           <geometry>
             <box><size>1.0 0.8 0.8</size></box>
@@ -101,7 +101,7 @@
 
     <model name="person">
       <static>true</static>
-      <pose>6.5 -1.6 0 0 0 0</pose>
+      <pose>7.2 3.0 0 0 0 0</pose>
       <link name="body">
         <collision name="collision">
           <pose>0 0 1 0 0 0</pose>

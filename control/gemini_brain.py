@@ -495,8 +495,8 @@ class GeminiRuntime:
         camera = "fresh" if self._has_fresh_frame() else "stale or missing"
         state = (
             f"{start}[STATE]\n"
-            f"Camera: {camera}; forward-facing; image-left=body-left; "
-            "image-right=body-right; image-center=current heading\n"
+            f"Camera: {camera}; forward-facing; image-left=body-right; "
+            "image-right=body-left; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "[HEARTBEAT] Inspect the newest image and state now. Use one action "
@@ -1138,7 +1138,8 @@ def _tools():
                 "Forward is positive and right is positive. If a visible target is "
                 "centered and the range is clear, move toward it. Use a shorter "
                 "duration when close or uncertain and a longer one when the path "
-                "is clearly open."
+                "is clearly open. A completed movement only reports how far the "
+                "vehicle moved; it does not prove that a target was reached."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1263,7 +1264,9 @@ def _system_instruction() -> str:
         "or turn when it helps inspect or make progress; do not move merely because "
         "a heartbeat arrived. If the scene and goal are unchanged, do nothing. For any "
         "visual goal, use "
-        "its current position in the image: if it is centered and the path is clear, "
+        "its current position in the image. The camera is horizontally mirrored "
+        "relative to the body frame: image-left is body-right and image-right is "
+        "body-left. If it is centered and the path is clear, "
         "take a short step; if it is off-center, turn toward it; if it is unclear, "
         "reobserve or make one deliberate search turn. Choose movement amounts yourself; "
         "the user does not need to give exact angles or distances. After each move or "
@@ -1279,6 +1282,9 @@ def _system_instruction() -> str:
         "use a large turn for a small image offset. If a "
         "target is outside the view, make one scan in a chosen direction and inspect "
         "the new view before turning back. A "
+        "fresh image must show a requested object before claiming that it was found, "
+        "reached, or inspected; a movement result alone is not proof. Say when the "
+        "view is uncertain and keep observing. "
         "valid clear TOF reading is required before translation. CM5 and PX4 handle "
         "safety and stability; never "
         "request motors, attitude, altitude, position, or long motion. Choose only one "
