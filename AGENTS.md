@@ -146,9 +146,9 @@ checks camera transport through a deterministic zero-confidence fixture and
 keeps motion stopped. `--gemini` uses one streaming Gemini session.
 Camera-only runs still stop because they have no TOF reading. Use `--depth` when
 the brain should be allowed to move.
-Use `--trace` to print brain observations, native Gemini thought summaries,
-responses, actions, model latencies, and command reasons. Native thought
-summaries are optional; raw private reasoning is not exposed. Use
+Use `--trace` to print brain observations, every completed Gemini turn with its
+native thought summary, response, action, and latency, plus command reasons.
+Native thought summaries are optional; raw private reasoning is not exposed. Use
 `--snapshot PATH` to save a settled rendered frame for visual inspection. Use
 `--world`, `--duration`, `--request`,
 `--intent`, and `--memory` to vary the world, run length, dialogue, initial
@@ -217,7 +217,7 @@ safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
 completion response, which lets ER2 continue naturally. A quiet post-action turn
 gets one more state prompt after eight seconds, then starts a fresh session if it
-remains silent; ordinary turns use a 15-second stall timeout.
+remains silent; ordinary turns use a 20-second stall timeout.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -253,11 +253,14 @@ authoritative behavior trace.
   the next state heartbeat. After a physical action, the ordered tool response
   itself requests continuation. A quiet post-action turn gets one retry after
   eight seconds, then a fresh session if it remains silent; ordinary turns use
-  the 15-second timeout. The resumed session keeps
+  the 20-second timeout. The resumed session keeps
   the same situation, active request, and memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.
+  Open-world runs show accurate measured actions, but ER2 response latency
+  remains variable; traces expose every completed turn and its latency so
+  future improvements can follow observed behavior.
   Deterministic in-process brain fixtures remain only for repeatable simulation checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
