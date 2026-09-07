@@ -25,6 +25,8 @@ VIDEO_PERIOD_S = 1.0
 THINKING_BUDGET = 128
 # Let one native reasoning turn finish before treating the session as stalled.
 RESPONSE_TIMEOUT_S = 45.0
+# Re-prompt a silent decision before the longer session recovery timeout.
+RESPONSE_NUDGE_S = 8.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -132,6 +134,8 @@ class GeminiRuntime:
         self.session_reconnect_count = 0
         self._reconnect_requested = False
         self._last_model_activity_s: Optional[float] = None
+        self._last_model_output_s: Optional[float] = None
+        self._last_response_nudge_s: Optional[float] = None
         self._response_in_flight = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
@@ -315,6 +319,8 @@ class GeminiRuntime:
                                 if receive_task is None:
                                     response_started_s = time.monotonic()
                                     self._last_model_activity_s = response_started_s
+                                    self._last_model_output_s = response_started_s
+                                    self._last_response_nudge_s = None
                                     receive_task = asyncio.create_task(
                                         self._receive(
                                             session,
@@ -335,6 +341,7 @@ class GeminiRuntime:
                                     receive_task = None
                                     response_started_s = None
                                     self._last_model_activity_s = None
+                                    self._last_model_output_s = None
                                     if self._reconnect_requested:
                                         break
                                 elif (
@@ -453,6 +460,7 @@ class GeminiRuntime:
         # Keep streaming frames, but let each decision or blocking tool cycle
         # finish before prompting for another one.
         if self._response_in_flight:
+            await self._nudge_stalled_response(session)
             return
         dialogue = ""
         if self._dialogue and self._dialogue_in_flight is None:
@@ -483,6 +491,30 @@ class GeminiRuntime:
             self._memory_sent = True
         if self._bootstrap_pending:
             self._bootstrap_pending = False
+
+    async def _nudge_stalled_response(self, session):
+        """Interrupt one silent model response with current state."""
+
+        now = time.monotonic()
+        if (
+            self._active_action is not None
+            or self._last_model_output_s is None
+            or now - self._last_model_output_s < RESPONSE_NUDGE_S
+            or (
+                self._last_response_nudge_s is not None
+                and now - self._last_response_nudge_s < RESPONSE_NUDGE_S
+            )
+        ):
+            return
+        async with self._send_lock:
+            if not self._response_in_flight:
+                return
+            self._last_response_nudge_s = now
+            print(
+                "Gemini response silent; requesting a fresh state.",
+                flush=True,
+            )
+            await session.send_realtime_input(text=self._heartbeat_text(""))
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -532,7 +564,9 @@ class GeminiRuntime:
 
     async def _receive(self, session, types, response_started_s):
         async for message in session.receive():
-            self._last_model_activity_s = time.monotonic()
+            message_time = time.monotonic()
+            self._last_model_activity_s = message_time
+            model_output = False
             turn_complete = False
             update = message.session_resumption_update
             if update is not None and update.resumable and update.new_handle:
@@ -549,6 +583,7 @@ class GeminiRuntime:
             if content is not None:
                 turn = content.model_turn
                 if turn is not None and turn.parts:
+                    model_output = True
                     for part in turn.parts:
                         if not part.text:
                             continue
@@ -561,19 +596,23 @@ class GeminiRuntime:
                 else:
                     transcript = content.output_transcription
                     if transcript is not None and transcript.text:
+                        model_output = True
                         self._response_parts.append(transcript.text)
                 turn_complete = bool(
                     content.turn_complete or content.generation_complete
                 )
+                model_output = model_output or turn_complete
                 if content.interrupted:
                     # Keep completed tool effects, but let the next heartbeat
                     # start a clean decision cycle.
                     self._response_parts.clear()
                     self._response_thoughts.clear()
+                    self._actions.clear()
                     self._response_in_flight = False
                     return
             tool_call = message.tool_call
             if tool_call is not None:
+                model_output = True
                 responses = []
                 for call in tool_call.function_calls:
                     args = call.args or {}
@@ -610,7 +649,11 @@ class GeminiRuntime:
                         )
                     self._last_model_activity_s = time.monotonic()
             if message.tool_call_cancellation is not None:
+                model_output = True
                 self._cancel_action("Gemini cancelled it")
+
+            if model_output:
+                self._last_model_output_s = message_time
 
             if self._reconnect_requested:
                 self._response_parts.clear()
