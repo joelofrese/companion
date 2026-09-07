@@ -21,11 +21,13 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
+# Give a slow model response one fresh state prompt before reconnecting.
+HEARTBEAT_PERIOD_S = 15.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
 THINKING_BUDGET = 128
-# Give a slow model turn time to finish, but recover before a short flight is
-# spent waiting on a response that produced no action.
-RESPONSE_TIMEOUT_S = 30.0
+# Give a slow model turn time to finish, but retry before a short flight is
+# spent waiting on a stalled session.
+RESPONSE_TIMEOUT_S = 20.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -299,6 +301,7 @@ class GeminiRuntime:
                         try:
                             receive_task = None
                             response_started_s = None
+                            last_heartbeat_s = None
                             while (
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
@@ -309,19 +312,33 @@ class GeminiRuntime:
                                     response_started_s = None
                                     if self._reconnect_requested:
                                         break
+                                now = time.monotonic()
+                                slow_response = (
+                                    receive_task is not None
+                                    and response_started_s is not None
+                                    and self._active_action is None
+                                    and now - response_started_s >= HEARTBEAT_PERIOD_S
+                                )
                                 heartbeat_due = (
-                                    receive_task is None
+                                    last_heartbeat_s is None
+                                    or receive_task is None
                                     or (
                                         self._dialogue
                                         and self._dialogue_in_flight is None
                                     )
+                                    or (
+                                        slow_response
+                                        and last_heartbeat_s is not None
+                                        and now - last_heartbeat_s >= HEARTBEAT_PERIOD_S
+                                    )
                                 )
                                 if heartbeat_due:
-                                    # Heartbeats start reasoning and interrupt a
-                                    # generation. Let a normal turn and its tool
-                                    # response finish. The video task continues
-                                    # sending fresh frames while an action runs.
+                                    # Heartbeats start reasoning and may interrupt
+                                    # a slow generation. This keeps the model's
+                                    # state current while video continues during
+                                    # a physical action.
                                     await self._heartbeat(session, types)
+                                    last_heartbeat_s = time.monotonic()
                                 if receive_task is None:
                                     response_started_s = time.monotonic()
                                     receive_task = asyncio.create_task(
@@ -1214,15 +1231,10 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short, chosen duration. "
-                "Forward is positive and right is positive. Use this when a visible "
-                "target is centered or the forward path is clearly open and the range "
-                "is clear. Do not use forward motion to correct a target that is left "
-                "or right of center; turn first. When exploring without a target, a "
-                "short forward step is enough to learn more. Use a shorter "
-                "duration when close or uncertain and a longer one when the path "
-                "is clearly open. This physical call returns after measured completion. "
-                "A completed movement only reports how far the vehicle moved; it does "
-                "not prove that a target was reached."
+                "Forward is positive and right is positive. Use it only with a clear "
+                "path and valid range reading. Keep the step short when uncertain, "
+                "then inspect the next image. The physical call returns after measured "
+                "completion; it does not prove that a target was reached."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1264,28 +1276,10 @@ def _tools():
         {
             "name": "turn",
             "description": (
-                "Turn in place slowly by an angle relative to the current heading. "
-                "Choose the angle yourself from the current image and heading; "
-                "the user does not need to provide it. Use a small correction when "
-                "nearly aligned: about 2-4 degrees for a small offset and 5-8 "
-                "degrees near the edge. Use 8 degrees only for a broad scan. "
-                "If a visible target is off-center, turn toward it instead of moving. "
-                "A target on image-right requires a right turn, and a target on "
-                "image-left requires a left turn. "
-                "A target already visible in the frame is not a search: use the "
-                "smallest turn that brings it toward the image center. "
-                "When it reaches the center third of the image, stop turning and "
-                "reassess whether to move or acknowledge. After a turn, only turn "
-                "the same direction again if the newest image still shows the target "
-                "outside that center third, and make the correction smaller. "
-                "Compare the target's new position with the prior image: continue "
-                "only if it moved closer to center, reverse with a smaller correction "
-                "if it crossed center, and do not repeat blindly if the view did not "
-                "improve. "
-                "Never use a large turn for a small visual error. If the target is "
-                "not visible, make one deliberate scan, then reassess before reversing. "
-                "After one turn, reassess from a new image before turning again. "
-                "This physical call returns after the measured turn settles."
+                "Turn in place slowly by a relative angle. Choose the direction and "
+                "a small angle from the newest image and heading: image-left means "
+                "left, and image-right means right. After the physical call returns, "
+                "inspect the new image before choosing another movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1358,44 +1352,21 @@ def _system_instruction() -> str:
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, TOF distance, body velocity, heading, active action, "
-        "dialogue, and action result. The tools are the only way to act: use `move`, "
-        "`turn`, `hover`, `speak`, or `ack`. Choose at most one tool call per decision "
-        "or do nothing. Keep the user's request active until it is complete or changed. "
-        "When no specific target is named, treat clear people and objects in the current "
-        "view as possible subjects of exploration. Inspect the current frame before "
-        "scanning; do not turn merely because exploration was requested. Describe only "
-        "what the newest image supports; if it is unclear, say so instead of inventing "
-        "room details. "
-        "\n\n"
-        "Visual control: the camera is aligned with the body. Image-right is body-right "
-        "and requires a right turn; image-left requires a left turn. If a visible target "
-        "is off-center, turn toward it and do not move forward yet. Use `move` when the "
-        "target is centered or the forward path is clearly open. If there is no target, "
-        "a short forward step is a useful way to explore after a clear frame. If the target "
-        "is not visible, make one small deliberate scan and inspect the next image. A left "
-        "turn moves image contents toward image-right, and a right turn moves them toward "
-        "image-left. After each turn, check the newest image before turning again. Do not "
-        "repeat a broad scan when the target is already visible. When a target reaches "
-        "the center third of the image, stop turning and reassess whether to move or "
-        "acknowledge. After a turn, only turn the same direction again if the newest "
-        "image still shows the target outside that center third, and make the correction "
-        "smaller. Compare the target's new position with the prior image: continue only "
-        "if it moved closer to center, reverse with a smaller correction if it crossed "
-        "center, and do not repeat blindly if the view did not improve. Before each turn, "
-        "use the newest image: image-left means `left`, "
-        "image-right means `right`; do not reuse the opposite direction from an older "
-        "image. Choose angles, speeds, and durations yourself; the user does not need "
-        "to provide them.\n\n"
-        "Move and turn are blocking physical tools: the call returns after the action "
-        "has settled, while camera frames and safety checks continue. Use its final "
-        "measured result, new heading, and fresh camera frame before choosing the next "
-        "physical movement. A movement result does not prove that a target was found or "
-        "reached. A valid clear TOF reading is required before translation.\n\n"
-        "Move slowly in the body frame and turn by relative yaw only. Never request motors, "
-        "attitude, altitude, position, or long motion. CM5 and PX4 provide final safety and "
-        "stability. Hover for an explicit stop or stale, unclear, or unsafe state. Speak "
-        "only for the user or a meaningful event. After answering a user message, wait "
-        "for new dialogue before speaking again."
+        "dialogue, and action result. Decide autonomously with the tools: `move`, "
+        "`turn`, `hover`, `speak`, or `ack`. Choose at most one tool per decision. "
+        "Keep the user's request active until it is complete or changed, and describe "
+        "only what the newest image supports.\n\n"
+        "The camera faces forward. Image-left means body-left and requires a left turn; "
+        "image-right means body-right and requires a right turn. Use the newest image "
+        "to choose each direction. Turn toward a visible target before moving toward it. "
+        "Move only when the path and TOF range are clear. Choose small, slow actions and "
+        "inspect the new image after every physical action. Move and turn are blocking: "
+        "their results include measured motion, heading, telemetry, and a fresh frame "
+        "before another physical movement is chosen.\n\n"
+        "Use body-frame translation and relative yaw only. Never request motors, attitude, "
+        "altitude, position, or long motion. Hover when stopping or when the scene is "
+        "unclear or unsafe. Speak for the user or a meaningful event, then wait for new "
+        "dialogue before speaking again."
     )
 
 

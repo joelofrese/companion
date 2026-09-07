@@ -218,6 +218,8 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
   actions remain separately visible. Move and turn actions are blocking and
   serialized while their live state, completion, and heading are reported.
+  A slow model response gets one fresh-state heartbeat before session
+  reconnect; a stalled session holds zero.
   Deterministic in-process brain fixtures remain only for repeatable simulation checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
