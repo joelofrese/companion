@@ -207,8 +207,10 @@ physical move or turn stays active until its duration or observed heading settle
 safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
 completion response. If no model output appears for eight seconds while the
-vehicle is idle, one fresh state heartbeat requests a new decision; a 45-second
-period without model activity still reconnects the session.
+vehicle is idle, one fresh state heartbeat requests a new decision; another
+eight seconds of silence starts a fresh session with the same situation, active
+request, and memory instead of resuming a dead context. A 45-second period
+without model activity still reconnects the session.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -233,13 +235,14 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   dialogue or a completed physical action before repeating. Tool results and
   physical completion feed a fresh state and image before the next movement decision.
   The prompt asks ER 2 to
-  compare each new view before correcting movement and reassess after three
+  compare each new view before correcting movement and reassess after two
   turns without a meaningful translation. Centered targets and open-ended
   exploration produce bounded motion; side-target visual steering is still
   stochastic and remains an active simulation goal. The streaming loop sends the
   newest frame once per second and waits for each model/tool cycle before sending
   the next state heartbeat. An idle silent response is re-prompted after eight
-  seconds and reconnects after further silence; a 45-second period without model
+  seconds; another eight seconds of silence starts a fresh session with the same
+  situation, active request, and memory. A 45-second period without model
   activity remains a fallback while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and

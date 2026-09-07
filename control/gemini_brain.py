@@ -22,13 +22,13 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
-THINKING_BUDGET = 128
+THINKING_BUDGET = 32
 # Let one native reasoning turn finish before treating the session as stalled.
 RESPONSE_TIMEOUT_S = 45.0
 # Re-prompt a silent decision before the longer session recovery timeout.
 RESPONSE_NUDGE_S = 8.0
 # Do not leave the body idle if the re-prompt itself does not wake the model.
-RESPONSE_RECONNECT_S = 16.0
+RESPONSE_RECONNECT_S = 8.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -42,7 +42,7 @@ DEFAULT_TURN_DEG = 8.0
 MAX_TURN_DEG = 15.0
 # Prevent an open-ended visual scan from rotating without reassessing.
 # Require a translation or fresh dialogue before a repeated turn loop grows.
-MAX_TURNS_WITHOUT_MOVE = 3
+MAX_TURNS_WITHOUT_MOVE = 2
 MIN_TURN_RESET_DISTANCE_M = 0.15
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
@@ -534,6 +534,12 @@ class GeminiRuntime:
             self._response_thoughts.clear()
             self._actions.clear()
             self._response_in_flight = False
+            # A silent resumed context is not useful for the next decision.
+            # Start clean; the situation, active request, and editable memory
+            # are sent again by the normal bootstrap path.
+            self._session_handle = None
+            self._memory_sent = False
+            self._bootstrap_pending = True
             self._reconnect_requested = True
             self._close_session()
 
@@ -1408,7 +1414,7 @@ def _tools():
                 "with the previous image: use a smaller correction if the target is "
                 "still off-center, reverse if it moved away, and move when it is "
                 "roughly ahead. After several turns without a meaningful translation, "
-                "reassess rather than rotating by habit. After three completed turns "
+                "reassess rather than rotating by habit. After two completed turns "
                 "without a meaningful translation, reassess with a meaningful move, "
                 "hover, or new dialogue before turning again. If the turn "
                 "tool says it is unavailable, do not retry it; choose move, hover, or "
@@ -1519,7 +1525,7 @@ def _system_instruction() -> str:
         "telemetry, and a fresh frame before another physical movement is chosen. If "
         "several turn results pass without a meaningful translation, reassess the "
         "newest image and choose a short move, hover, or a direction supported by "
-        "fresh evidence; do not rotate by habit. Three completed turns without a "
+        "fresh evidence; do not rotate by habit. Two completed turns without a "
         "meaningful translation temporarily make turn unavailable until a meaningful "
         "move, hover, or new dialogue resets the count. A tiny or blocked move does "
         "not reset it. A repeated same-direction turn may be reduced to the normal "
