@@ -35,7 +35,7 @@ MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
 # Let the model omit precision it cannot reliably estimate from one image.
 DEFAULT_TURN_DEG = 8.0
-MAX_TURN_DEG = 15.0
+MAX_TURN_DEG = 90.0
 # Keep open-ended exploration from spinning in place.
 MAX_TURNS_WITHOUT_MOVE = 2
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
@@ -667,7 +667,9 @@ class GeminiRuntime:
                 for call in tool_call.function_calls:
                     args = call.args or {}
                     result = await self._execute(call.name, args)
-                    if call.name == "speak" and result.get("status") in (
+                    if call.name == "ack" and result.get("status") == "acknowledged":
+                        continue_after_tool = True
+                    elif call.name == "speak" and result.get("status") in (
                         "spoken",
                         "already_spoken",
                     ):
@@ -1426,8 +1428,9 @@ def _tools():
                         "description": (
                             f"Optional deliberate turn from {MIN_TURN_DEG:.0f} "
                             f"through {MAX_TURN_DEG:.0f} degrees. Omit it for the "
-                            f"normal {DEFAULT_TURN_DEG:.0f}-degree correction; use "
-                            "10-15 degrees only for one broad reorientation."
+                            f"normal {DEFAULT_TURN_DEG:.0f}-degree correction; choose "
+                            "a larger angle when the newest view calls for a broad "
+                            "reorientation."
                         ),
                         "minimum": MIN_TURN_DEG,
                         "maximum": MAX_TURN_DEG,

@@ -40,7 +40,8 @@ merge and delete it.
 - Physical actions must be direct Gemini tool calls; text or JSON action
   descriptions never move the vehicle.
 - A move may include a small yaw rate for a smooth arc; `turn` remains the
-  in-place reorientation action.
+  in-place reorientation action and can request a measured broad turn up to
+  90 degrees.
 - After two consecutive turns without a translation, turn is unavailable until
   a move completes.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
