@@ -36,6 +36,7 @@ MIN_TURN_DEG = 2.0
 MAX_TURN_DEG = 5.0
 # Prevent an open-ended visual scan from rotating without reassessing.
 MAX_TURNS_WITHOUT_MOVE = 6
+MIN_TURN_RESET_DISTANCE_M = 0.15
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -102,7 +103,7 @@ class GeminiRuntime:
         self._speech_blocked = False
         self._active_action: Optional[ActiveAction] = None
         self._action_finished_at_s: Optional[float] = None
-        self._turns_since_move = 0
+        self._turns_since_meaningful_move = 0
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -125,6 +126,7 @@ class GeminiRuntime:
         self._session = None
         self.session_reconnect_count = 0
         self._reconnect_requested = False
+        self._last_model_activity_s: Optional[float] = None
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -160,7 +162,7 @@ class GeminiRuntime:
         message = message.strip()
         self._latest_user_request = message
         self._speech_blocked = False
-        self._turns_since_move = 0
+        self._turns_since_meaningful_move = 0
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -292,8 +294,8 @@ class GeminiRuntime:
                         await self._frame_ready.wait()
                         if self._closed.is_set():
                             return
-                        video_task = asyncio.create_task(
-                            self._stream_video(session, types)
+                        heartbeat_task = asyncio.create_task(
+                            self._heartbeat_loop(session, types)
                         )
                         try:
                             receive_task = None
@@ -302,26 +304,9 @@ class GeminiRuntime:
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
                             ):
-                                if receive_task is not None and receive_task.done():
-                                    await receive_task
-                                    receive_task = None
-                                    response_started_s = None
-                                    if self._reconnect_requested:
-                                        break
-                                heartbeat_due = (
-                                    receive_task is None
-                                    or (
-                                        self._dialogue
-                                        and self._dialogue_in_flight is None
-                                    )
-                                )
-                                if heartbeat_due:
-                                    # Heartbeats start a new reasoning turn. Let a
-                                    # native turn or tool follow-up finish unless
-                                    # new dialogue needs to interrupt it.
-                                    await self._heartbeat(session, types)
                                 if receive_task is None:
                                     response_started_s = time.monotonic()
+                                    self._last_model_activity_s = response_started_s
                                     receive_task = asyncio.create_task(
                                         self._receive(
                                             session,
@@ -329,25 +314,29 @@ class GeminiRuntime:
                                             response_started_s,
                                         )
                                     )
-                                sent_at_s = time.monotonic()
-                                try:
-                                    await asyncio.wait_for(
-                                        asyncio.shield(receive_task),
-                                        timeout=VIDEO_PERIOD_S,
-                                    )
-                                except asyncio.TimeoutError:
-                                    pass
-                                if receive_task.done():
+                                done, _ = await asyncio.wait(
+                                    (heartbeat_task, receive_task),
+                                    timeout=VIDEO_PERIOD_S,
+                                    return_when=asyncio.FIRST_COMPLETED,
+                                )
+                                if heartbeat_task in done:
+                                    await heartbeat_task
+                                    break
+                                if receive_task in done:
                                     await receive_task
                                     receive_task = None
                                     response_started_s = None
+                                    self._last_model_activity_s = None
                                     if self._reconnect_requested:
                                         break
                                 elif (
                                     response_started_s is not None
                                     and self._active_action is None
-                                    and time.monotonic() - response_started_s
-                                    > RESPONSE_TIMEOUT_S
+                                    and time.monotonic()
+                                    - (
+                                        self._last_model_activity_s
+                                        or response_started_s
+                                    ) > RESPONSE_TIMEOUT_S
                                 ):
                                     print(
                                         "Gemini response stalled; reconnecting the session.",
@@ -361,20 +350,11 @@ class GeminiRuntime:
                                     self._response_parts.clear()
                                     self._response_thoughts.clear()
                                     self._actions.clear()
+                                    self._last_model_activity_s = None
                                     self._reconnect_requested = True
                                     break
-                                remaining_s = VIDEO_PERIOD_S - (
-                                    time.monotonic() - sent_at_s
-                                )
-                                if remaining_s > 0.0:
-                                    try:
-                                        await asyncio.wait_for(
-                                            self._closed.wait(), timeout=remaining_s
-                                        )
-                                    except asyncio.TimeoutError:
-                                        pass
                         finally:
-                            tasks = [video_task]
+                            tasks = [heartbeat_task]
                             if receive_task is not None:
                                 tasks.append(receive_task)
                             for task in tasks:
@@ -383,6 +363,7 @@ class GeminiRuntime:
                                 *tasks,
                                 return_exceptions=True,
                             )
+                            self._last_model_activity_s = None
                         if self._dialogue_in_flight is not None:
                             self._dialogue_in_flight = None
                             self._dialogue_send_complete = False
@@ -446,16 +427,15 @@ class GeminiRuntime:
             self._last_frame_sent_count = self._frame_count
         self.video_frame_count += 1
 
-    async def _stream_video(self, session, types):
-        """Keep the Live session supplied with the newest camera frame."""
+    async def _heartbeat_loop(self, session, types):
+        """Continuously prompt Gemini with the newest frame and state."""
 
         while not self._closed.is_set():
+            await self._heartbeat(session, types)
             try:
-                await asyncio.wait_for(
-                    self._closed.wait(), timeout=VIDEO_PERIOD_S
-                )
+                await asyncio.wait_for(self._closed.wait(), timeout=VIDEO_PERIOD_S)
             except asyncio.TimeoutError:
-                await self._send_frame(session, types)
+                pass
 
     async def _heartbeat(self, session, types):
         """Send the current camera frame and state heartbeat."""
@@ -513,7 +493,7 @@ class GeminiRuntime:
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
-        elif self._latest_user_request:
+        elif self._latest_user_request and self._bootstrap_pending:
             state += f"\nCurrent user request (still active): {self._latest_user_request}"
         if memory:
             state += (
@@ -530,6 +510,7 @@ class GeminiRuntime:
 
     async def _receive(self, session, types, response_started_s):
         async for message in session.receive():
+            self._last_model_activity_s = time.monotonic()
             turn_complete = False
             update = message.session_resumption_update
             if update is not None and update.resumable and update.new_handle:
@@ -563,9 +544,8 @@ class GeminiRuntime:
                     content.turn_complete or content.generation_complete
                 )
                 if content.interrupted:
-                    # A heartbeat intentionally interrupts unfinished model
-                    # text. Keep completed tool effects, but let the next
-                    # heartbeat start a clean decision cycle.
+                    # Keep completed tool effects, but let the next heartbeat
+                    # start a clean decision cycle.
                     self._response_parts.clear()
                     self._response_thoughts.clear()
                     return
@@ -605,6 +585,7 @@ class GeminiRuntime:
                         await session.send_tool_response(
                             function_responses=responses
                         )
+                    self._last_model_activity_s = time.monotonic()
             if message.tool_call_cancellation is not None:
                 self._cancel_action("Gemini cancelled it")
 
@@ -636,7 +617,6 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "ack":
-            self._turns_since_move = 0
             result = {
                 "status": "acknowledged",
                 "telemetry": _telemetry_text(self._telemetry),
@@ -646,7 +626,7 @@ class GeminiRuntime:
                 self._active_action is None
                 and not self._stop_requested
             ):
-                self._turns_since_move = 0
+                self._turns_since_meaningful_move = 0
                 result = {
                     "status": "already_hovering",
                     "reason": "the vehicle is already holding position",
@@ -666,7 +646,7 @@ class GeminiRuntime:
             else:
                 self._stop_requested = False
                 cancelled = self._cancel_action("hover")
-                self._turns_since_move = 0
+                self._turns_since_meaningful_move = 0
                 self._record_action("hover")
                 result = {
                     "status": "hovering",
@@ -774,19 +754,20 @@ class GeminiRuntime:
         busy = self._busy_response()
         if busy is not None:
             return busy
-        if self._turns_since_move >= MAX_TURNS_WITHOUT_MOVE:
+        if self._turns_since_meaningful_move >= MAX_TURNS_WITHOUT_MOVE:
             return {
                 "status": "unavailable",
                 "reason": (
-                    f"{MAX_TURNS_WITHOUT_MOVE} turns completed without a move; "
-                    "reassess the newest image and choose move, hover, or ack "
-                    "before turning again"
+                    f"{MAX_TURNS_WITHOUT_MOVE} turns completed without a meaningful "
+                    "translation; "
+                    "reassess the newest image and choose a meaningful move, hover, "
+                    "or wait for new dialogue before turning again"
                 ),
                 "movement_tools": (
                     "turn unavailable; do not call turn again. Choose move, hover, "
-                    "ack, or wait for new dialogue to reset the turn count"
+                    "or wait for new dialogue to reset the turn count"
                 ),
-                "turns_since_move": self._turns_since_move,
+                "turns_since_meaningful_move": self._turns_since_meaningful_move,
                 "telemetry": _telemetry_text(self._telemetry),
             }
         observation = self._observation_required_response()
@@ -890,7 +871,7 @@ class GeminiRuntime:
             if self._last_action_result:
                 return (
                     f"{self._last_action_result}; movement tools available; "
-                    f"turns since move={self._turns_since_move}"
+                    f"turns since meaningful move={self._turns_since_meaningful_move}"
                 )
             return "none; movement tools available"
         details = [
@@ -903,7 +884,9 @@ class GeminiRuntime:
         if actual is not None:
             details.append(f"observed heading change={actual:+.1f} degrees")
         if action.kind == "turn":
-            details.append(f"turns since move={self._turns_since_move + 1}")
+            details.append(
+                f"turns since meaningful move={self._turns_since_meaningful_move + 1}"
+            )
         if self._action_is_blocked(action):
             details.append("paused until safety telemetry permits movement")
         details.append("move and turn tools unavailable until completion")
@@ -1061,9 +1044,13 @@ class GeminiRuntime:
         if action.kind in ("move", "turn"):
             self._speech_blocked = False
         if action.kind == "turn":
-            self._turns_since_move += 1
-        else:
-            self._turns_since_move = 0
+            self._turns_since_meaningful_move += 1
+        elif (
+            status == "completed"
+            and math.hypot(action.observed_forward_m, action.observed_right_m)
+            >= MIN_TURN_RESET_DISTANCE_M
+        ):
+            self._turns_since_meaningful_move = 0
         response = self._action_response(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._remember_action(result)
@@ -1084,7 +1071,7 @@ class GeminiRuntime:
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
-        self._turns_since_move = 0
+        self._turns_since_meaningful_move = 0
         response = self._action_response(action, "cancelled", result, actual)
         self._record_action(result)
         self._remember_action(result)
@@ -1120,7 +1107,9 @@ class GeminiRuntime:
             response["observed_heading_change_deg"] = actual_heading_deg
         if action.kind == "turn":
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
-            response["turns_since_move"] = self._turns_since_move
+            response["turns_since_meaningful_move"] = (
+                self._turns_since_meaningful_move
+            )
             response["visual_effect"] = (
                 "the scene should have moved toward image-right after a left turn"
                 if action.direction == "left"
@@ -1131,6 +1120,11 @@ class GeminiRuntime:
                 "forward": action.observed_forward_m,
                 "right": action.observed_right_m,
             }
+            response["turn_scan"] = (
+                "reset after meaningful translation"
+                if self._turns_since_meaningful_move == 0
+                else "still limited; translation was too small or incomplete"
+            )
         return response
 
     def _fresh_frame_sent_after_action(self) -> bool:
@@ -1205,7 +1199,9 @@ def _tools():
                 "Forward is positive and right is positive. Use it only with a clear "
                 "path and valid range reading. Keep the step short when uncertain, "
                 "then inspect the next image. The physical call returns after measured "
-                "completion; it does not prove that a target was reached."
+                "completion; it does not prove that a target was reached. A meaningful "
+                "measured translation resets the turn scan limit; a tiny or blocked "
+                "move does not."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1254,11 +1250,12 @@ def _tools():
                 "inspect the new image before choosing another movement. Compare it "
                 "with the previous image: use a smaller correction if the target is "
                 "still off-center, reverse if it moved away, and move when it is "
-                "roughly ahead. After several turns without a move, reassess rather "
-                "than rotating by habit. After six completed turns without a move, "
-                "reassess with move, hover, or ack before turning again. If the turn "
+                "roughly ahead. After several turns without a meaningful translation, "
+                "reassess rather than rotating by habit. After six completed turns "
+                "without a meaningful translation, reassess with a meaningful move, "
+                "hover, or new dialogue before turning again. If the turn "
                 "tool says it is unavailable, do not retry it; choose move, hover, or "
-                "ack instead."
+                "wait for new dialogue instead."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1341,19 +1338,20 @@ def _system_instruction() -> str:
         "The camera faces forward. A target on image-left requires a left turn; a target "
         "on image-right requires a right turn. Use the newest image to choose each "
         "direction. Turn toward a visible target only while it is clearly to one side. "
-        "When it is roughly ahead, stop turning and take a short move or inspect the "
-        "scene; do not seek perfect centering. Compare each new view with the previous "
-        "one, use a smaller correction while it improves, and reverse only if it moved "
-        "away. Move only when the path and TOF range are clear. Choose small, slow "
-        "actions and inspect the new image after every physical action. Move and turn "
-        "are blocking: "
-        "their results include measured motion, heading, telemetry, and a fresh frame "
-        "before another physical movement is chosen. If several turn results pass "
-        "without a move, reassess the newest image and choose a short move, hover, "
-        "ack, or a direction supported by fresh evidence; do not rotate by habit. "
-        "Six completed turns without a move temporarily make turn unavailable until "
-        "move, hover, ack, or new dialogue resets the count. Never retry an unavailable "
-        "turn; choose move, hover, or ack and reassess.\n\n"
+        "When it is roughly ahead, stop turning and take a short move or inspect "
+        "the scene; do not seek perfect centering. Compare each new view with the "
+        "previous one, use a smaller correction while it improves, and reverse only "
+        "if it moved away. Move only when the path and TOF range are clear. Choose "
+        "small, slow actions and inspect the new image after every physical action. "
+        "Move and turn are blocking: their results include measured motion, heading, "
+        "telemetry, and a fresh frame before another physical movement is chosen. If "
+        "several turn results pass without a meaningful translation, reassess the "
+        "newest image and choose a short move, hover, or a direction supported by "
+        "fresh evidence; do not rotate by habit. Six completed turns without a "
+        "meaningful translation temporarily make turn unavailable until a meaningful "
+        "move, hover, or new dialogue resets the count. A tiny or blocked move does "
+        "not reset it. Never retry an unavailable turn; choose move, hover, or wait "
+        "for new dialogue and reassess.\n\n"
         "Use body-frame translation and relative yaw only. Never request motors, attitude, "
         "altitude, position, or long motion. Hover when stopping or when the scene is "
         "unclear or unsafe. Speak for the user or a meaningful new event, not to narrate "
