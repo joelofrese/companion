@@ -532,11 +532,8 @@ class GeminiRuntime:
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
-        elif self._bootstrap_pending and self._latest_user_request:
-            state += (
-                "\nPrevious user request from before this session restarted: "
-                f"{self._latest_user_request}"
-            )
+        elif self._latest_user_request:
+            state += f"\nCurrent user request (still active): {self._latest_user_request}"
         if memory:
             state += (
                 "\nMemory (prior experience; verify it against the current image "
@@ -1279,7 +1276,10 @@ def _tools():
                 "Turn in place slowly by a relative angle. Choose the direction and "
                 "a small angle from the newest image and heading: image-left means "
                 "left, and image-right means right. After the physical call returns, "
-                "inspect the new image before choosing another movement."
+                "inspect the new image before choosing another movement. Compare it "
+                "with the previous image: use a smaller correction if the target is "
+                "still off-center, reverse if it moved away, and move when it is "
+                "roughly ahead."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1358,9 +1358,13 @@ def _system_instruction() -> str:
         "only what the newest image supports.\n\n"
         "The camera faces forward. Image-left means body-left and requires a left turn; "
         "image-right means body-right and requires a right turn. Use the newest image "
-        "to choose each direction. Turn toward a visible target before moving toward it. "
-        "Move only when the path and TOF range are clear. Choose small, slow actions and "
-        "inspect the new image after every physical action. Move and turn are blocking: "
+        "to choose each direction. Turn toward a visible target only while it is clearly "
+        "to one side. When it is roughly ahead, stop turning and take a short move or "
+        "inspect the scene; do not seek perfect centering. Compare each new view with "
+        "the previous one, use a smaller correction while it improves, and reverse if "
+        "it moves away. Move only when the path and TOF range are clear. Choose small, "
+        "slow actions and inspect the new image after every physical action. Move and "
+        "turn are blocking: "
         "their results include measured motion, heading, telemetry, and a fresh frame "
         "before another physical movement is chosen.\n\n"
         "Use body-frame translation and relative yaw only. Never request motors, attitude, "

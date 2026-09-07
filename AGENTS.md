@@ -218,6 +218,10 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
   actions remain separately visible. Move and turn actions are blocking and
   serialized while their live state, completion, and heading are reported.
+  The latest user request stays in state heartbeats, and the prompt asks ER 2
+  to compare each new view before correcting movement. Centered targets and
+  open-ended exploration produce bounded motion; side-target visual steering
+  is still stochastic and remains an active simulation goal.
   A slow model response gets one fresh-state heartbeat before session
   reconnect; a stalled session holds zero.
   Deterministic in-process brain fixtures remain only for repeatable simulation checks.
