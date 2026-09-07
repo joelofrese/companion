@@ -568,8 +568,11 @@ class GeminiRuntime:
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
-        elif self._latest_user_request and self._bootstrap_pending:
-            state += f"\nCurrent user request (still active): {self._latest_user_request}"
+        elif self._latest_user_request:
+            state += (
+                "\nActive user request (keep working until complete or changed): "
+                f"{self._latest_user_request}"
+            )
         if memory:
             state += (
                 "\nMemory (prior experience and measured action calibration; verify "
