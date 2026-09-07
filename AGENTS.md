@@ -213,9 +213,9 @@ return their observed completion before Gemini chooses another movement. One
 physical move or turn stays active until its duration or observed heading settles;
 safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
-completion response and one fresh state prompt to request continuation. A quiet
-post-action turn gets one more state prompt after eight seconds, then starts a
-fresh session if it remains silent; ordinary turns use a 15-second stall timeout.
+completion response, which lets ER2 continue naturally. A quiet post-action turn
+gets one more state prompt after eight seconds, then starts a fresh session if it
+remains silent; ordinary turns use a 15-second stall timeout.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -249,9 +249,9 @@ authoritative behavior trace.
   The streaming loop sends
   the newest frame once per second and waits for each model/tool cycle before sending
   the next state heartbeat. After a physical action, the ordered tool response
-  includes one fresh state prompt requesting continuation. A quiet post-action
-  turn gets one retry after eight seconds, then a fresh session if it remains
-  silent; ordinary turns use the 15-second timeout. The resumed session keeps
+  itself requests continuation. A quiet post-action turn gets one retry after
+  eight seconds, then a fresh session if it remains silent; ordinary turns use
+  the 15-second timeout. The resumed session keeps
   the same situation, active request, and memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and

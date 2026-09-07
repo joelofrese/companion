@@ -702,13 +702,9 @@ class GeminiRuntime:
                             and not self._reconnect_requested
                         ):
                             print(
-                                "Gemini tool finished; requesting the next state.",
+                                "Gemini tool finished; waiting for continuation.",
                                 flush=True,
                             )
-                            await session.send_realtime_input(
-                                text=self._heartbeat_text("")
-                            )
-                            self._last_action_result = ""
                     self._last_model_activity_s = time.monotonic()
                     if (
                         (completed_action or continue_after_tool)
@@ -1383,7 +1379,10 @@ def _tools():
                 "direction from the newest image and heading: image-left means left "
                 "and image-right means right. Omit the angle for the normal "
                 f"{DEFAULT_TURN_DEG:.0f}-degree correction. Inspect the next image "
-                "and measured heading before choosing another movement."
+                "and measured heading before choosing another movement. Use one "
+                "small turn to change the view, then prefer a short translation "
+                "when the path is clear; do not scan repeatedly without a new "
+                "visual reason."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1474,7 +1473,11 @@ def _system_instruction() -> str:
         "result, choose whatever next movement the newest image and telemetry support; "
         "another turn is allowed when it is useful. Use turns to inspect, then make "
         "deliberate progress when a clear path is visible; do not keep turning without "
-        "a reason in the newest view. Use hover when stopping or when the scene is "
+        "a reason in the newest view. In an open scene, use one useful turn to change "
+        "the view, then prefer a short translation when the path is clear. Use another "
+        "turn only when the newest image gives a reason such as a target being off-center, "
+        "an obstacle, or an unexplored direction; do not scan indefinitely just because "
+        "the previous action completed. Use hover when stopping or when the scene is "
         "unclear or unsafe. Speaking completes the current response; after speaking, "
         "choose a physical action or hover until new dialogue or a completed physical "
         "action allows another update. Do not use speech to narrate a plan or replace "
