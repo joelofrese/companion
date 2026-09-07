@@ -21,7 +21,7 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Reserve a small native budget for reasoning without making actions too slow.
+# Reserve a small native budget for visual reasoning without making actions too slow.
 THINKING_BUDGET = 128
 # Give a slow model turn time to finish, but recover before a short flight is
 # spent waiting on a response that produced no action.
@@ -1243,6 +1243,10 @@ def _tools():
                 "image-left requires a left turn. "
                 "A target already visible in the frame is not a search: use the "
                 "smallest turn that brings it toward the image center. "
+                "When it reaches the center third of the image, stop turning and "
+                "reassess whether to move or acknowledge. After a turn, only turn "
+                "the same direction again if the newest image still shows the target "
+                "outside that center third, and make the correction smaller. "
                 "Never use a large turn for a small visual error. If the target is "
                 "not visible, make one deliberate scan, then reassess before reversing. "
                 "After one turn, reassess from a new image before turning again."
@@ -1327,8 +1331,12 @@ def _system_instruction() -> str:
         "is off-center, turn toward it and do not move forward yet. Use `move` only when "
         "the target is centered, the path is clear, and a short step helps. If the target "
         "is not visible, make one small deliberate scan and inspect the new image. Do not "
-        "repeat a broad scan when the target is already visible. Choose angles, speeds, "
-        "and durations yourself; the user does not need to provide them.\n\n"
+        "repeat a broad scan when the target is already visible. When a target reaches "
+        "the center third of the image, stop turning and reassess whether to move or "
+        "acknowledge. After a turn, only turn the same direction again if the newest "
+        "image still shows the target outside that center third, and make the correction "
+        "smaller. Choose angles, speeds, and durations yourself; the user does not need "
+        "to provide them.\n\n"
         "After every move or turn, wait for its measured result and then a fresh camera "
         "frame before choosing another physical action. Use the new heading and result to "
         "correct the next action. A movement result does not prove that a target was found "

@@ -15,8 +15,10 @@ def _decode_frame(message):
     image = np.frombuffer(frame, dtype=np.uint8).reshape(height, step)
     image = image[:, : width * 3]
     # Gazebo publishes RGB. Keep the shared frame format BGR, like GStreamer,
-    # so the brain's JPEG conversion handles both camera sources the same way.
-    return image.reshape(height, width, 3)[:, :, ::-1]
+    # and mirror the forward camera once so image-right is body-right for the
+    # brain and for the hardware-facing camera contract.
+    image = image.reshape(height, width, 3)[:, :, ::-1]
+    return np.ascontiguousarray(image[:, ::-1, :])
 
 
 class GazeboCamera(GazeboTopicReader):
