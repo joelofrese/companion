@@ -39,7 +39,8 @@ merge and delete it.
   the CM5 still limits every physical command.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
   streaming while one move or turn completes; its measured result and fresh
-  telemetry arrive before the next movement. Safety holds pause the action until
+  telemetry arrive before the next movement, and a newer camera frame is
+  required before another physical action. Safety holds pause the action until
   movement is allowed.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
   acknowledges the stop. The CM5 handles safety overrides.
@@ -132,8 +133,8 @@ the brain should be allowed to move.
 Use `--trace` to print brain observations, native Gemini thought summaries,
 responses, actions, model latencies, and command reasons. Native thought
 summaries are optional; raw private reasoning is not exposed. Use
-`--snapshot PATH` to save the first
-rendered frame for visual inspection. Use `--world`, `--duration`, `--request`,
+`--snapshot PATH` to save a settled rendered frame for visual inspection. Use
+`--world`, `--duration`, `--request`,
 `--intent`, and `--memory` to vary the world, run length, dialogue, initial
 situation, and persistent experience. Typed dialogue also works during an
 exploratory run.

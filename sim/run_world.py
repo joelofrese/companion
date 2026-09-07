@@ -445,7 +445,7 @@ def main(argv=None):
     parser.add_argument(
         "--snapshot",
         type=Path,
-        help="save the first Gazebo camera frame for visual inspection",
+        help="save a settled Gazebo camera frame for visual inspection",
     )
     parser.add_argument(
         "--request",

@@ -23,10 +23,9 @@ DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 VIDEO_PERIOD_S = 1.0
 # Reserve a small native budget for reasoning without making actions too slow.
 THINKING_BUDGET = 128
-# Give a slow model turn time to finish; the CM5 holds zero motion meanwhile.
-# Recover from a turn that produces no result before it consumes a short flight;
-# physical actions have their own completion deadline.
-RESPONSE_TIMEOUT_S = 45.0
+# Give a slow model turn time to finish, but recover before a short flight is
+# spent waiting on a response that produced no action.
+RESPONSE_TIMEOUT_S = 15.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -35,7 +34,7 @@ MAX_MOVE_S = 2.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 20.0
+MAX_TURN_DEG = 15.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -49,6 +48,7 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
+MAX_SAME_DIRECTION_TURNS = 2
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -103,6 +103,9 @@ class GeminiRuntime:
         self._last_spoken_generation = -1
         self._last_spoken_at_s: Optional[float] = None
         self._active_action: Optional[ActiveAction] = None
+        self._action_finished_at_s: Optional[float] = None
+        self._turn_direction: Optional[str] = None
+        self._same_direction_turns = 0
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -160,6 +163,8 @@ class GeminiRuntime:
         message = message.strip()
         self._latest_user_request = message
         self._dialogue_generation += 1
+        self._turn_direction = None
+        self._same_direction_turns = 0
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -495,8 +500,8 @@ class GeminiRuntime:
         camera = "fresh" if self._has_fresh_frame() else "stale or missing"
         state = (
             f"{start}[STATE]\n"
-            f"Camera: {camera}; forward-facing; image-left=body-right; "
-            "image-right=body-left; image-center=current heading\n"
+            f"Camera: {camera}; forward-facing; image-left=body-left; "
+            "image-right=body-right; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
             "[HEARTBEAT] Inspect the newest image and state now. Use one action "
@@ -730,6 +735,9 @@ class GeminiRuntime:
         busy = self._busy_response()
         if busy is not None:
             return busy
+        observation = self._observation_required_response()
+        if observation is not None:
+            return observation
         now = time.monotonic()
         action = ActiveAction(
             "move",
@@ -743,6 +751,8 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._turn_direction = None
+        self._same_direction_turns = 0
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -778,6 +788,23 @@ class GeminiRuntime:
         busy = self._busy_response()
         if busy is not None:
             return busy
+        observation = self._observation_required_response()
+        if observation is not None:
+            return observation
+        if (
+            self._turn_direction == direction
+            and self._same_direction_turns >= MAX_SAME_DIRECTION_TURNS
+        ):
+            return {
+                "status": "unavailable",
+                "reason": (
+                    f"{MAX_SAME_DIRECTION_TURNS} same-direction turns just completed; "
+                    "inspect the newest image and choose a smaller correction, "
+                    "translation, the other direction, hover, or ack"
+                ),
+                "movement_tools": "available now",
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         now = time.monotonic()
         angle_deg = float(angle_deg)
         action = ActiveAction(
@@ -829,6 +856,25 @@ class GeminiRuntime:
             "movement_tools": "unavailable until the active action completes",
             "telemetry": _telemetry_text(self._telemetry),
         }
+
+    def _observation_required_response(self):
+        if (
+            self._action_finished_at_s is not None
+            and (
+                self._latest_frame_at_s is None
+                or self._latest_frame_at_s <= self._action_finished_at_s
+            )
+        ):
+            return {
+                "status": "unavailable",
+                "reason": (
+                    "wait for a fresh camera frame after the previous physical "
+                    "action before choosing another movement"
+                ),
+                "movement_tools": "unavailable until a fresh frame arrives",
+                "telemetry": _telemetry_text(self._telemetry),
+            }
+        return None
 
     def _translation_text(self, action: ActiveAction) -> str:
         return (
@@ -1017,6 +1063,13 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._action_finished_at_s = time.monotonic()
+        if action.kind == "turn":
+            if self._turn_direction == action.direction:
+                self._same_direction_turns += 1
+            else:
+                self._turn_direction = action.direction
+                self._same_direction_turns = 1
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -1036,6 +1089,7 @@ class GeminiRuntime:
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
+        self._action_finished_at_s = time.monotonic()
         self._finish_action_waiter(
             action,
             self._action_response(action, "cancelled", result, actual),
@@ -1185,7 +1239,11 @@ def _tools():
                 "Choose the angle yourself from the current image and heading; "
                 "the user does not need to provide it. Use a small correction when "
                 "nearly aligned: about 2-6 degrees for a small offset and 8-15 "
-                "degrees near the edge. Use 15-20 degrees only for a broad scan. "
+                "degrees near the edge. Use 10-15 degrees only for a broad scan. "
+                "A target on image-right requires a right turn, and a target on "
+                "image-left requires a left turn. "
+                "A target already visible in the frame is not a search: use the "
+                "smallest turn that brings it toward the image center. "
                 "Never use a large turn for a small visual error. If the target is "
                 "not visible, make one deliberate scan, then reassess before reversing. "
                 "After one turn, reassess from a new image before turning again."
@@ -1264,15 +1322,19 @@ def _system_instruction() -> str:
         "or turn when it helps inspect or make progress; do not move merely because "
         "a heartbeat arrived. If the scene and goal are unchanged, do nothing. For any "
         "visual goal, use "
-        "its current position in the image. The camera is horizontally mirrored "
-        "relative to the body frame: image-left is body-right and image-right is "
-        "body-left. If it is centered and the path is clear, "
+        "its current position in the image. The camera is aligned with the body "
+        "frame: image-left is body-left and image-right is body-right. Therefore "
+        "image-right means call `turn` right, and image-left means call `turn` "
+        "left. If it is centered and the path is clear, "
         "take a short step; if it is off-center, turn toward it; if it is unclear, "
         "reobserve or make one deliberate search turn. Choose movement amounts yourself; "
+        "A visible target is not a search: use the smallest turn that brings it toward "
+        "the image center, then reobserve instead of repeating a broad scan. "
         "the user does not need to give exact angles or distances. After each move or "
         "turn, wait for its blocking result. It includes the observed movement, "
-        "current heading, and current telemetry. Before choosing another physical "
-        "action, inspect the newest image and telemetry and act only when it helps "
+        "current heading, and current telemetry. After that result, wait for a fresh "
+        "image captured after the action before choosing another physical action. "
+        "Then inspect the newest image and telemetry and act only when it helps "
         "the request, not merely because the previous action finished. Use the "
         "measured action result and "
         "current heading from telemetry to correct the next action; never repeat a "
