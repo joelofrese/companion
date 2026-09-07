@@ -209,7 +209,7 @@ physical move or turn stays active until its duration or observed heading settle
 safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
 completion response. If ER2 does not continue after a physical result, one fresh
-state prompt is sent after eight seconds. A 30-second period without model
+state prompt is sent on the next heartbeat. A 30-second period without model
 activity reconnects a genuinely stalled session.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
@@ -240,8 +240,8 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   exploration produce bounded motion; side-target visual steering is still
   stochastic and remains an active simulation goal. The streaming loop sends the
   newest frame once per second and waits for each model/tool cycle before sending
-  the next state heartbeat. After a physical action, one fresh state prompt can
-  request continuation after eight seconds; a 30-second period without model
+  the next state heartbeat. After a physical action, one fresh state prompt
+  requests continuation on the next heartbeat; a 30-second period without model
   activity starts a fresh session with the same situation, active request, and
   memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;

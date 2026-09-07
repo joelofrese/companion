@@ -138,6 +138,7 @@ class GeminiRuntime:
         self._last_model_activity_s: Optional[float] = None
         self._last_response_nudge_s: Optional[float] = None
         self._response_in_flight = False
+        self._tool_call_in_flight = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -278,6 +279,7 @@ class GeminiRuntime:
                     self._dialogue_in_flight = None
                     self._dialogue_send_complete = False
                 self._response_in_flight = False
+                self._tool_call_in_flight = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -496,11 +498,12 @@ class GeminiRuntime:
             self._bootstrap_pending = False
 
     async def _nudge_after_action(self, session):
-        """Prompt once when ER2 does not continue after a physical result."""
+        """Recover if an action result could not send its ordered follow-up."""
 
         if (
             not self._last_action_result
             or self._active_action is not None
+            or self._tool_call_in_flight
             or self._last_model_activity_s is None
             or time.monotonic() - self._last_model_activity_s < POST_ACTION_NUDGE_S
             or self._last_response_nudge_s is not None
@@ -616,7 +619,9 @@ class GeminiRuntime:
                     return
             tool_call = message.tool_call
             if tool_call is not None:
+                self._tool_call_in_flight = True
                 responses = []
+                completed_action = False
                 for call in tool_call.function_calls:
                     args = call.args or {}
                     result = await self._execute(call.name, args)
@@ -625,6 +630,7 @@ class GeminiRuntime:
                         "timed out before target",
                         "cancelled",
                     ):
+                        completed_action = True
                         fresh_frame = await self._wait_for_fresh_action_frame()
                         result["camera_frame"] = self._last_frame_sent_count
                         result["camera_observation"] = (
@@ -650,7 +656,18 @@ class GeminiRuntime:
                         await session.send_tool_response(
                             function_responses=responses
                         )
+                        if completed_action and not self._reconnect_requested:
+                            self._last_response_nudge_s = time.monotonic()
+                            print(
+                                "Gemini action finished; requesting the next state.",
+                                flush=True,
+                            )
+                            await session.send_realtime_input(
+                                text=self._heartbeat_text("")
+                            )
+                            self._last_action_result = ""
                     self._last_model_activity_s = time.monotonic()
+                self._tool_call_in_flight = False
             if message.tool_call_cancellation is not None:
                 self._cancel_action("Gemini cancelled it")
 
