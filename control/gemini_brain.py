@@ -34,7 +34,7 @@ MAX_MOVE_S = 2.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 15.0
+MAX_TURN_DEG = 8.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -92,6 +92,8 @@ class GeminiRuntime:
         self._latest_frame = None
         self._latest_frame_at_s: Optional[float] = None
         self._last_frame_sent_at_s: Optional[float] = None
+        self._frame_count = 0
+        self._last_frame_sent_count = 0
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._dialogue_in_flight: Optional[str] = None
@@ -190,6 +192,7 @@ class GeminiRuntime:
         if frame is not None:
             self._latest_frame = frame
             self._latest_frame_at_s = time.monotonic()
+            self._frame_count += 1
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
@@ -309,12 +312,19 @@ class GeminiRuntime:
                                     response_started_s = None
                                     if self._reconnect_requested:
                                         break
-                                await self._send_pending_action_response(session, types)
+                                action_response_sent = (
+                                    await self._send_pending_action_response(
+                                        session, types
+                                    )
+                                )
                                 heartbeat_due = (
-                                    receive_task is None
-                                    or (
-                                        self._dialogue
-                                        and self._dialogue_in_flight is None
+                                    not action_response_sent
+                                    and (
+                                        receive_task is None
+                                        or (
+                                            self._dialogue
+                                            and self._dialogue_in_flight is None
+                                        )
                                     )
                                 )
                                 if heartbeat_due:
@@ -447,6 +457,7 @@ class GeminiRuntime:
                 video=types.Blob(data=image_bytes, mime_type="image/jpeg")
             )
             self._last_frame_sent_at_s = now
+            self._last_frame_sent_count = self._frame_count
         self.video_frame_count += 1
 
     async def _stream_video(self, session, types):
@@ -500,7 +511,11 @@ class GeminiRuntime:
         start = ""
         if self._bootstrap_pending:
             start = f"[START]\nSituation: {self.situation}\n"
-        camera = "fresh" if self._has_fresh_frame() else "stale or missing"
+        camera = (
+            f"fresh frame {self._frame_count}"
+            if self._has_fresh_frame()
+            else "stale or missing"
+        )
         state = (
             f"{start}[STATE]\n"
             f"Camera: {camera}; forward-facing; image-left=body-left; "
@@ -1122,6 +1137,13 @@ class GeminiRuntime:
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
+        if action.kind == "turn":
+            response["heading_before_deg"] = _heading_value(action.start_heading_rad)
+            response["visual_effect"] = (
+                "the scene should have moved toward image-right after a left turn"
+                if action.direction == "left"
+                else "the scene should have moved toward image-left after a right turn"
+            )
         if action.kind == "move":
             response["observed_translation_m"] = {
                 "forward": action.observed_forward_m,
@@ -1146,6 +1168,11 @@ class GeminiRuntime:
             if not self._fresh_frame_sent_after_action():
                 return False
         kind, call_id, response = pending
+        response["camera_frame"] = self._last_frame_sent_count
+        response["camera_observation"] = (
+            "a fresh camera frame captured after the action was sent immediately "
+            "before this result"
+        )
         async with self._send_lock:
             await session.send_tool_response(
                 function_responses=types.FunctionResponse(
@@ -1233,10 +1260,11 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short, chosen duration. "
-                "Forward is positive and right is positive. Use this only when a "
-                "visible target is centered and the range is clear. Do not use "
-                "forward motion to correct a target that is left or right of center; "
-                "turn first. Use a shorter "
+                "Forward is positive and right is positive. Use this when a visible "
+                "target is centered or the forward path is clearly open and the range "
+                "is clear. Do not use forward motion to correct a target that is left "
+                "or right of center; turn first. When exploring without a target, a "
+                "short forward step is enough to learn more. Use a shorter "
                 "duration when close or uncertain and a longer one when the path "
                 "is clearly open. A completed movement only reports how far the "
                 "vehicle moved; it does not prove that a target was reached."
@@ -1284,8 +1312,8 @@ def _tools():
                 "Turn in place slowly by an angle relative to the current heading. "
                 "Choose the angle yourself from the current image and heading; "
                 "the user does not need to provide it. Use a small correction when "
-                "nearly aligned: about 2-6 degrees for a small offset and 8-15 "
-                "degrees near the edge. Use 10-15 degrees only for a broad scan. "
+                "nearly aligned: about 2-4 degrees for a small offset and 5-8 "
+                "degrees near the edge. Use 8 degrees only for a broad scan. "
                 "If a visible target is off-center, turn toward it instead of moving. "
                 "A target on image-right requires a right turn, and a target on "
                 "image-left requires a left turn. "
@@ -1295,6 +1323,10 @@ def _tools():
                 "reassess whether to move or acknowledge. After a turn, only turn "
                 "the same direction again if the newest image still shows the target "
                 "outside that center third, and make the correction smaller. "
+                "Compare the target's new position with the prior image: continue "
+                "only if it moved closer to center, reverse with a smaller correction "
+                "if it crossed center, and do not repeat blindly if the view did not "
+                "improve. "
                 "Never use a large turn for a small visual error. If the target is "
                 "not visible, make one deliberate scan, then reassess before reversing. "
                 "After one turn, reassess from a new image before turning again."
@@ -1381,8 +1413,9 @@ def _system_instruction() -> str:
         "\n\n"
         "Visual control: the camera is aligned with the body. Image-right is body-right "
         "and requires a right turn; image-left requires a left turn. If a visible target "
-        "is off-center, turn toward it and do not move forward yet. Use `move` only when "
-        "the target is centered, the path is clear, and a short step helps. If the target "
+        "is off-center, turn toward it and do not move forward yet. Use `move` when the "
+        "target is centered or the forward path is clearly open. If there is no target, "
+        "a short forward step is a useful way to explore after a clear frame. If the target "
         "is not visible, make one small deliberate scan and inspect the next image. A left "
         "turn moves image contents toward image-right, and a right turn moves them toward "
         "image-left. After each turn, check the newest image before turning again. Do not "
@@ -1390,7 +1423,10 @@ def _system_instruction() -> str:
         "the center third of the image, stop turning and reassess whether to move or "
         "acknowledge. After a turn, only turn the same direction again if the newest "
         "image still shows the target outside that center third, and make the correction "
-        "smaller. Before each turn, use the newest image: image-left means `left`, "
+        "smaller. Compare the target's new position with the prior image: continue only "
+        "if it moved closer to center, reverse with a smaller correction if it crossed "
+        "center, and do not repeat blindly if the view did not improve. Before each turn, "
+        "use the newest image: image-left means `left`, "
         "image-right means `right`; do not reuse the opposite direction from an older "
         "image. Choose angles, speeds, and durations yourself; the user does not need "
         "to provide them.\n\n"
