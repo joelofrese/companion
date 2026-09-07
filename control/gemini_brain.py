@@ -527,6 +527,7 @@ class GeminiRuntime:
         if self._dialogue_in_flight == dialogue:
             self._dialogue_send_complete = True
             self.dialogue_sent_count += 1
+            self._last_model_activity_s = time.monotonic()
 
     async def _retry_action_follow_up(self, session):
         """Prompt once more when ER2 goes quiet after a completed action."""
