@@ -366,6 +366,9 @@ class GeminiRuntime:
                                     self._response_thoughts.clear()
                                     self._actions.clear()
                                     self._last_model_activity_s = None
+                                    self._session_handle = None
+                                    self._memory_sent = False
+                                    self._bootstrap_pending = True
                                     self._reconnect_requested = True
                                     break
                         finally:
