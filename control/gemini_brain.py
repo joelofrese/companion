@@ -1435,8 +1435,10 @@ def _tools():
             "name": "speak",
             "description": (
                 "Say one short message when the user asks or a meaningful new event "
-                "is worth sharing. After speaking, do not call speak again until "
-                "new dialogue or a completed physical action."
+                "is worth sharing. Do not announce a planned movement instead of "
+                "calling move or turn; speak after the observation or action is "
+                "real. After speaking, do not call speak again until new dialogue "
+                "or a completed physical action."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1475,7 +1477,10 @@ def _system_instruction() -> str:
         "a reason in the newest view. Use hover when stopping or when the scene is "
         "unclear or unsafe. Speaking completes the current response; after speaking, "
         "choose a physical action or hover until new dialogue or a completed physical "
-        "action allows another update. The CM5 limits every physical command."
+        "action allows another update. Do not use speech to narrate a plan or replace "
+        "a safe movement: when the situation calls for looking, approaching, or "
+        "exploring, call move or turn directly and speak only after a real observation "
+        "or event. The CM5 limits every physical command."
     )
 
 
