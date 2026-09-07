@@ -41,6 +41,8 @@ merge and delete it.
   descriptions never move the vehicle.
 - A move may include a small yaw rate for a smooth arc; `turn` remains the
   in-place reorientation action.
+- After two consecutive turns without a translation, turn is unavailable until
+  a move completes.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
   streaming while one move or turn completes; its measured result and fresh
   telemetry arrive before the next movement, and a newer camera frame is

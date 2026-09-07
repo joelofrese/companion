@@ -36,6 +36,8 @@ MIN_TURN_DEG = 2.0
 # Let the model omit precision it cannot reliably estimate from one image.
 DEFAULT_TURN_DEG = 8.0
 MAX_TURN_DEG = 15.0
+# Keep open-ended exploration from spinning in place.
+MAX_TURNS_WITHOUT_MOVE = 2
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -102,6 +104,7 @@ class GeminiRuntime:
         self._latest_user_request = self.situation
         self._speech_blocked = False
         self._active_action: Optional[ActiveAction] = None
+        self._turns_since_move = 0
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -879,6 +882,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._turns_since_move = 0
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -910,6 +914,18 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
+        if self._turns_since_move >= MAX_TURNS_WITHOUT_MOVE:
+            return {
+                "status": "unavailable",
+                "reason": (
+                    "two consecutive turns completed without a translation; "
+                    "choose move or hover, then turn again only after a move"
+                ),
+                "movement_tools": (
+                    "move and hover available; turn unavailable until a move completes"
+                ),
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         now = time.monotonic()
         angle_deg = float(angle_deg)
         action = ActiveAction(
@@ -926,6 +942,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
+        self._turns_since_move += 1
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1008,9 +1025,14 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
+            availability = (
+                "turn unavailable until a move completes"
+                if self._turns_since_move >= MAX_TURNS_WITHOUT_MOVE
+                else "movement tools available"
+            )
             if self._last_action_result:
-                return f"{self._last_action_result}; movement tools available"
-            return "none; movement tools available"
+                return f"{self._last_action_result}; {availability}"
+            return f"none; {availability}"
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
@@ -1381,8 +1403,8 @@ def _tools():
                 f"{DEFAULT_TURN_DEG:.0f}-degree correction. Inspect the next image "
                 "and measured heading before choosing another movement. Use one "
                 "small turn to change the view, then prefer a short translation "
-                "when the path is clear; do not scan repeatedly without a new "
-                "visual reason."
+                "when the path is clear; after two consecutive turns without a "
+                "translation, choose move or hover before turning again."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1479,7 +1501,9 @@ def _system_instruction() -> str:
         "the view, then prefer a short translation when the path is clear. Use another "
         "turn only when the newest image gives a reason such as a target being off-center, "
         "an obstacle, or an unexplored direction; do not scan indefinitely just because "
-        "the previous action completed. Do not repeat the same translation twice "
+        "the previous action completed. After two consecutive turns without a "
+        "translation, choose move or hover before turning again. Do not repeat "
+        "the same translation twice "
         "unless the newest view clearly shows progress toward a visible target; "
         "otherwise make one small turn or hover to reassess. Never keep moving "
         "through an unchanged or ambiguous view. Use hover when stopping or when "
