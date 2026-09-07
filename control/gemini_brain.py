@@ -1093,12 +1093,21 @@ class GeminiRuntime:
         result: str,
         actual_heading_deg: Optional[float],
     ) -> dict:
+        movement_tools = "available now"
+        if (
+            self._action_finished_at_s is not None
+            and (
+                self._latest_frame_at_s is None
+                or self._latest_frame_at_s <= self._action_finished_at_s
+            )
+        ):
+            movement_tools = "available after a fresh camera frame"
         response = {
             "status": status,
             "action": result,
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
-            "movement_tools": "available now",
+            "movement_tools": movement_tools,
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
