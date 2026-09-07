@@ -156,11 +156,11 @@ Add `--faults` to inject the normal obstacle, sensor, camera-frame, link,
 invalid-command, brain-shutdown, and Gemini-reconnect schedule into an
 exploratory run. Add `--headless` for unattended runs without the Gazebo GUI.
 
-The companion-owned `objects` world adds simple colored shapes and a primitive
-mannequin for visual exploration. The runner starts the vehicle at zero yaw,
-warms the Gazebo camera after vehicle spawn, and leaves the camera
-user-controlled. Camera and depth explorations default to this world; other
-exploratory runs use the empty stock world.
+The companion-owned `objects` world adds a simple room, table, chair, colored
+shapes, and a primitive mannequin for visual exploration. The runner starts the
+vehicle at zero yaw, warms the Gazebo camera after vehicle spawn, and leaves the
+camera user-controlled. Camera and depth explorations default to this world;
+other exploratory runs use the empty stock world.
 Oversized simulation frames are reduced to the real 640-pixel camera width
 before the brain sees them. Gazebo's forward camera keeps its native horizontal
 orientation so ER2 sees the same left and right as the rendered frame. Because
@@ -229,6 +229,9 @@ authoritative behavior trace.
   command path, faults, recovery, safety, landing, and disarm.
 - Exploratory camera and depth worlds exercise open-ended situations, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
+- The `objects` world provides a readable room with simple furniture and visual
+  landmarks for free-roaming ER2 tasks; it remains a simulation fixture, not a
+  DEXI 3 hardware claim.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It starts with one situation prompt and one direct
   tool heartbeat, keeps that situation active as context, then uses native context

@@ -99,6 +99,111 @@
       </link>
     </model>
 
+    <model name="room">
+      <static>true</static>
+      <link name="back_wall">
+        <pose>14 0 1.5 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>0.2 16 3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.2 16 3</size></box></geometry>
+          <material>
+            <ambient>0.22 0.25 0.3 1</ambient>
+            <diffuse>0.42 0.46 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="left_wall">
+        <pose>4 -8 1.5 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>20 0.2 3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>20 0.2 3</size></box></geometry>
+          <material>
+            <ambient>0.22 0.25 0.3 1</ambient>
+            <diffuse>0.42 0.46 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="right_wall">
+        <pose>4 8 1.5 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>20 0.2 3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>20 0.2 3</size></box></geometry>
+          <material>
+            <ambient>0.22 0.25 0.3 1</ambient>
+            <diffuse>0.42 0.46 0.55 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="table">
+      <static>true</static>
+      <pose>10 -3.5 0 0 0 0</pose>
+      <link name="top">
+        <pose>0 0 1.1 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>2.0 1.2 0.18</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 1.2 0.18</size></box></geometry>
+          <material>
+            <ambient>0.35 0.16 0.05 1</ambient>
+            <diffuse>0.65 0.3 0.08 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="support">
+        <pose>0 0 0.55 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>0.3 0.3 1.1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.3 1.1</size></box></geometry>
+          <material>
+            <ambient>0.25 0.1 0.03 1</ambient>
+            <diffuse>0.5 0.2 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="chair">
+      <static>true</static>
+      <pose>10 3.5 0 0 0 0</pose>
+      <link name="seat">
+        <pose>0 0 0.55 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>0.8 0.8 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.8 0.8 0.15</size></box></geometry>
+          <material>
+            <ambient>0.05 0.18 0.35 1</ambient>
+            <diffuse>0.08 0.35 0.7 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="back">
+        <pose>0.3 0 1.15 0 0 0</pose>
+        <collision name="collision">
+          <geometry><box><size>0.15 0.8 1.2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.8 1.2</size></box></geometry>
+          <material>
+            <ambient>0.05 0.18 0.35 1</ambient>
+            <diffuse>0.08 0.35 0.7 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
     <model name="person">
       <static>true</static>
       <pose>7.2 3.0 0 0 0 0</pose>
