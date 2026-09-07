@@ -37,6 +37,8 @@ merge and delete it.
   decides from images, dialogue, telemetry, memory, and previous outputs.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
+- Physical actions must be direct Gemini tool calls; text or JSON action
+  descriptions never move the vehicle.
 - A move may include a small yaw rate for a smooth arc; `turn` remains the
   in-place reorientation action.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
@@ -210,9 +212,9 @@ return their observed completion before Gemini chooses another movement. One
 physical move or turn stays active until its duration or observed heading settles;
 safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
-completion response. If ER2 does not continue after a physical result, one fresh
-state prompt is sent on the next heartbeat. A 30-second period without model
-activity reconnects a genuinely stalled session.
+completion response and one fresh state prompt to request continuation. A quiet
+post-action turn gets one more state prompt after eight seconds, then reconnects
+if it remains silent; ordinary turns use a 30-second stall timeout.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -244,10 +246,11 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   exploration produce bounded motion; side-target visual steering is still
   stochastic and remains an active simulation goal. The streaming loop sends the
   newest frame once per second and waits for each model/tool cycle before sending
-  the next state heartbeat. After a physical action, one fresh state prompt
-  requests continuation on the next heartbeat; a 30-second period without model
-  activity starts a fresh session with the same situation, active request, and
-  memory while the body holds zero.
+  the next state heartbeat. After a physical action, the ordered tool response
+  includes one fresh state prompt requesting continuation. A quiet post-action
+  turn gets one retry after eight seconds, then a fresh session if it remains
+  silent; ordinary turns use the 30-second timeout. The resumed session keeps
+  the same situation, active request, and memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.
