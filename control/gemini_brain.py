@@ -72,7 +72,7 @@ class ActiveAction:
     blocked_since_s: Optional[float] = None
     observed_forward_m: float = 0.0
     observed_right_m: float = 0.0
-    tool_call_id: Optional[str] = None
+    completion: Optional[asyncio.Future] = None
 
 
 class GeminiRuntime:
@@ -104,7 +104,6 @@ class GeminiRuntime:
         self._last_spoken_generation = -1
         self._last_spoken_at_s: Optional[float] = None
         self._active_action: Optional[ActiveAction] = None
-        self._pending_action_response = None
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -175,7 +174,6 @@ class GeminiRuntime:
             return
         self._stop_requested = False
         self._cancel_action("Gemini session reconnecting")
-        self._pending_action_response = None
         self._reconnect_requested = True
         self._close_session()
 
@@ -235,7 +233,6 @@ class GeminiRuntime:
 
         self._stop_requested = False
         self._cancel_action("brain closed")
-        self._pending_action_response = None
         self._closed.set()
         self._frame_ready.set()
         self._close_session()
@@ -312,19 +309,11 @@ class GeminiRuntime:
                                     response_started_s = None
                                     if self._reconnect_requested:
                                         break
-                                action_response_sent = (
-                                    await self._send_pending_action_response(
-                                        session, types
-                                    )
-                                )
                                 heartbeat_due = (
-                                    not action_response_sent
-                                    and (
-                                        receive_task is None
-                                        or (
-                                            self._dialogue
-                                            and self._dialogue_in_flight is None
-                                        )
+                                    receive_task is None
+                                    or (
+                                        self._dialogue
+                                        and self._dialogue_in_flight is None
                                     )
                                 )
                                 if heartbeat_due:
@@ -424,7 +413,6 @@ class GeminiRuntime:
                         )
                     else:
                         self._cancel_action("Gemini session reconnecting")
-                        self._pending_action_response = None
                         print(f"Gemini session reconnecting: {error}", flush=True)
                 if self._closed.is_set():
                     return
@@ -591,24 +579,32 @@ class GeminiRuntime:
                 responses = []
                 for call in tool_call.function_calls:
                     args = call.args or {}
-                    result = await self._execute(
-                        call.name,
-                        args,
+                    result = await self._execute(call.name, args)
+                    if call.name in ("move", "turn") and result.get("status") in (
+                        "completed",
+                        "timed out before target",
+                        "cancelled",
+                    ):
+                        fresh_frame = await self._wait_for_fresh_action_frame()
+                        result["camera_frame"] = self._last_frame_sent_count
+                        result["camera_observation"] = (
+                            "a fresh camera frame captured after the action was "
+                            "sent immediately before this result"
+                            if fresh_frame
+                            else "no fresh camera frame arrived before the result"
+                        )
+                        result["movement_tools"] = (
+                            "available now"
+                            if fresh_frame
+                            else "unavailable until a fresh camera frame arrives"
+                        )
+                    responses.append(
+                        types.FunctionResponse(
+                            name=call.name,
+                            response=result,
+                            id=call.id,
+                        )
                     )
-                    started = (
-                        call.name in ("move", "turn")
-                        and result.get("status") == "started"
-                    )
-                    response = types.FunctionResponse(
-                        name=call.name,
-                        response=result,
-                        id=call.id,
-                    )
-                    if started and self._active_action is not None:
-                        self._active_action.tool_call_id = call.id
-                        response.will_continue = True
-                        response.scheduling = types.FunctionResponseScheduling.SILENT
-                    responses.append(response)
                 if responses:
                     async with self._send_lock:
                         await session.send_tool_response(
@@ -723,7 +719,7 @@ class GeminiRuntime:
                 result = {"status": "spoken"}
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
-        if result.get("status") in ("started", "hovering", "spoken"):
+        if result.get("status") in ("hovering", "spoken"):
             self.action_count += 1
         if result.get("status") in ("rejected", "unavailable", "already_spoken"):
             reason = str(result.get("reason", "")).strip()
@@ -776,21 +772,13 @@ class GeminiRuntime:
             right_m_s=right_m_s,
             last_update_s=now,
             last_sample_s=now,
+            completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
         self._last_action_result = ""
+        self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
-        return {
-            "status": "started",
-            "action": self._action_label(action),
-            "body_velocity": {
-                "forward_m_s": forward_m_s,
-                "right_m_s": right_m_s,
-            },
-            "heading_deg": _heading_value(self._telemetry.heading_rad),
-            "movement_tools": "unavailable until this action completes",
-            "telemetry": _telemetry_text(self._telemetry),
-        }
+        return await self._wait_for_action(action)
 
     async def _turn(self, args: dict) -> dict:
         direction = str(args.get("direction", "")).strip().lower()
@@ -823,32 +811,28 @@ class GeminiRuntime:
             direction,
             angle_deg,
             now + angle_deg / TURN_RATE_DEG_S + ACTION_GRACE_S,
-            self._telemetry.heading_rad
-            if _finite(self._telemetry.heading_rad)
-            else None,
+            start_heading_rad=(
+                self._telemetry.heading_rad
+                if _finite(self._telemetry.heading_rad)
+                else None
+            ),
             last_update_s=now,
+            completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
         self._last_action_result = ""
+        self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
-        return {
-            "status": "started",
-            "action": self._action_label(action),
-            "heading_deg": _heading_value(self._telemetry.heading_rad),
-            "movement_tools": "unavailable until this action completes",
-            "telemetry": _telemetry_text(self._telemetry),
-        }
+        return await self._wait_for_action(action)
+
+    async def _wait_for_action(self, action: ActiveAction) -> dict:
+        if action.completion is None:
+            return {"status": "cancelled", "reason": "action had no completion handle"}
+        return await asyncio.shield(action.completion)
 
     def _busy_response(self):
         self._refresh_action()
         action = self._active_action
-        if self._pending_action_response is not None:
-            return {
-                "status": "unavailable",
-                "reason": "the measured result of the previous action is still being sent",
-                "movement_tools": "unavailable until the action result is received",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         if action is None:
             if self._stop_requested:
                 return {
@@ -915,8 +899,6 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
-            if self._pending_action_response is not None:
-                return "previous action completed; sending its measured result"
             if self._last_action_result:
                 return f"{self._last_action_result}; movement tools available"
             return "none; movement tools available"
@@ -1083,13 +1065,12 @@ class GeminiRuntime:
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
-        self._queue_action_response(
-            action,
-            self._action_response(action, status, result, actual_heading_deg),
-        )
+        response = self._action_response(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
+        if action.completion is not None and not action.completion.done():
+            action.completion.set_result(response)
 
     def _cancel_action(self, reason: str) -> str:
         action = self._active_action
@@ -1103,13 +1084,12 @@ class GeminiRuntime:
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
-        self._queue_action_response(
-            action,
-            self._action_response(action, "cancelled", result, actual),
-        )
+        response = self._action_response(action, "cancelled", result, actual)
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
+        if action.completion is not None and not action.completion.done():
+            action.completion.set_result(response)
         return self._action_label(action)
 
     def _action_response(
@@ -1151,42 +1131,6 @@ class GeminiRuntime:
             }
         return response
 
-    def _queue_action_response(self, action: ActiveAction, response: dict):
-        if action.tool_call_id is not None:
-            self._pending_action_response = (
-                action.kind,
-                action.tool_call_id,
-                response,
-            )
-
-    async def _send_pending_action_response(self, session, types) -> bool:
-        pending = self._pending_action_response
-        if pending is None:
-            return False
-        if not self._fresh_frame_sent_after_action():
-            await self._send_frame(session, types)
-            if not self._fresh_frame_sent_after_action():
-                return False
-        kind, call_id, response = pending
-        response["camera_frame"] = self._last_frame_sent_count
-        response["camera_observation"] = (
-            "a fresh camera frame captured after the action was sent immediately "
-            "before this result"
-        )
-        async with self._send_lock:
-            await session.send_tool_response(
-                function_responses=types.FunctionResponse(
-                    name=kind,
-                    response=response,
-                    id=call_id,
-                    will_continue=False,
-                    scheduling=types.FunctionResponseScheduling.INTERRUPT,
-                )
-            )
-        if self._pending_action_response == pending:
-            self._pending_action_response = None
-        return True
-
     def _fresh_frame_sent_after_action(self) -> bool:
         finished_at_s = self._action_finished_at_s
         return (
@@ -1196,6 +1140,16 @@ class GeminiRuntime:
             and self._last_frame_sent_at_s is not None
             and self._last_frame_sent_at_s > finished_at_s
         )
+
+    async def _wait_for_fresh_action_frame(self) -> bool:
+        deadline = time.monotonic() + 2.0 * VIDEO_PERIOD_S
+        while (
+            not self._fresh_frame_sent_after_action()
+            and not self._closed.is_set()
+            and time.monotonic() < deadline
+        ):
+            await asyncio.sleep(0.05)
+        return self._fresh_frame_sent_after_action()
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
@@ -1266,10 +1220,11 @@ def _tools():
                 "or right of center; turn first. When exploring without a target, a "
                 "short forward step is enough to learn more. Use a shorter "
                 "duration when close or uncertain and a longer one when the path "
-                "is clearly open. A completed movement only reports how far the "
-                "vehicle moved; it does not prove that a target was reached."
+                "is clearly open. This physical call returns after measured completion. "
+                "A completed movement only reports how far the vehicle moved; it does "
+                "not prove that a target was reached."
             ),
-            "behavior": "NON_BLOCKING",
+            "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -1329,9 +1284,10 @@ def _tools():
                 "improve. "
                 "Never use a large turn for a small visual error. If the target is "
                 "not visible, make one deliberate scan, then reassess before reversing. "
-                "After one turn, reassess from a new image before turning again."
+                "After one turn, reassess from a new image before turning again. "
+                "This physical call returns after the measured turn settles."
             ),
-            "behavior": "NON_BLOCKING",
+            "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -1430,9 +1386,9 @@ def _system_instruction() -> str:
         "image-right means `right`; do not reuse the opposite direction from an older "
         "image. Choose angles, speeds, and durations yourself; the user does not need "
         "to provide them.\n\n"
-        "Move and turn return immediately while the physical action runs. Keep observing, "
-        "but do not call another move or turn while one is active. Wait for its final "
-        "measured result, new heading, and a fresh camera frame before choosing the next "
+        "Move and turn are blocking physical tools: the call returns after the action "
+        "has settled, while camera frames and safety checks continue. Use its final "
+        "measured result, new heading, and fresh camera frame before choosing the next "
         "physical movement. A movement result does not prove that a target was found or "
         "reached. A valid clear TOF reading is required before translation.\n\n"
         "Move slowly in the body frame and turn by relative yaw only. Never request motors, "
