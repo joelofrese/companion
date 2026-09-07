@@ -27,6 +27,8 @@ THINKING_BUDGET = 128
 RESPONSE_TIMEOUT_S = 45.0
 # Re-prompt a silent decision before the longer session recovery timeout.
 RESPONSE_NUDGE_S = 8.0
+# Do not leave the body idle if the re-prompt itself does not wake the model.
+RESPONSE_RECONNECT_S = 16.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -39,7 +41,8 @@ MIN_TURN_DEG = 2.0
 DEFAULT_TURN_DEG = 8.0
 MAX_TURN_DEG = 15.0
 # Prevent an open-ended visual scan from rotating without reassessing.
-MAX_TURNS_WITHOUT_MOVE = 6
+# Require a translation or fresh dialogue before a repeated turn loop grows.
+MAX_TURNS_WITHOUT_MOVE = 3
 MIN_TURN_RESET_DISTANCE_M = 0.15
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
@@ -509,12 +512,28 @@ class GeminiRuntime:
         async with self._send_lock:
             if not self._response_in_flight:
                 return
-            self._last_response_nudge_s = now
+            if self._last_response_nudge_s is None:
+                self._last_response_nudge_s = now
+                print(
+                    "Gemini response silent; requesting a fresh state.",
+                    flush=True,
+                )
+                await session.send_realtime_input(
+                    text=self._heartbeat_text("")
+                )
+                return
+            if now - self._last_response_nudge_s < RESPONSE_RECONNECT_S:
+                return
             print(
-                "Gemini response silent; requesting a fresh state.",
+                "Gemini response stayed silent; reconnecting the session.",
                 flush=True,
             )
-            await session.send_realtime_input(text=self._heartbeat_text(""))
+            self._response_parts.clear()
+            self._response_thoughts.clear()
+            self._actions.clear()
+            self._response_in_flight = False
+            self._reconnect_requested = True
+            self._close_session()
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -1348,7 +1367,7 @@ def _tools():
                 "with the previous image: use a smaller correction if the target is "
                 "still off-center, reverse if it moved away, and move when it is "
                 "roughly ahead. After several turns without a meaningful translation, "
-                "reassess rather than rotating by habit. After six completed turns "
+                "reassess rather than rotating by habit. After three completed turns "
                 "without a meaningful translation, reassess with a meaningful move, "
                 "hover, or new dialogue before turning again. If the turn "
                 "tool says it is unavailable, do not retry it; choose move, hover, or "
@@ -1442,6 +1461,9 @@ def _system_instruction() -> str:
         "The camera faces forward. A target on image-left requires a left turn; a target "
         "on image-right requires a right turn. Use the newest image to choose each "
         "direction. Turn toward a visible target only while it is clearly to one side. "
+        "If a visual search target is not visible, make one small turn or short safe "
+        "move to search, then inspect the next image; do not wait indefinitely for "
+        "it to appear. "
         "When it is roughly ahead, stop turning and take a short move or inspect "
         "the scene; do not seek perfect centering. Compare each new view with the "
         "previous one, use a smaller correction while it improves, and reverse only "
@@ -1455,7 +1477,7 @@ def _system_instruction() -> str:
         "telemetry, and a fresh frame before another physical movement is chosen. If "
         "several turn results pass without a meaningful translation, reassess the "
         "newest image and choose a short move, hover, or a direction supported by "
-        "fresh evidence; do not rotate by habit. Six completed turns without a "
+        "fresh evidence; do not rotate by habit. Three completed turns without a "
         "meaningful translation temporarily make turn unavailable until a meaningful "
         "move, hover, or new dialogue resets the count. A tiny or blocked move does "
         "not reset it. A repeated same-direction turn may be reduced to the normal "

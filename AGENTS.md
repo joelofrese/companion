@@ -44,8 +44,8 @@ merge and delete it.
   movement is allowed.
 - Camera frames stream once per second. A normal state heartbeat starts the next
   model decision only after the current decision or physical tool cycle finishes,
-  so it does not interrupt Gemini's reasoning. An idle silent response may receive
-  one explicit recovery heartbeat after eight seconds.
+  so it does not interrupt Gemini's reasoning. An idle silent response receives
+  one recovery heartbeat after eight seconds, then reconnects after further silence.
 - A spoken response answers one user message; Gemini waits for new dialogue
   before speaking again.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
@@ -210,9 +210,8 @@ period without model activity still reconnects the session.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
-The trace reads
-Gemini's native `thought` parts separately from visible responses and tool
-calls; ER 2 may emit no thought summaries even when it reasons internally.
+The trace reads Gemini's native `thought` parts separately from visible responses
+and tool calls; ER 2 may emit no thought summaries even when it reasons internally.
 
 ## Current state
 
@@ -232,14 +231,14 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   dialogue or a completed physical action before repeating. Tool results and
   physical completion feed a fresh state and image before the next movement decision.
   The prompt asks ER 2 to
-  compare each new view before correcting movement and reassess after six
+  compare each new view before correcting movement and reassess after three
   turns without a meaningful translation. Centered targets and open-ended
   exploration produce bounded motion; side-target visual steering is still
   stochastic and remains an active simulation goal. The streaming loop sends the
   newest frame once per second and waits for each model/tool cycle before sending
   the next state heartbeat. An idle silent response is re-prompted after eight
-  seconds; a 45-second period without model activity reconnects while the body
-  holds zero.
+  seconds and reconnects after further silence; a 45-second period without model
+  activity remains a fallback while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.
