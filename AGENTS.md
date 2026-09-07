@@ -46,8 +46,9 @@ merge and delete it.
   movement is allowed.
 - Camera frames stream once per second. A normal state heartbeat starts the next
   model decision only after the current decision or physical tool cycle finishes,
-  so it does not interrupt Gemini's reasoning. A silent response is allowed to
-  finish; a bounded response timeout reconnects only a genuinely stalled session.
+  so it does not interrupt Gemini's reasoning. If ER2 does not continue after a
+  completed physical action, one fresh state prompt is sent after a short wait;
+  a bounded response timeout reconnects only a genuinely stalled session.
 - A spoken response answers one user message; Gemini waits for new dialogue
   before speaking again.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
@@ -207,9 +208,9 @@ return their observed completion before Gemini chooses another movement. One
 physical move or turn stays active until its duration or observed heading settles;
 safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
-completion response. A 30-second period without model activity reconnects a
-genuinely stalled session; normal responses are never interrupted by recovery
-prompts.
+completion response. If ER2 does not continue after a physical result, one fresh
+state prompt is sent after eight seconds. A 30-second period without model
+activity reconnects a genuinely stalled session.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -239,9 +240,10 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   exploration produce bounded motion; side-target visual steering is still
   stochastic and remains an active simulation goal. The streaming loop sends the
   newest frame once per second and waits for each model/tool cycle before sending
-  the next state heartbeat. A 30-second period without model activity starts a
-  fresh session with the same situation, active request, and memory while the
-  body holds zero.
+  the next state heartbeat. After a physical action, one fresh state prompt can
+  request continuation after eight seconds; a 30-second period without model
+  activity starts a fresh session with the same situation, active request, and
+  memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.
