@@ -1159,6 +1159,8 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             return
+        if actual_heading_deg is None and action.start_heading_rad is not None:
+            actual_heading_deg = self._heading_change_deg(action)
         result = f"{self._action_label(action)} {status}"
         if actual_heading_deg is not None:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
@@ -1235,8 +1237,9 @@ class GeminiRuntime:
         }
         if actual_heading_deg is not None:
             response["observed_heading_change_deg"] = actual_heading_deg
-        if action.kind == "turn":
+        if action.start_heading_rad is not None:
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
+        if action.kind == "turn":
             if action.requested_amount is not None:
                 response["requested_angle_deg"] = action.requested_amount
             if action.limit_reason:
@@ -1332,7 +1335,9 @@ def _tools():
                 "Move slowly in the body frame for a short, chosen duration. "
                 "Forward is positive and right is positive. Use it only with a clear "
                 "path and valid range reading. An optional small yaw rate can make "
-                "a smooth arc while translating; use `turn` for an in-place turn. "
+                "a smooth arc while translating; during open-ended exploration, "
+                "prefer a safe translating arc when it can make progress and scan. "
+                "Use `turn` for an in-place turn. "
                 "Keep the step short when uncertain, "
                 "then inspect the next image. The physical call returns after measured "
                 "completion; it does not prove that a target was reached. A meaningful "
@@ -1488,6 +1493,9 @@ def _system_instruction() -> str:
         "When a small safe action is clear, act promptly rather than waiting for "
         "perfect certainty. When a task is active and the scene is clear, do not "
         "choose `ack` merely to defer the next action. "
+        "When the situation or request is exploration, keep exploring until the "
+        "user changes it; after each completed action, choose another small safe "
+        "action or deliberately hover and say why instead of ending silently. "
         "Keep the user's request active until it is complete or changed, and describe "
         "only what the newest image supports. Use measured past motion to calibrate "
         "future commands, but trust current telemetry and the newest image first.\n\n"
@@ -1503,10 +1511,11 @@ def _system_instruction() -> str:
         "if it moved away. You choose the turn size: use a small correction for a "
         "small visual error and omit the angle for the normal correction. Use a "
         "larger bounded turn only once for a broad reorientation; do not ask the "
-        "user for an exact turn amount. Move only when the path and TOF "
-        "range are clear. Choose slow actions and inspect the new image after every "
-        "physical action. A move may include a small yaw rate for a smooth arc; use "
-        "turn when you need to reorient in place. "
+        "user for an exact turn amount. Move only when the path and TOF range are "
+        "clear. In open-ended exploration, prefer a short translating move with a "
+        "gentle yaw rate when it can make progress while scanning; use turn when "
+        "you need to reorient in place. Choose slow actions and inspect the new "
+        "image after every physical action. "
         "Move and turn are blocking: their results include measured motion, heading, "
         "telemetry, and a fresh frame before another physical movement is chosen. If "
         "several turn results pass without a meaningful translation, reassess the "

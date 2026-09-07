@@ -233,7 +233,9 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   serialized while their live state, completion, and heading are reported.
   Speech is a blocking tool call that returns immediately, but waits for new
   dialogue or a completed physical action before repeating. Tool results and
-  physical completion feed a fresh state and image before the next movement decision.
+  physical completion feed a fresh state and image before the next movement decision;
+  translating arcs also report their measured heading change. Exploration remains
+  active until the user changes it.
   The prompt asks ER 2 to
   compare each new view before correcting movement and reassess after two
   turns without a meaningful translation. Centered targets and open-ended
