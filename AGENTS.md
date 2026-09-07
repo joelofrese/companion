@@ -218,8 +218,9 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
 - Exploratory camera and depth worlds exercise open-ended situations, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
-  for simulation and the CM5. It starts with one situation prompt, then uses
-  native context compression and session resumption while continuously
+  for simulation and the CM5. It starts with one situation prompt and one small
+  safe-action-or-hover instruction, then uses native context compression and
+  session resumption while continuously
   choosing bounded move, turn, hover, and speech actions. Native
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
   actions remain separately visible. Move and turn actions are blocking and

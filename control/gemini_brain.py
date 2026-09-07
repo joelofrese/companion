@@ -491,7 +491,11 @@ class GeminiRuntime:
                 memory = self.memory_store.context()
         start = ""
         if self._bootstrap_pending:
-            start = f"[START]\nSituation: {self.situation}\n"
+            start = (
+                f"[START]\nSituation: {self.situation}\n"
+                "Begin now: choose one small safe action from the current scene, "
+                "or hover if no action is clear. Do not wait for another prompt.\n"
+            )
         camera = (
             f"fresh frame {self._frame_count}"
             if self._has_fresh_frame()
