@@ -1,4 +1,4 @@
-"""Deterministic VLM and LLM brain used only by simulation."""
+"""Deterministic brain fixture used only by simulation."""
 
 from collections import deque
 from dataclasses import dataclass
@@ -71,7 +71,7 @@ def _experience_outcome(telemetry: Telemetry) -> str:
 
 @dataclass(frozen=True)
 class VisualObservation:
-    """One VLM description of an image."""
+    """One deterministic visual observation."""
 
     timestamp_s: float
     description: str
@@ -139,7 +139,7 @@ class LanguageModel(Protocol):
 
 
 class CompanionMind:
-    """Connect a VLM subconscious to a conscious language model."""
+    """Connect deterministic visual and decision fixtures."""
 
     def __init__(
         self,
@@ -215,7 +215,7 @@ class CompanionMind:
         timestamp_s: float,
         telemetry: Telemetry = Telemetry(),
     ) -> VisualObservation:
-        """Ask the VLM to describe one image."""
+        """Ask the visual fixture to describe one image."""
 
         with self._lock:
             intent_generation = self._intent_generation
@@ -245,7 +245,7 @@ class CompanionMind:
         dialogue: Optional[str] = None,
         intent_override: Optional[str] = None,
     ) -> ConsciousDecision:
-        """Ask the LLM to update intent, focus, dialogue, and summary."""
+        """Ask the decision fixture to update intent and focus."""
 
         with self._lock:
             intent_generation = self._intent_generation
@@ -287,7 +287,7 @@ class CompanionMind:
                 )
             else:
                 # A continuing goal may be worded differently by the model.
-                # Keep the current text so fresh VLM work remains usable.
+                # Keep the current text so fresh visual work remains usable.
                 intent = information.intent
             intent_changed = intent != information.intent
             focus = decision.focus.strip() if isinstance(decision.focus, str) else ""

@@ -1,4 +1,4 @@
-"""Run the deterministic simulation mind beside the motion loop."""
+"""Run the deterministic brain fixture beside the motion loop."""
 
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -20,7 +20,7 @@ CONSCIOUS_PERIOD_S = 0.5
 
 
 class MindRuntime:
-    """Turn VLM suggestions into safe companion commands."""
+    """Turn fixture observations into safe companion commands."""
 
     def __init__(
         self,
@@ -62,7 +62,7 @@ class MindRuntime:
 
     @property
     def latest_observation_age_s(self) -> Optional[float]:
-        """Return how long the newest VLM result has been available."""
+        """Return how long the newest visual result has been available."""
 
         if self._observation_ready_at_s is None:
             return None
@@ -78,7 +78,7 @@ class MindRuntime:
 
     @property
     def observation_count(self) -> int:
-        """Return the number of VLM observations completed."""
+        """Return the number of visual observations completed."""
 
         return self._observation_count
 
@@ -90,7 +90,7 @@ class MindRuntime:
 
     @property
     def latest_observation_duration_s(self) -> Optional[float]:
-        """Return how long the newest VLM request took."""
+        """Return how long the newest visual request took."""
 
         return self._observation_duration_s
 

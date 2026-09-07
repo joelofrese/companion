@@ -42,8 +42,9 @@ merge and delete it.
   telemetry arrive before the next movement, and a newer camera frame is
   required before another physical action. Safety holds pause the action until
   movement is allowed.
-- A frame and state heartbeat is sent once per second, including during actions,
-  so Gemini can reassess the newest scene.
+- Camera frames stream once per second. A state heartbeat starts the next model
+  decision only after the current decision or physical tool cycle finishes, so
+  the heartbeat cannot interrupt Gemini's own reasoning.
 - A spoken response answers one user message; Gemini waits for new dialogue
   before speaking again.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
@@ -97,6 +98,8 @@ Keep two simulation modes:
 
 The deterministic brain fixture is simulation-only; Gemini is the production
 brain.
+There is no local VLM or detector fallback; the fixture only makes repeatable
+control-path checks possible.
 
 From `companion/`:
 
@@ -192,14 +195,15 @@ Streaming session. Native context-window compression keeps the in-flight
 conversation bounded, and native session resumption reconnects it with the
 latest resumable handle when a connection ends; a rejected handle starts a
 fresh session with the situation and memory. The editable memory file is only
-prior experience across runs. The session receives the newest 640-pixel JPEG and
-state heartbeat once per second, including while model turns and physical actions
-run. Heartbeats may interrupt unfinished model text so Gemini can reassess the
-newest scene. Movement and turn tools return their observed completion before
-Gemini chooses another movement. One physical move or turn stays active until its
-duration or observed heading settles; safety holds pause its timing; the action
-state reports the command, phase, remaining time, and heading. The movement tool
-also sends Gemini a native completion response.
+prior experience across runs. The session receives the newest 640-pixel JPEG once
+per second. A state heartbeat starts the next model decision after the current
+model or physical tool cycle finishes; this avoids interrupting unfinished
+reasoning while keeping the camera stream continuous. Movement and turn tools
+return their observed completion before Gemini chooses another movement. One
+physical move or turn stays active until its duration or observed heading settles;
+safety holds pause its timing; the action state reports the command, phase,
+remaining time, and heading. The movement tool also sends Gemini a native
+completion response.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -228,8 +232,9 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   turns without a meaningful translation. Centered targets and open-ended
   exploration produce bounded motion; side-target visual steering is still
   stochastic and remains an active simulation goal. The streaming loop sends the
-  newest frame and state once per second; a 45-second period without model
-  activity reconnects while the body holds zero.
+  newest frame once per second and waits for each model/tool cycle before sending
+  the next state heartbeat; a 45-second period without model activity reconnects
+  while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.

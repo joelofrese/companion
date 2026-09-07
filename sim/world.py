@@ -648,7 +648,7 @@ async def run(
                         )
                         if signature != last_observation_signature:
                             print(
-                                f"[VLM {elapsed_s:5.1f}s] "
+                                f"[FIXTURE-VISION {elapsed_s:5.1f}s] "
                                 f"{signature[0]}; answer={signature[1]}; "
                                 f"alternate={signature[2] or 'none'}; "
                                 f"next-focus={signature[3]}; movement={signature[4]}; "
@@ -670,7 +670,7 @@ async def run(
                         )
                         if signature != last_decision_signature:
                             print(
-                                f"[LLM {elapsed_s:5.1f}s] "
+                                f"[FIXTURE-BRAIN {elapsed_s:5.1f}s] "
                                 f"intent={signature[0]}; changed={signature[1]}; "
                                 f"focus={signature[2]}; summary={signature[3]}; "
                                 f"latency={control.latest_decision_duration_s:.2f}s",
@@ -709,22 +709,22 @@ async def run(
                         reason = "conscious intent is hover"
                     elif observation is None:
                         reason = (
-                            "waiting for the first VLM observation"
+                            "waiting for the first fixture observation"
                             if control.observation_count == 0
-                            else "latest VLM observation failed"
+                            else "latest fixture observation failed"
                         )
                     elif (
                         control.latest_observation_age_s is None
                         or control.latest_observation_age_s > MAX_MOVEMENT_AGE_S
                     ):
-                        reason = "VLM movement lease expired"
+                        reason = "fixture movement lease expired"
                     elif (
                         control.latest_frame_age_s is None
                         or control.latest_frame_age_s > MAX_FRAME_GAP_S
                     ):
                         reason = "camera frame lease expired"
                     elif observation.confidence < MIN_MOVEMENT_CONFIDENCE:
-                        reason = "VLM confidence is below the movement threshold"
+                        reason = "fixture confidence is below the movement threshold"
                     elif (
                         observation.focused_answer
                         and (
@@ -734,7 +734,7 @@ async def run(
                     ):
                         reason = "visual focus confirmed"
                     elif observation.movement in ("stop", "hover"):
-                        reason = f"VLM suggested {observation.movement}"
+                        reason = f"fixture suggested {observation.movement}"
                     else:
                         reason = "Brain timing or intent refresh held zero"
             else:

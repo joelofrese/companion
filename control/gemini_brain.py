@@ -33,7 +33,9 @@ MAX_MOVE_S = 2.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 2.0
-MAX_TURN_DEG = 5.0
+# Let the model omit precision it cannot reliably estimate from one image.
+DEFAULT_TURN_DEG = 8.0
+MAX_TURN_DEG = 15.0
 # Prevent an open-ended visual scan from rotating without reassessing.
 MAX_TURNS_WITHOUT_MOVE = 6
 MIN_TURN_RESET_DISTANCE_M = 0.15
@@ -73,6 +75,8 @@ class ActiveAction:
     blocked_since_s: Optional[float] = None
     observed_forward_m: float = 0.0
     observed_right_m: float = 0.0
+    requested_amount: Optional[float] = None
+    limit_reason: str = ""
     completion: Optional[asyncio.Future] = None
 
 
@@ -104,6 +108,7 @@ class GeminiRuntime:
         self._active_action: Optional[ActiveAction] = None
         self._action_finished_at_s: Optional[float] = None
         self._turns_since_meaningful_move = 0
+        self._last_turn_direction: Optional[str] = None
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -127,6 +132,7 @@ class GeminiRuntime:
         self.session_reconnect_count = 0
         self._reconnect_requested = False
         self._last_model_activity_s: Optional[float] = None
+        self._response_in_flight = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -163,6 +169,7 @@ class GeminiRuntime:
         self._latest_user_request = message
         self._speech_blocked = False
         self._turns_since_meaningful_move = 0
+        self._last_turn_direction = None
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -264,6 +271,7 @@ class GeminiRuntime:
                     self._bootstrap_pending = True
                     self._dialogue_in_flight = None
                     self._dialogue_send_complete = False
+                self._response_in_flight = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -441,6 +449,11 @@ class GeminiRuntime:
         """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
+        # Heartbeat text is a new user turn and interrupts model generation.
+        # Keep streaming frames, but let each decision or blocking tool cycle
+        # finish before prompting for another one.
+        if self._response_in_flight:
+            return
         dialogue = ""
         if self._dialogue and self._dialogue_in_flight is None:
             dialogue = self._dialogue[0]
@@ -448,11 +461,13 @@ class GeminiRuntime:
             self._dialogue_send_complete = False
         async with self._send_lock:
             action_result = self._last_action_result
+            self._response_in_flight = True
             try:
                 await session.send_realtime_input(
                     text=self._heartbeat_text(dialogue)
                 )
             except Exception:
+                self._response_in_flight = False
                 if dialogue and self._dialogue_in_flight == dialogue:
                     self._dialogue_in_flight = None
                     self._dialogue_send_complete = False
@@ -548,6 +563,7 @@ class GeminiRuntime:
                     # start a clean decision cycle.
                     self._response_parts.clear()
                     self._response_thoughts.clear()
+                    self._response_in_flight = False
                     return
             tool_call = message.tool_call
             if tool_call is not None:
@@ -598,6 +614,7 @@ class GeminiRuntime:
                 self._acknowledge_dialogue()
                 self.turn_count += 1
                 self._finish_turn(response_started_s)
+                self._response_in_flight = False
                 return
 
     def _acknowledge_dialogue(self):
@@ -627,6 +644,7 @@ class GeminiRuntime:
                 and not self._stop_requested
             ):
                 self._turns_since_meaningful_move = 0
+                self._last_turn_direction = None
                 result = {
                     "status": "already_hovering",
                     "reason": "the vehicle is already holding position",
@@ -647,6 +665,7 @@ class GeminiRuntime:
                 self._stop_requested = False
                 cancelled = self._cancel_action("hover")
                 self._turns_since_meaningful_move = 0
+                self._last_turn_direction = None
                 self._record_action("hover")
                 result = {
                     "status": "hovering",
@@ -741,7 +760,9 @@ class GeminiRuntime:
                 "status": "rejected",
                 "reason": "direction must be left or right",
             }
-        if (
+        if angle_deg is None:
+            angle_deg = DEFAULT_TURN_DEG
+        elif (
             isinstance(angle_deg, bool)
             or not isinstance(angle_deg, (int, float))
             or not math.isfinite(angle_deg)
@@ -774,7 +795,19 @@ class GeminiRuntime:
         if observation is not None:
             return observation
         now = time.monotonic()
-        angle_deg = float(angle_deg)
+        requested_angle_deg = float(angle_deg)
+        limit_reason = ""
+        if (
+            self._last_turn_direction == direction
+            and self._turns_since_meaningful_move > 0
+        ):
+            angle_deg = min(requested_angle_deg, DEFAULT_TURN_DEG)
+            if angle_deg < requested_angle_deg:
+                limit_reason = (
+                    "same-direction correction limited until meaningful translation"
+                )
+        else:
+            angle_deg = requested_angle_deg
         action = ActiveAction(
             "turn",
             direction,
@@ -786,6 +819,8 @@ class GeminiRuntime:
                 else None
             ),
             last_update_s=now,
+            requested_amount=requested_angle_deg,
+            limit_reason=limit_reason,
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
@@ -1039,18 +1074,22 @@ class GeminiRuntime:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
+        if action.limit_reason:
+            result += f"; {action.limit_reason}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
             self._speech_blocked = False
         if action.kind == "turn":
             self._turns_since_meaningful_move += 1
+            self._last_turn_direction = action.direction
         elif (
             status == "completed"
             and math.hypot(action.observed_forward_m, action.observed_right_m)
             >= MIN_TURN_RESET_DISTANCE_M
         ):
             self._turns_since_meaningful_move = 0
+            self._last_turn_direction = None
         response = self._action_response(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._remember_action(result)
@@ -1072,6 +1111,7 @@ class GeminiRuntime:
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
         self._turns_since_meaningful_move = 0
+        self._last_turn_direction = None
         response = self._action_response(action, "cancelled", result, actual)
         self._record_action(result)
         self._remember_action(result)
@@ -1107,6 +1147,10 @@ class GeminiRuntime:
             response["observed_heading_change_deg"] = actual_heading_deg
         if action.kind == "turn":
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
+            if action.requested_amount is not None:
+                response["requested_angle_deg"] = action.requested_amount
+            if action.limit_reason:
+                response["angle_limit"] = action.limit_reason
             response["turns_since_meaningful_move"] = (
                 self._turns_since_meaningful_move
             )
@@ -1243,8 +1287,11 @@ def _tools():
         {
             "name": "turn",
             "description": (
-                "Turn in place slowly by a relative angle. Choose the direction and "
-                "a small angle from the newest image and heading. A target on the "
+                "Turn in place slowly by a measured relative angle. Choose the "
+                "direction from the newest image and heading. Omit the angle for "
+                f"a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger "
+                "bounded angle only for one deliberate reorientation. Do not wait "
+                "for the user to provide an exact angle. A target on the "
                 "left half of the image means turn left; a target on the right half "
                 "means turn right. After the physical call returns, "
                 "inspect the new image before choosing another movement. Compare it "
@@ -1255,7 +1302,9 @@ def _tools():
                 "without a meaningful translation, reassess with a meaningful move, "
                 "hover, or new dialogue before turning again. If the turn "
                 "tool says it is unavailable, do not retry it; choose move, hover, or "
-                "wait for new dialogue instead."
+                "wait for new dialogue instead. A repeated same-direction turn may "
+                "be reduced to the normal correction size; trust the applied angle "
+                "and measured heading in its result."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1273,14 +1322,16 @@ def _tools():
                     "angle_deg": {
                         "type": "NUMBER",
                         "description": (
-                            f"A turn from {MIN_TURN_DEG:.0f} through "
-                            f"{MAX_TURN_DEG:.0f} degrees."
+                            f"Optional deliberate turn from {MIN_TURN_DEG:.0f} "
+                            f"through {MAX_TURN_DEG:.0f} degrees. Omit it for the "
+                            f"normal {DEFAULT_TURN_DEG:.0f}-degree correction; use "
+                            "10-15 degrees only for one broad reorientation."
                         ),
                         "minimum": MIN_TURN_DEG,
                         "maximum": MAX_TURN_DEG,
                     },
                 },
-                "required": ["direction", "angle_deg"],
+                "required": ["direction"],
             },
         },
         {
@@ -1341,8 +1392,12 @@ def _system_instruction() -> str:
         "When it is roughly ahead, stop turning and take a short move or inspect "
         "the scene; do not seek perfect centering. Compare each new view with the "
         "previous one, use a smaller correction while it improves, and reverse only "
-        "if it moved away. Move only when the path and TOF range are clear. Choose "
-        "small, slow actions and inspect the new image after every physical action. "
+        "if it moved away. You choose the turn size: use a small correction for a "
+        "small visual error and omit the angle for the normal correction. Use a "
+        "larger bounded turn only once for a broad reorientation; do not ask the "
+        "user for an exact turn amount. Move only when the path and TOF "
+        "range are clear. Choose slow actions and inspect the new image after every "
+        "physical action. "
         "Move and turn are blocking: their results include measured motion, heading, "
         "telemetry, and a fresh frame before another physical movement is chosen. If "
         "several turn results pass without a meaningful translation, reassess the "
@@ -1350,8 +1405,9 @@ def _system_instruction() -> str:
         "fresh evidence; do not rotate by habit. Six completed turns without a "
         "meaningful translation temporarily make turn unavailable until a meaningful "
         "move, hover, or new dialogue resets the count. A tiny or blocked move does "
-        "not reset it. Never retry an unavailable turn; choose move, hover, or wait "
-        "for new dialogue and reassess.\n\n"
+        "not reset it. A repeated same-direction turn may be reduced to the normal "
+        "correction size; use its applied angle and measured heading. Never retry an "
+        "unavailable turn; choose move, hover, or wait for new dialogue and reassess.\n\n"
         "Use body-frame translation and relative yaw only. Never request motors, attitude, "
         "altitude, position, or long motion. Hover when stopping or when the scene is "
         "unclear or unsafe. Speak for the user or a meaningful new event, not to narrate "
