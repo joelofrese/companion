@@ -52,7 +52,8 @@ merge and delete it.
   and may interrupt that reasoning; a bounded response timeout reconnects only a
   genuinely stalled session.
 - A spoken response answers one user message; new dialogue may interrupt it, and
-  Gemini waits for new dialogue before speaking again.
+  Gemini waits for new dialogue or a completed physical action before speaking
+  again.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
   acknowledges the stop. The CM5 handles safety overrides.
 - Stale, malformed, missing, or unsafe input becomes zero motion.
