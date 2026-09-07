@@ -530,12 +530,18 @@ class GeminiRuntime:
             if self._has_fresh_frame()
             else "stale or missing"
         )
+        speech = (
+            "available"
+            if not self._speech_blocked
+            else "unavailable until new dialogue or a completed physical action"
+        )
         state = (
             f"{start}[STATE]\n"
             f"Camera: {camera}; forward-facing; image-left=body-left; "
             "image-right=body-right; image-center=current heading\n"
             f"Vehicle: {_telemetry_text(self._telemetry)}\n"
             f"Action: {self._action_state_text()}\n"
+            f"Speech: {speech}\n"
             "[HEARTBEAT] Inspect the newest image and state now. If the task is "
             "active and the scene is clear, choose one small safe physical action. "
             "Do not use `ack` merely because this heartbeat arrived; use `ack` "
