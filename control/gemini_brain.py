@@ -48,7 +48,6 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
-MAX_SAME_DIRECTION_TURNS = 2
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -104,8 +103,6 @@ class GeminiRuntime:
         self._last_spoken_at_s: Optional[float] = None
         self._active_action: Optional[ActiveAction] = None
         self._action_finished_at_s: Optional[float] = None
-        self._turn_direction: Optional[str] = None
-        self._same_direction_turns = 0
         self._stop_requested = False
         self._last_action_result = ""
         self.latest_thought = ""
@@ -163,8 +160,6 @@ class GeminiRuntime:
         message = message.strip()
         self._latest_user_request = message
         self._dialogue_generation += 1
-        self._turn_direction = None
-        self._same_direction_turns = 0
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -751,8 +746,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._turn_direction = None
-        self._same_direction_turns = 0
         self._last_action_result = ""
         self._record_action(f"started {self._action_label(action)}")
         return {
@@ -791,20 +784,6 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
-        if (
-            self._turn_direction == direction
-            and self._same_direction_turns >= MAX_SAME_DIRECTION_TURNS
-        ):
-            return {
-                "status": "unavailable",
-                "reason": (
-                    f"{MAX_SAME_DIRECTION_TURNS} same-direction turns just completed; "
-                    "inspect the newest image and choose a smaller correction, "
-                    "translation, the other direction, hover, or ack"
-                ),
-                "movement_tools": "available now",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         now = time.monotonic()
         angle_deg = float(angle_deg)
         action = ActiveAction(
@@ -1064,12 +1043,6 @@ class GeminiRuntime:
             result += f"; {self._translation_text(action)}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
-        if action.kind == "turn":
-            if self._turn_direction == action.direction:
-                self._same_direction_turns += 1
-            else:
-                self._turn_direction = action.direction
-                self._same_direction_turns = 1
         self._finish_action_waiter(
             action,
             self._action_response(action, status, result, actual_heading_deg),
@@ -1189,8 +1162,10 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short, chosen duration. "
-                "Forward is positive and right is positive. If a visible target is "
-                "centered and the range is clear, move toward it. Use a shorter "
+                "Forward is positive and right is positive. Use this only when a "
+                "visible target is centered and the range is clear. Do not use "
+                "forward motion to correct a target that is left or right of center; "
+                "turn first. Use a shorter "
                 "duration when close or uncertain and a longer one when the path "
                 "is clearly open. A completed movement only reports how far the "
                 "vehicle moved; it does not prove that a target was reached."
@@ -1240,6 +1215,7 @@ def _tools():
                 "the user does not need to provide it. Use a small correction when "
                 "nearly aligned: about 2-6 degrees for a small offset and 8-15 "
                 "degrees near the edge. Use 10-15 degrees only for a broad scan. "
+                "If a visible target is off-center, turn toward it instead of moving. "
                 "A target on image-right requires a right turn, and a target on "
                 "image-left requires a left turn. "
                 "A target already visible in the frame is not a search: use the "
@@ -1312,49 +1288,26 @@ def _system_instruction() -> str:
 
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
-        "newest image, forward TOF distance, body velocity, heading, active action, "
-        "dialogue, and action result. To move, call `move`; to turn, call `turn`; to "
-        "stop, call `hover`; to talk, call `speak`; to acknowledge state without "
-        "changing the vehicle, call `ack`. These tools are the only way to act. "
-        "Never output action JSON or describe a tool call as text. Choose one tool "
-        "call or do nothing. Keep a user request active until "
-        "it is complete or changed, and explore when asked. During exploration, move "
-        "or turn when it helps inspect or make progress; do not move merely because "
-        "a heartbeat arrived. If the scene and goal are unchanged, do nothing. For any "
-        "visual goal, use "
-        "its current position in the image. The camera is aligned with the body "
-        "frame: image-left is body-left and image-right is body-right. Therefore "
-        "image-right means call `turn` right, and image-left means call `turn` "
-        "left. If it is centered and the path is clear, "
-        "take a short step; if it is off-center, turn toward it; if it is unclear, "
-        "reobserve or make one deliberate search turn. Choose movement amounts yourself; "
-        "A visible target is not a search: use the smallest turn that brings it toward "
-        "the image center, then reobserve instead of repeating a broad scan. "
-        "the user does not need to give exact angles or distances. After each move or "
-        "turn, wait for its blocking result. It includes the observed movement, "
-        "current heading, and current telemetry. After that result, wait for a fresh "
-        "image captured after the action before choosing another physical action. "
-        "Then inspect the newest image and telemetry and act only when it helps "
-        "the request, not merely because the previous action finished. Use the "
-        "measured action result and "
-        "current heading from telemetry to correct the next action; never repeat a "
-        "movement or turn without a fresh view. Use slow body-frame horizontal moves "
-        "and relative yaw turns; use a small correction when nearly aligned and a "
-        "larger deliberate turn when needed, never more than the tool limit. Do not "
-        "use a large turn for a small image offset. If a "
-        "target is outside the view, make one scan in a chosen direction and inspect "
-        "the new view before turning back. A "
-        "fresh image must show a requested object before claiming that it was found, "
-        "reached, or inspected; a movement result alone is not proof. Say when the "
-        "view is uncertain and keep observing. "
-        "valid clear TOF reading is required before translation. CM5 and PX4 handle "
-        "safety and stability; never "
-        "request motors, attitude, altitude, position, or long motion. Choose only one "
-        "physical action at a time. Hover for explicit stop or stale, unclear, or "
-        "unsafe state, and do not repeat hover while already hovering. Do not repeat "
-        "a greeting or observation without a new user message or meaningful event. "
-        "Leave a pause between autonomous messages. Speak only to answer the user "
-        "or report a meaningful event."
+        "newest camera image, TOF distance, body velocity, heading, active action, "
+        "dialogue, and action result. The tools are the only way to act: use `move`, "
+        "`turn`, `hover`, `speak`, or `ack`. Choose at most one tool call per decision "
+        "or do nothing. Keep the user's request active until it is complete or changed. "
+        "\n\n"
+        "Visual control: the camera is aligned with the body. Image-right is body-right "
+        "and requires a right turn; image-left requires a left turn. If a visible target "
+        "is off-center, turn toward it and do not move forward yet. Use `move` only when "
+        "the target is centered, the path is clear, and a short step helps. If the target "
+        "is not visible, make one small deliberate scan and inspect the new image. Do not "
+        "repeat a broad scan when the target is already visible. Choose angles, speeds, "
+        "and durations yourself; the user does not need to provide them.\n\n"
+        "After every move or turn, wait for its measured result and then a fresh camera "
+        "frame before choosing another physical action. Use the new heading and result to "
+        "correct the next action. A movement result does not prove that a target was found "
+        "or reached. A valid clear TOF reading is required before translation.\n\n"
+        "Move slowly in the body frame and turn by relative yaw only. Never request motors, "
+        "attitude, altitude, position, or long motion. CM5 and PX4 provide final safety and "
+        "stability. Hover for an explicit stop or stale, unclear, or unsafe state. Speak "
+        "only for the user or a meaningful event, and do not repeat the same message."
     )
 
 
