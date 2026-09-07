@@ -219,7 +219,8 @@ An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
 The trace reads Gemini's native `thought` parts separately from visible responses
-and tool calls; ER 2 may emit no thought summaries even when it reasons internally.
+and tool calls when ER 2 emits them; tool calls and measured state are the
+authoritative behavior trace.
 
 ## Current state
 
@@ -228,24 +229,21 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
 - Exploratory camera and depth worlds exercise open-ended situations, dialogue,
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
-  for simulation and the CM5. It starts with one situation prompt and one small
-  safe-action-or-hover instruction, keeps that situation active as context, then
-  uses native context compression and session resumption while continuously
-  choosing bounded move, turn, hover, and speech actions. Native
-  thought-part tracing is enabled, but ER 2 may emit no thought summaries;
-  actions remain separately visible. Move and turn actions are blocking and
+  for simulation and the CM5. It starts with one situation prompt and one direct
+  tool heartbeat, keeps that situation active as context, then uses native context
+  compression and session resumption while continuously choosing bounded move,
+  turn, hover, and speech actions. Native thought-part tracing remains available
+  when ER 2 emits summaries. Explicit thinking is not enabled because direct tool
+  calls are the priority; actions remain separately visible. Move and turn actions are blocking and
   serialized while their live state, completion, and heading are reported.
   Speech is a blocking tool call that returns immediately, but waits for new
   dialogue or a completed physical action before repeating. Tool results and
   physical completion feed a fresh state and image before the next movement decision;
   translating arcs also report their measured heading change. Exploration remains
-  active until the user changes it.
-  The prompt asks ER 2 to
-  compare each new view before correcting movement and reassess after two
-  turns without a meaningful translation. Centered targets and open-ended
-  exploration produce bounded motion; side-target visual steering is still
-  stochastic and remains an active simulation goal. The streaming loop sends the
-  newest frame once per second and waits for each model/tool cycle before sending
+  active until the user changes it. The compact prompt gives ER 2 the newest image,
+  telemetry, action state, and dialogue, then asks for one direct function call.
+  The streaming loop sends
+  the newest frame once per second and waits for each model/tool cycle before sending
   the next state heartbeat. After a physical action, the ordered tool response
   includes one fresh state prompt requesting continuation. A quiet post-action
   turn gets one retry after eight seconds, then a fresh session if it remains
@@ -254,8 +252,6 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.
-  The current native thinking budget is kept small for timely closed-loop
-  decisions; change it only with free-roaming simulation evidence.
   Deterministic in-process brain fixtures remain only for repeatable simulation checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.

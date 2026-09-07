@@ -21,8 +21,6 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Reserve a small native budget for visual reasoning without making actions too slow.
-THINKING_BUDGET = 16
 # Let one native reasoning turn finish before treating the session as stalled.
 RESPONSE_TIMEOUT_S = 30.0
 # Give ER2 one bounded continuation prompt before declaring a quiet action turn stalled.
@@ -291,10 +289,6 @@ class GeminiRuntime:
                         temperature=0.2,
                         tools=_tools(),
                         system_instruction=_system_instruction(),
-                        thinking_config=types.ThinkingConfig(
-                            thinking_budget=THINKING_BUDGET,
-                            include_thoughts=True,
-                        ),
                         context_window_compression=(
                             types.ContextWindowCompressionConfig(
                                 sliding_window=types.SlidingWindow()
@@ -569,51 +563,38 @@ class GeminiRuntime:
         if not self._memory_sent:
             if self.memory_store is not None:
                 memory = self.memory_store.context()
-        start = ""
+        parts = []
         if self._bootstrap_pending:
-            start = (
-                f"[START]\nSituation: {self.situation}\n"
-                "Begin now: choose one small safe action from the current scene, "
-                "or hover if no action is clear. Do not wait for another prompt.\n"
-            )
+            parts.append(f"[START] Situation: {self.situation}")
+            if not dialogue and self._latest_user_request != self.situation:
+                parts.append(f"Current request: {self._latest_user_request}")
         camera = (
-            f"fresh frame {self._frame_count}"
+            "fresh"
             if self._has_fresh_frame()
-            else "stale or missing"
+            else "stale"
         )
         speech = (
-            "available"
+            "ready"
             if not self._speech_blocked
-            else "unavailable until new dialogue or a completed physical action"
+            else "waiting for new dialogue or a completed physical action"
         )
-        state = (
-            f"{start}[STATE]\n"
-            f"Camera: {camera}; forward-facing; image-left=body-left; "
-            "image-right=body-right; image-center=current heading\n"
-            f"Vehicle: {_telemetry_text(self._telemetry)}\n"
-            f"Action: {self._action_state_text()}\n"
-            f"Speech: {speech}\n"
-            "[HEARTBEAT] Inspect the newest image and state now. If the task is "
-            "active and the scene is clear, choose one small safe physical action. "
-            "If acting, call the matching tool directly; never return an action as "
-            "text or JSON. "
-            "Do not end the turn silently: choose the next action, `hover`, or "
-            "`ack`. Use `ack` only while waiting, when no safe progress is clear, "
-            "or when no action is needed."
+        parts.append(
+            f"[STATE] camera={camera}; telemetry={_telemetry_text(self._telemetry)}; "
+            f"action={self._action_state_text()}; speech={speech}"
         )
         if dialogue:
-            state += f"\nUser: {dialogue}"
-        elif self._latest_user_request:
-            state += (
-                "\nActive user request (keep working until complete or changed): "
-                f"{self._latest_user_request}"
-            )
+            parts.append(f"[USER] {dialogue}")
         if memory:
-            state += (
-                "\nMemory (prior experience and measured action calibration; verify "
-                f"it against the current image and telemetry):\n{memory}"
+            parts.append(
+                "[MEMORY] Prior experience; verify it against the current image "
+                f"and telemetry:\n{memory}"
             )
-        return state
+        parts.append(
+            "[HEARTBEAT] Call one tool directly now: move, turn, hover, speak, or "
+            "ack. Do not return an action as text or JSON. If no safe action is "
+            "clear, call hover or ack."
+        )
+        return "\n".join(parts)
 
     def _has_fresh_frame(self) -> bool:
         return (
@@ -1387,17 +1368,10 @@ def _tools():
         {
             "name": "move",
             "description": (
-                "Move slowly in the body frame for a short, chosen duration. "
-                "Forward is positive and right is positive. Use it only with a clear "
-                "path and valid range reading. An optional small yaw rate can make "
-                "a smooth arc while translating; during open-ended exploration, "
-                "prefer a safe translating arc when it can make progress and scan. "
-                "Use `turn` for an in-place turn. "
-                "Keep the step short when uncertain, "
-                "then inspect the next image. The physical call returns after measured "
-                "completion; it does not prove that a target was reached. A meaningful "
-                "measured translation resets the turn scan limit; a tiny or blocked "
-                "move does not."
+                "Move slowly in the body frame for a short duration. Forward is "
+                "positive and right is positive. Use a clear path and valid range "
+                "reading. A small yaw rate can make a smooth arc. Inspect the next "
+                "image and the measured result after the move."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1450,23 +1424,10 @@ def _tools():
             "name": "turn",
             "description": (
                 "Turn in place slowly by a measured relative angle. Choose the "
-                "direction from the newest image and heading. Omit the angle for "
-                f"a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger "
-                "bounded angle only for one deliberate reorientation. Do not wait "
-                "for the user to provide an exact angle. A target on the "
-                "left half of the image means turn left; a target on the right half "
-                "means turn right. After the physical call returns, "
-                "inspect the new image before choosing another movement. Compare it "
-                "with the previous image: use a smaller correction if the target is "
-                "still off-center, reverse if it moved away, and move when it is "
-                "roughly ahead. After several turns without a meaningful translation, "
-                "reassess rather than rotating by habit. After two completed turns "
-                "without a meaningful translation, reassess with a meaningful move, "
-                "hover, or new dialogue before turning again. If the turn "
-                "tool says it is unavailable, do not retry it; choose move, hover, or "
-                "wait for new dialogue instead. A repeated same-direction turn may "
-                "be reduced to the normal correction size; trust the applied angle "
-                "and measured heading in its result."
+                "direction from the newest image and heading: image-left means left "
+                "and image-right means right. Omit the angle for the normal "
+                f"{DEFAULT_TURN_DEG:.0f}-degree correction. Inspect the next image "
+                "and measured heading before choosing another movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1500,9 +1461,7 @@ def _tools():
             "name": "ack",
             "description": (
                 "Acknowledge the newest image and telemetry without moving or "
-                "speaking. Use this only while waiting, when no safe progress is "
-                "clear, or when no action is needed; do not use it merely because "
-                "a heartbeat arrived during an active task."
+                "speaking. Use this while waiting or when no safe action is clear."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
@@ -1510,10 +1469,8 @@ def _tools():
         {
             "name": "hover",
             "description": (
-                "Stop horizontal motion and hold position. Use this when the "
-                "task is complete, while waiting, or when the scene is unclear. "
-                "If already holding position, do nothing instead. It can interrupt "
-                "a movement only for an explicit stop."
+                "Stop horizontal motion and hold position when the task is complete, "
+                "while waiting, or when the scene is unclear."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
@@ -1521,10 +1478,8 @@ def _tools():
         {
             "name": "speak",
             "description": (
-                "Say one short message to the nearby user when the user asks or a "
-                "meaningful new event is worth sharing. Do not narrate an intended "
-                "movement; call move or turn instead. After speaking, wait for new "
-                "dialogue or a completed physical action before speaking again."
+                "Say one short message when the user asks or a meaningful new event "
+                "is worth sharing."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1542,52 +1497,24 @@ def _system_instruction() -> str:
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, TOF distance, body velocity, heading, active action, "
-        "dialogue, measured action result, and prior calibration memory. Decide "
-        "autonomously with the tools: `move`, "
-        "`turn`, `hover`, `speak`, or `ack`. Call the chosen tool directly; never "
-        "describe or serialize a physical action as JSON, Markdown, or prose. "
-        "Choose at most one tool per decision. "
-        "When a small safe action is clear, act promptly rather than waiting for "
-        "perfect certainty. When a task is active and the scene is clear, do not "
-        "choose `ack` merely to defer the next action. "
-        "When the situation or request is exploration, keep exploring until the "
-        "user changes it; after each completed action, choose another small safe "
-        "action or deliberately hover and say why instead of ending silently. "
-        "Keep the user's request active until it is complete or changed, and describe "
-        "only what the newest image supports. Use measured past motion to calibrate "
-        "future commands, but trust current telemetry and the newest image first.\n\n"
-        "The camera faces forward. A target on image-left requires a left turn; a target "
-        "on image-right requires a right turn. Use the newest image to choose each "
-        "direction. Turn toward a visible target only while it is clearly to one side. "
-        "If a visual search target is not visible, make one small turn or short safe "
-        "move to search, then inspect the next image; do not wait indefinitely for "
-        "it to appear. "
-        "When it is roughly ahead, stop turning and take a short move or inspect "
-        "the scene; do not seek perfect centering. Compare each new view with the "
-        "previous one, use a smaller correction while it improves, and reverse only "
-        "if it moved away. You choose the turn size: use a small correction for a "
-        "small visual error and omit the angle for the normal correction. Use a "
-        "larger bounded turn only once for a broad reorientation; do not ask the "
-        "user for an exact turn amount. Move only when the path and TOF range are "
-        "clear. In open-ended exploration, prefer a short translating move with a "
-        "gentle yaw rate when it can make progress while scanning; use turn when "
-        "you need to reorient in place. Choose slow actions and inspect the new "
-        "image after every physical action. "
-        "Move and turn are blocking: their results include measured motion, heading, "
-        "telemetry, and a fresh frame before another physical movement is chosen. If "
-        "several turn results pass without a meaningful translation, reassess the "
-        "newest image and choose a short move, hover, or a direction supported by "
-        "fresh evidence; do not rotate by habit. Two completed turns without a "
-        "meaningful translation temporarily make turn unavailable until a meaningful "
-        "move, hover, or new dialogue resets the count. A tiny or blocked move does "
-        "not reset it. A repeated same-direction turn may be reduced to the normal "
-        "correction size; use its applied angle and measured heading. Never retry an "
-        "unavailable turn; choose move, hover, or wait for new dialogue and reassess.\n\n"
-        "Use body-frame translation and relative yaw only. Never request motors, attitude, "
-        "altitude, position, or long motion. Hover when stopping or when the scene is "
-        "unclear or unsafe. Speak for the user or a meaningful new event, not to narrate "
-        "an intended action. After speaking, choose movement or `ack`; wait for new "
-        "dialogue or a completed physical action before speaking again."
+        "dialogue, measured result, and prior calibration memory. Make physical "
+        "decisions through the function interface: choose one of `move`, `turn`, "
+        "`hover`, `speak`, or `ack` for each decision. Use the interface directly "
+        "rather than an ordinary text response. Keep the user's situation or request "
+        "active until it is complete or changed.\n\n"
+        "The camera faces forward. Image-left is left of the vehicle and image-right "
+        "is right. Choose each direction from the newest image and heading. Move only "
+        "when the path and TOF range are clear. Prefer short, slow actions and inspect "
+        "the next image and measured result after every physical action. In exploration, "
+        "make deliberate progress with short moves and turns rather than waiting for "
+        "perfect certainty. Use measured motion to improve later choices, but trust the "
+        "current image and telemetry first.\n\n"
+        "Move and turn complete only after their measured result is available. While one "
+        "is active, wait for its result before choosing another movement. The result "
+        "includes heading, telemetry, and whether movement is available. If a turn is "
+        "temporarily unavailable, choose a move, hover, or ack and reassess. Use hover "
+        "when stopping or when the scene is unclear or unsafe. Speak briefly for the "
+        "user or a meaningful event. The CM5 limits every physical command."
     )
 
 
