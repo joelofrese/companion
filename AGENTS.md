@@ -42,6 +42,8 @@ merge and delete it.
   telemetry arrive before the next movement, and a newer camera frame is
   required before another physical action. Safety holds pause the action until
   movement is allowed.
+- A spoken response answers one user message; Gemini waits for new dialogue
+  before speaking again.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
   acknowledges the stop. The CM5 handles safety overrides.
 - Stale, malformed, missing, or unsafe input becomes zero motion.

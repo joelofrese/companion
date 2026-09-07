@@ -382,6 +382,9 @@ class GeminiRuntime:
                                 *tasks,
                                 return_exceptions=True,
                             )
+                        if self._dialogue_in_flight is not None:
+                            self._dialogue_in_flight = None
+                            self._dialogue_send_complete = False
                         self._session = None
                 except asyncio.CancelledError:
                     raise
@@ -661,6 +664,17 @@ class GeminiRuntime:
             message = str(args.get("message", "")).strip()
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
+            elif (
+                self._dialogue_generation > 0
+                and self._dialogue_generation == self._last_spoken_generation
+            ):
+                result = {
+                    "status": "already_spoken",
+                    "reason": (
+                        "already answered the latest user message; "
+                        "wait for new dialogue"
+                    ),
+                }
             elif (
                 self._last_spoken_at_s is not None
                 and self._dialogue_generation == self._last_spoken_generation
@@ -1270,7 +1284,8 @@ def _tools():
             "description": (
                 "Say one short message to the nearby user. Do not repeat a greeting "
                 "or observation unless the user or scene gives a new reason. Leave "
-                "a pause between autonomous messages; answer new user dialogue "
+                "a pause between autonomous messages; after answering a user message, "
+                "wait for new dialogue before speaking again. Answer new user dialogue "
                 "without waiting."
             ),
             "behavior": "BLOCKING",
@@ -1292,6 +1307,11 @@ def _system_instruction() -> str:
         "dialogue, and action result. The tools are the only way to act: use `move`, "
         "`turn`, `hover`, `speak`, or `ack`. Choose at most one tool call per decision "
         "or do nothing. Keep the user's request active until it is complete or changed. "
+        "When no specific target is named, treat clear people and objects in the current "
+        "view as possible subjects of exploration. Inspect the current frame before "
+        "scanning; do not turn merely because exploration was requested. Describe only "
+        "what the newest image supports; if it is unclear, say so instead of inventing "
+        "room details. "
         "\n\n"
         "Visual control: the camera is aligned with the body. Image-right is body-right "
         "and requires a right turn; image-left requires a left turn. If a visible target "
@@ -1307,7 +1327,8 @@ def _system_instruction() -> str:
         "Move slowly in the body frame and turn by relative yaw only. Never request motors, "
         "attitude, altitude, position, or long motion. CM5 and PX4 provide final safety and "
         "stability. Hover for an explicit stop or stale, unclear, or unsafe state. Speak "
-        "only for the user or a meaningful event, and do not repeat the same message."
+        "only for the user or a meaningful event. After answering a user message, wait "
+        "for new dialogue before speaking again."
     )
 
 
