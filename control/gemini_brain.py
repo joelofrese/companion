@@ -75,6 +75,7 @@ class ActiveAction:
     last_heading_rad: Optional[float] = None
     forward_m_s: float = 0.0
     right_m_s: float = 0.0
+    yaw_rate_deg_s: float = 0.0
     last_update_s: Optional[float] = None
     last_sample_s: Optional[float] = None
     blocked_since_s: Optional[float] = None
@@ -229,6 +230,7 @@ class GeminiRuntime:
                 return VelocityCommand(
                     forward_m_s=action.forward_m_s,
                     right_m_s=action.right_m_s,
+                    yaw_rate_deg_s=action.yaw_rate_deg_s,
                 )
             return VelocityCommand()
         if (
@@ -781,7 +783,20 @@ class GeminiRuntime:
             args, "right_m_s", -MAX_RIGHT_SPEED_M_S, MAX_RIGHT_SPEED_M_S
         )
         duration_s = _number_between(args, "duration_s", MIN_MOVE_S, MAX_MOVE_S)
-        if forward_m_s is None or right_m_s is None or duration_s is None:
+        yaw_rate_deg_s = 0.0
+        if "yaw_rate_deg_s" in args:
+            yaw_rate_deg_s = _number_between(
+                args,
+                "yaw_rate_deg_s",
+                -TURN_RATE_DEG_S,
+                TURN_RATE_DEG_S,
+            )
+        if (
+            forward_m_s is None
+            or right_m_s is None
+            or duration_s is None
+            or yaw_rate_deg_s is None
+        ):
             return {
                 "status": "rejected",
                 "reason": (
@@ -789,6 +804,8 @@ class GeminiRuntime:
                     f"{MAX_FORWARD_SPEED_M_S} to {MAX_FORWARD_SPEED_M_S}; "
                     "right_m_s must be "
                     f"-{MAX_RIGHT_SPEED_M_S} to {MAX_RIGHT_SPEED_M_S}; "
+                    "yaw_rate_deg_s must be "
+                    f"-{TURN_RATE_DEG_S} to {TURN_RATE_DEG_S}; "
                     f"duration_s must be {MIN_MOVE_S} to {MAX_MOVE_S}"
                 ),
             }
@@ -809,8 +826,14 @@ class GeminiRuntime:
             _move_direction(forward_m_s, right_m_s),
             duration_s,
             now + duration_s,
+            start_heading_rad=(
+                self._telemetry.heading_rad
+                if yaw_rate_deg_s and _finite(self._telemetry.heading_rad)
+                else None
+            ),
             forward_m_s=forward_m_s,
             right_m_s=right_m_s,
+            yaw_rate_deg_s=yaw_rate_deg_s,
             last_update_s=now,
             last_sample_s=now,
             completion=asyncio.get_running_loop().create_future(),
@@ -962,10 +985,13 @@ class GeminiRuntime:
         if action is None:
             return "none"
         if action.kind == "move":
-            return (
+            label = (
                 f"move forward={action.forward_m_s:+.2f}m/s "
                 f"right={action.right_m_s:+.2f}m/s for {action.amount:.1f}s"
             )
+            if action.yaw_rate_deg_s:
+                label += f" yaw={action.yaw_rate_deg_s:+.1f}deg/s"
+            return label
         return f"turn {action.direction} {action.amount:.0f} degrees"
 
     def _action_state_text(self) -> str:
@@ -1233,6 +1259,7 @@ class GeminiRuntime:
                 "forward": action.observed_forward_m,
                 "right": action.observed_right_m,
             }
+            response["yaw_rate_deg_s"] = action.yaw_rate_deg_s
             response["turn_scan"] = (
                 "reset after meaningful translation"
                 if self._turns_since_meaningful_move == 0
@@ -1275,8 +1302,7 @@ class GeminiRuntime:
     def _finish_turn(self, response_started_s):
         thought = _model_text(self._response_thoughts)
         response = _model_text(self._response_parts)
-        actions = tuple(self._actions)
-        action = "; ".join(actions) or "none"
+        action = self._actions[-1] if self._actions else "none"
         self._response_thoughts.clear()
         self._response_parts.clear()
         self._actions.clear()
@@ -1310,7 +1336,9 @@ def _tools():
             "description": (
                 "Move slowly in the body frame for a short, chosen duration. "
                 "Forward is positive and right is positive. Use it only with a clear "
-                "path and valid range reading. Keep the step short when uncertain, "
+                "path and valid range reading. An optional small yaw rate can make "
+                "a smooth arc while translating; use `turn` for an in-place turn. "
+                "Keep the step short when uncertain, "
                 "then inspect the next image. The physical call returns after measured "
                 "completion; it does not prove that a target was reached. A meaningful "
                 "measured translation resets the turn scan limit; a tiny or blocked "
@@ -1348,6 +1376,16 @@ def _tools():
                         ),
                         "minimum": MIN_MOVE_S,
                         "maximum": MAX_MOVE_S,
+                    },
+                    "yaw_rate_deg_s": {
+                        "type": "NUMBER",
+                        "description": (
+                            "Optional body yaw rate while translating; positive is "
+                            f"right, from -{TURN_RATE_DEG_S} through "
+                            f"{TURN_RATE_DEG_S} degrees per second."
+                        ),
+                        "minimum": -TURN_RATE_DEG_S,
+                        "maximum": TURN_RATE_DEG_S,
                     },
                 },
                 "required": ["forward_m_s", "right_m_s", "duration_s"],
@@ -1472,7 +1510,8 @@ def _system_instruction() -> str:
         "larger bounded turn only once for a broad reorientation; do not ask the "
         "user for an exact turn amount. Move only when the path and TOF "
         "range are clear. Choose slow actions and inspect the new image after every "
-        "physical action. "
+        "physical action. A move may include a small yaw rate for a smooth arc; use "
+        "turn when you need to reorient in place. "
         "Move and turn are blocking: their results include measured motion, heading, "
         "telemetry, and a fresh frame before another physical movement is chosen. If "
         "several turn results pass without a meaningful translation, reassess the "

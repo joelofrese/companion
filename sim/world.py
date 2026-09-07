@@ -170,7 +170,11 @@ async def run(
     telemetry_task = None
     attitude_task = None
     offboard_task = None
-    dialogue_input = DialogueInput(dialogue_request) if exploratory else None
+    dialogue_input = (
+        DialogueInput(None if gemini else dialogue_request)
+        if exploratory
+        else None
+    )
     gazebo_camera = None
     gazebo_depth = None
     person_motion = None
@@ -239,6 +243,8 @@ async def run(
                 situation=initial_intent,
                 memory=memory_store,
             )
+            if dialogue_request is not None:
+                control.add_dialogue(dialogue_request)
             await control.start()
 
         heading_deg = await prepare(drone)

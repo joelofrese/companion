@@ -37,6 +37,8 @@ merge and delete it.
   decides from images, dialogue, telemetry, memory, and previous outputs.
 - Gemini chooses among its bounded movement, turn, hover, and speech tools;
   the CM5 still limits every physical command.
+- A move may include a small yaw rate for a smooth arc; `turn` remains the
+  in-place reorientation action.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
   streaming while one move or turn completes; its measured result and fresh
   telemetry arrive before the next movement, and a newer camera frame is
