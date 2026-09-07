@@ -22,7 +22,7 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
-THINKING_BUDGET = 32
+THINKING_BUDGET = 16
 # Prompt the next decision as soon as a blocking action has returned its result.
 POST_ACTION_NUDGE_S = 0.0
 # Let one native reasoning turn finish before treating the session as stalled.
@@ -107,7 +107,7 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._dialogue_in_flight: Optional[str] = None
         self._dialogue_send_complete = False
-        self._latest_user_request = ""
+        self._latest_user_request = self.situation
         self._speech_blocked = False
         self._active_action: Optional[ActiveAction] = None
         self._action_finished_at_s: Optional[float] = None
@@ -580,9 +580,9 @@ class GeminiRuntime:
             f"Speech: {speech}\n"
             "[HEARTBEAT] Inspect the newest image and state now. If the task is "
             "active and the scene is clear, choose one small safe physical action. "
-            "Do not use `ack` merely because this heartbeat arrived; use `ack` "
-            "only while waiting, when no safe progress is clear, or when no action "
-            "is needed."
+            "Do not end the turn silently: choose the next action, `hover`, or "
+            "`ack`. Use `ack` only while waiting, when no safe progress is clear, "
+            "or when no action is needed."
         )
         if dialogue:
             state += f"\nUser: {dialogue}"
@@ -730,6 +730,7 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "ack":
+            self._record_action("ack")
             result = {
                 "status": "acknowledged",
                 "telemetry": _telemetry_text(self._telemetry),
@@ -1070,7 +1071,7 @@ class GeminiRuntime:
             if action.phase == "running" and actual is not None:
                 requested_rad = math.radians(action.amount)
                 progress_rad = math.radians(actual)
-                if progress_rad >= requested_rad - HEADING_TOLERANCE_RAD:
+                if progress_rad >= _turn_completion_rad(requested_rad):
                     action.phase = "settling"
                     action.stable_since_s = now
                     action.last_heading_rad = self._telemetry.heading_rad
@@ -1105,10 +1106,10 @@ class GeminiRuntime:
         if now >= action.deadline_s:
             actual = self._heading_change_deg(action)
             if action.kind == "turn" and actual is not None:
-                requested = action.amount - math.degrees(HEADING_TOLERANCE_RAD)
+                completion_rad = _turn_completion_rad(math.radians(action.amount))
                 status = (
                     "completed"
-                    if actual >= requested
+                    if math.radians(actual) >= completion_rad
                     else "timed out before target"
                 )
                 self._complete_action(status, actual)
@@ -1715,3 +1716,9 @@ def _angle_delta_rad(start: float, end: float) -> float:
     """Return the signed shortest heading change from start to end."""
 
     return (end - start + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _turn_completion_rad(requested_rad: float) -> float:
+    """Require meaningful progress even for the smallest allowed turn."""
+
+    return max(requested_rad * 0.5, requested_rad - HEADING_TOLERANCE_RAD)

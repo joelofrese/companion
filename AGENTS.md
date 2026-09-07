@@ -191,8 +191,8 @@ The default production commands use Gemini:
 
 Production uses one Gemini Robotics ER 2 Streaming session on the CM5. It
 starts with one situation prompt, using `Explore the surroundings autonomously.`
-by default
-or the value of `--intent`. Use `--dialogue` for typed conversation,
+by default or the value of `--intent`. The initial situation remains active
+context until dialogue changes it. Use `--dialogue` for typed conversation,
 `--voice-once` for one spoken request, and `--memory` for editable experience
 memory.
 
@@ -227,8 +227,8 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   memory, bounded motion, and simulated TOF safety. Camera-only motion stops.
 - Gemini ER 2 Streaming is the current production path and persistent brain
   for simulation and the CM5. It starts with one situation prompt and one small
-  safe-action-or-hover instruction, then uses native context compression and
-  session resumption while continuously
+  safe-action-or-hover instruction, keeps that situation active as context, then
+  uses native context compression and session resumption while continuously
   choosing bounded move, turn, hover, and speech actions. Native
   thought-part tracing is enabled, but ER 2 may emit no thought summaries;
   actions remain separately visible. Move and turn actions are blocking and
@@ -251,6 +251,8 @@ and tool calls; ER 2 may emit no thought summaries even when it reasons internal
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
   telemetry remain authoritative.
+  The current native thinking budget is kept small for timely closed-loop
+  decisions; change it only with free-roaming simulation evidence.
   Deterministic in-process brain fixtures remain only for repeatable simulation checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
