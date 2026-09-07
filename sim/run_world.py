@@ -273,7 +273,7 @@ def run(
     depth: bool = False,
     duration_s: Optional[float] = None,
     gemini: bool = False,
-    initial_intent: str = "explore the surroundings",
+    initial_intent: str = "Explore the surroundings autonomously.",
     model_pose: Optional[str] = None,
     memory_path: Optional[Path] = None,
     snapshot_path: Optional[Path] = None,
@@ -425,7 +425,7 @@ def main(argv=None):
     )
     parser.add_argument(
         "--intent",
-        default="explore the surroundings",
+        default="Explore the surroundings autonomously.",
         help="initial situation for Gemini",
     )
     parser.add_argument(

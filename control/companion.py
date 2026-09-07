@@ -12,7 +12,7 @@ from onboard.video_sender import GStreamerH264Sender
 from vision.video_stream import AsyncLatestFrameReader, GStreamerH264Receiver, H264StreamConfig
 
 
-DEFAULT_SITUATION = "explore the surroundings"
+DEFAULT_SITUATION = "Explore the surroundings autonomously."
 
 
 def build_parser():

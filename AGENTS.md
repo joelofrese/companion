@@ -190,7 +190,8 @@ The default production commands use Gemini:
 ```
 
 Production uses one Gemini Robotics ER 2 Streaming session on the CM5. It
-starts with one situation prompt, using `explore the surroundings` by default
+starts with one situation prompt, using `Explore the surroundings autonomously.`
+by default
 or the value of `--intent`. Use `--dialogue` for typed conversation,
 `--voice-once` for one spoken request, and `--memory` for editable experience
 memory.

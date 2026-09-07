@@ -18,7 +18,7 @@ from control.velocity import VelocityCommand
 
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
-DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
+DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
