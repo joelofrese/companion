@@ -542,8 +542,8 @@ class GeminiRuntime:
             state += f"\nCurrent user request (still active): {self._latest_user_request}"
         if memory:
             state += (
-                "\nMemory (prior experience; verify it against the current image "
-                f"and telemetry):\n{memory}"
+                "\nMemory (prior experience and measured action calibration; verify "
+                f"it against the current image and telemetry):\n{memory}"
             )
         return state
 
@@ -809,8 +809,8 @@ class GeminiRuntime:
                     "before turning again"
                 ),
                 "movement_tools": (
-                    "turn unavailable until move, hover, ack, or new dialogue resets "
-                    "the turn count"
+                    "turn unavailable; do not call turn again. Choose move, hover, "
+                    "ack, or wait for new dialogue to reset the turn count"
                 ),
                 "turns_since_move": self._turns_since_move,
                 "telemetry": _telemetry_text(self._telemetry),
@@ -1210,28 +1210,14 @@ class GeminiRuntime:
             print(f"Gemini thought: {thought}", flush=True)
         if response:
             print(f"Gemini response: {response}", flush=True)
-        if self.memory_store is not None:
-            memory_action = "; ".join(
-                event for event in actions if not event.startswith("started ")
+        if (
+            self.memory_store is not None
+            and summary not in ("", "none")
+            and action not in summary
+        ):
+            self.memory_store.remember(
+                f"{_telemetry_text(self._telemetry)}; summary={summary}"
             )
-            action_outcome = any(
-                marker in action
-                for marker in (
-                    " completed",
-                    " timed out",
-                    " cancelled ",
-                    "speak:",
-                    "hover",
-                )
-            )
-            useful_summary = summary not in ("", "none") and action not in summary
-            if action_outcome or useful_summary:
-                experience = _telemetry_text(self._telemetry)
-                if action_outcome and memory_action:
-                    experience += f"; action={memory_action}"
-                if useful_summary:
-                    experience += f"; summary={summary}"
-                self.memory_store.remember(experience)
 
 
 def _tools():
@@ -1296,7 +1282,9 @@ def _tools():
                 "still off-center, reverse if it moved away, and move when it is "
                 "roughly ahead. After several turns without a move, reassess rather "
                 "than rotating by habit. After six completed turns without a move, "
-                "reassess with move, hover, or ack before turning again."
+                "reassess with move, hover, or ack before turning again. If the turn "
+                "tool says it is unavailable, do not retry it; choose move, hover, or "
+                "ack instead."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1368,12 +1356,14 @@ def _system_instruction() -> str:
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, TOF distance, body velocity, heading, active action, "
-        "dialogue, and action result. Decide autonomously with the tools: `move`, "
+        "dialogue, measured action result, and prior calibration memory. Decide "
+        "autonomously with the tools: `move`, "
         "`turn`, `hover`, `speak`, or `ack`. Choose at most one tool per decision. "
         "When a small safe action is clear, act promptly rather than waiting for "
         "perfect certainty. "
         "Keep the user's request active until it is complete or changed, and describe "
-        "only what the newest image supports.\n\n"
+        "only what the newest image supports. Use measured past motion to calibrate "
+        "future commands, but trust current telemetry and the newest image first.\n\n"
         "The camera faces forward. A target on image-left requires a left turn; a target "
         "on image-right requires a right turn. Use the newest image to choose each "
         "direction. Turn toward a visible target only while it is clearly to one side. "
@@ -1388,7 +1378,8 @@ def _system_instruction() -> str:
         "without a move, reassess the newest image and choose a short move, hover, "
         "ack, or a direction supported by fresh evidence; do not rotate by habit. "
         "Six completed turns without a move temporarily make turn unavailable until "
-        "move, hover, ack, or new dialogue resets the count.\n\n"
+        "move, hover, ack, or new dialogue resets the count. Never retry an unavailable "
+        "turn; choose move, hover, or ack and reassess.\n\n"
         "Use body-frame translation and relative yaw only. Never request motors, attitude, "
         "altitude, position, or long motion. Hover when stopping or when the scene is "
         "unclear or unsafe. Speak for the user or a meaningful new event, not to narrate "

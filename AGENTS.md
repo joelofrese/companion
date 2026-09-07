@@ -226,6 +226,9 @@ calls; ER 2 may emit no thought summaries even when it reasons internally.
   bounded motion; side-target visual steering is still stochastic and remains
   an active simulation goal. A slow model response gets one fresh-state
   heartbeat before session reconnect; a stalled session holds zero.
+  Physical action outcomes are saved as compact measured calibration memory;
+  later sessions receive it as prior experience while current image and
+  telemetry remain authoritative.
   Deterministic in-process brain fixtures remain only for repeatable simulation checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
