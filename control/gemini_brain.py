@@ -21,8 +21,8 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Let one native reasoning turn finish before treating the session as stalled.
-RESPONSE_TIMEOUT_S = 30.0
+# Keep a silent reasoning turn from delaying the next recovery for too long.
+RESPONSE_TIMEOUT_S = 15.0
 # Give ER2 one bounded continuation prompt before declaring a quiet action turn stalled.
 FOLLOW_UP_RETRY_S = 8.0
 START_TIMEOUT_S = 20.0
@@ -374,7 +374,7 @@ class GeminiRuntime:
                                     self._response_thoughts.clear()
                                     self._actions.clear()
                                     self._last_model_activity_s = None
-                                    self._session_handle = None
+                                    # Keep it; a rejected handle is cleared on reconnect.
                                     self._memory_sent = False
                                     self._bootstrap_pending = True
                                     self._reconnect_requested = True
@@ -611,7 +611,12 @@ class GeminiRuntime:
 
     async def _receive(self, session, types, response_started_s):
         async for message in session.receive():
-            self._last_model_activity_s = time.monotonic()
+            if (
+                message.server_content is not None
+                or message.tool_call is not None
+                or message.tool_call_cancellation is not None
+            ):
+                self._last_model_activity_s = time.monotonic()
             turn_complete = False
             update = message.session_resumption_update
             if update is not None and update.resumable and update.new_handle:

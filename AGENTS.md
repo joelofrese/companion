@@ -247,7 +247,7 @@ authoritative behavior trace.
   the next state heartbeat. After a physical action, the ordered tool response
   includes one fresh state prompt requesting continuation. A quiet post-action
   turn gets one retry after eight seconds, then a fresh session if it remains
-  silent; ordinary turns use the 30-second timeout. The resumed session keeps
+  silent; ordinary turns use the 15-second timeout. The resumed session keeps
   the same situation, active request, and memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
