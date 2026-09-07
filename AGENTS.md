@@ -213,8 +213,8 @@ physical move or turn stays active until its duration or observed heading settle
 safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
 completion response and one fresh state prompt to request continuation. A quiet
-post-action turn gets one more state prompt after eight seconds, then reconnects
-if it remains silent; ordinary turns use a 30-second stall timeout.
+post-action turn gets one more state prompt after eight seconds, then starts a
+fresh session if it remains silent; ordinary turns use a 15-second stall timeout.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
