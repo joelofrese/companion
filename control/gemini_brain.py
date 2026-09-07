@@ -23,8 +23,6 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 VIDEO_PERIOD_S = 1.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
 THINKING_BUDGET = 16
-# Prompt the next decision as soon as a blocking action has returned its result.
-POST_ACTION_NUDGE_S = 0.0
 # Let one native reasoning turn finish before treating the session as stalled.
 RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
@@ -136,7 +134,6 @@ class GeminiRuntime:
         self.session_reconnect_count = 0
         self._reconnect_requested = False
         self._last_model_activity_s: Optional[float] = None
-        self._last_response_nudge_s: Optional[float] = None
         self._response_in_flight = False
         self._tool_call_in_flight = False
         self._closed = asyncio.Event()
@@ -327,7 +324,6 @@ class GeminiRuntime:
                                 if receive_task is None:
                                     response_started_s = time.monotonic()
                                     self._last_model_activity_s = response_started_s
-                                    self._last_response_nudge_s = None
                                     receive_task = asyncio.create_task(
                                         self._receive(
                                             session,
@@ -480,7 +476,6 @@ class GeminiRuntime:
                 if self._bootstrap_pending:
                     self._bootstrap_pending = False
                 return
-            await self._nudge_after_action(session)
             return
         dialogue = ""
         if self._dialogue and self._dialogue_in_flight is None:
@@ -526,28 +521,6 @@ class GeminiRuntime:
         if self._dialogue_in_flight == dialogue:
             self._dialogue_send_complete = True
             self.dialogue_sent_count += 1
-
-    async def _nudge_after_action(self, session):
-        """Recover if an action result could not send its ordered follow-up."""
-
-        if (
-            not self._last_action_result
-            or self._active_action is not None
-            or self._tool_call_in_flight
-            or self._last_model_activity_s is None
-            or time.monotonic() - self._last_model_activity_s < POST_ACTION_NUDGE_S
-            or self._last_response_nudge_s is not None
-        ):
-            return
-        async with self._send_lock:
-            if not self._response_in_flight or not self._last_action_result:
-                return
-            self._last_response_nudge_s = time.monotonic()
-            print(
-                "Gemini action finished; requesting the next state.",
-                flush=True,
-            )
-            await session.send_realtime_input(text=self._heartbeat_text(""))
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -687,7 +660,6 @@ class GeminiRuntime:
                             function_responses=responses
                         )
                         if completed_action and not self._reconnect_requested:
-                            self._last_response_nudge_s = time.monotonic()
                             print(
                                 "Gemini action finished; requesting the next state.",
                                 flush=True,
