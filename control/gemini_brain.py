@@ -21,8 +21,8 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Keep a silent reasoning turn from delaying the next recovery for too long.
-RESPONSE_TIMEOUT_S = 15.0
+# Allow normal ER2 dialogue latency before recovering a silent session.
+RESPONSE_TIMEOUT_S = 20.0
 # Give ER2 one bounded continuation prompt before declaring a quiet action turn stalled.
 FOLLOW_UP_RETRY_S = 8.0
 START_TIMEOUT_S = 20.0
