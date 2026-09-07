@@ -179,6 +179,10 @@ class GeminiRuntime:
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
+        if self._dialogue_in_flight is not None:
+            self._dialogue.clear()
+            self._dialogue_in_flight = None
+            self._dialogue_send_complete = False
         self._dialogue.append(message)
 
     def request_reconnect(self):
@@ -463,31 +467,37 @@ class GeminiRuntime:
         await self._send_frame(session, types)
         # Heartbeat text is a new user turn and interrupts model generation.
         # Keep streaming frames, but let each decision or blocking tool cycle
-        # finish before prompting for another one.
+        # finish before prompting for another one. New dialogue is the one
+        # intentional exception: it should reach the companion promptly.
         if self._response_in_flight:
+            if self._dialogue and self._dialogue_in_flight is None:
+                action_result = self._last_action_result
+                await self._send_dialogue(session, self._dialogue[0])
+                if action_result and self._last_action_result == action_result:
+                    self._last_action_result = ""
+                if not self._memory_sent:
+                    self._memory_sent = True
+                if self._bootstrap_pending:
+                    self._bootstrap_pending = False
+                return
             await self._nudge_after_action(session)
             return
         dialogue = ""
         if self._dialogue and self._dialogue_in_flight is None:
             dialogue = self._dialogue[0]
-            self._dialogue_in_flight = dialogue
-            self._dialogue_send_complete = False
-        async with self._send_lock:
-            action_result = self._last_action_result
-            self._response_in_flight = True
-            try:
-                await session.send_realtime_input(
-                    text=self._heartbeat_text(dialogue)
-                )
-            except Exception:
-                self._response_in_flight = False
-                if dialogue and self._dialogue_in_flight == dialogue:
-                    self._dialogue_in_flight = None
-                    self._dialogue_send_complete = False
-                raise
-        if dialogue and self._dialogue_in_flight == dialogue:
-            self._dialogue_send_complete = True
-            self.dialogue_sent_count += 1
+        action_result = self._last_action_result
+        self._response_in_flight = True
+        if dialogue:
+            await self._send_dialogue(session, dialogue)
+        else:
+            async with self._send_lock:
+                try:
+                    await session.send_realtime_input(
+                        text=self._heartbeat_text("")
+                    )
+                except Exception:
+                    self._response_in_flight = False
+                    raise
         # Repeat a completed action once in the next heartbeat so the state is
         # easy to see even when the model did not close its turn.
         if action_result and self._last_action_result == action_result:
@@ -496,6 +506,26 @@ class GeminiRuntime:
             self._memory_sent = True
         if self._bootstrap_pending:
             self._bootstrap_pending = False
+
+    async def _send_dialogue(self, session, dialogue: str):
+        """Send user dialogue even when a model response is still running."""
+
+        self._dialogue_in_flight = dialogue
+        self._dialogue_send_complete = False
+        try:
+            async with self._send_lock:
+                await session.send_realtime_input(
+                    text=self._heartbeat_text(dialogue)
+                )
+        except Exception:
+            self._response_in_flight = False
+            if self._dialogue_in_flight == dialogue:
+                self._dialogue_in_flight = None
+                self._dialogue_send_complete = False
+            raise
+        if self._dialogue_in_flight == dialogue:
+            self._dialogue_send_complete = True
+            self.dialogue_sent_count += 1
 
     async def _nudge_after_action(self, session):
         """Recover if an action result could not send its ordered follow-up."""

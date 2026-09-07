@@ -510,6 +510,7 @@ async def run(
         last_traced_gemini_thought = ""
         last_traced_gemini_response = ""
         last_traced_gemini_action = "stop"
+        last_traced_gemini_dialogue = 0
         requested_focus_answered = False
 
         async def observe_velocity():
@@ -586,6 +587,7 @@ async def run(
             nonlocal last_traced_gemini_actions
             nonlocal last_traced_gemini_thought, last_traced_gemini_response
             nonlocal last_traced_gemini_action
+            nonlocal last_traced_gemini_dialogue
             if not trace:
                 return
 
@@ -625,6 +627,14 @@ async def run(
                     )
                     last_traced_gemini_action = control.latest_action
                     last_traced_gemini_actions = control.action_count
+                if control.dialogue_sent_count != last_traced_gemini_dialogue:
+                    print(
+                        f"[Gemini {elapsed_s:5.1f}s] dialogue sent; "
+                        f"sent={control.dialogue_sent_count}; "
+                        f"completed={control.dialogue_count}",
+                        flush=True,
+                    )
+                    last_traced_gemini_dialogue = control.dialogue_sent_count
                 if control.turn_count != last_traced_decision:
                     if (
                         control.latest_thought

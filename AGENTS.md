@@ -46,11 +46,11 @@ merge and delete it.
   movement is allowed.
 - Camera frames stream once per second. A normal state heartbeat starts the next
   model decision only after the current decision or physical tool cycle finishes,
-  so it does not interrupt Gemini's reasoning. If ER2 does not continue after a
-  completed physical action, one fresh state prompt is sent after a short wait;
-  a bounded response timeout reconnects only a genuinely stalled session.
-- A spoken response answers one user message; Gemini waits for new dialogue
-  before speaking again.
+  so it does not interrupt Gemini's reasoning. New dialogue is sent immediately
+  and may interrupt that reasoning; a bounded response timeout reconnects only a
+  genuinely stalled session.
+- A spoken response answers one user message; new dialogue may interrupt it, and
+  Gemini waits for new dialogue before speaking again.
 - An explicit stop dialogue cancels active movement immediately; the hover tool
   acknowledges the stop. The CM5 handles safety overrides.
 - Stale, malformed, missing, or unsafe input becomes zero motion.
@@ -203,7 +203,8 @@ fresh session with the situation and memory. The editable memory file is only
 prior experience across runs. The session receives the newest 640-pixel JPEG once
 per second. A state heartbeat starts the next model decision after the current
 model or physical tool cycle finishes; this avoids interrupting unfinished
-reasoning while keeping the camera stream continuous. Movement and turn tools
+reasoning while keeping the camera stream continuous. New dialogue may interrupt
+an in-flight model turn. Movement and turn tools
 return their observed completion before Gemini chooses another movement. One
 physical move or turn stays active until its duration or observed heading settles;
 safety holds pause its timing; the action state reports the command, phase,
