@@ -21,13 +21,10 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Observe the indoor environment and decide what to do next."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Give a slow model response one fresh state prompt before reconnecting.
-HEARTBEAT_PERIOD_S = 15.0
 # Reserve a small native budget for visual reasoning without making actions too slow.
 THINKING_BUDGET = 128
-# Give a slow model turn time to finish, but retry before a short flight is
-# spent waiting on a stalled session.
-RESPONSE_TIMEOUT_S = 20.0
+# Let one native reasoning turn finish before treating the session as stalled.
+RESPONSE_TIMEOUT_S = 45.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -128,7 +125,6 @@ class GeminiRuntime:
         self._session = None
         self.session_reconnect_count = 0
         self._reconnect_requested = False
-        self._followup_requested = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -302,7 +298,6 @@ class GeminiRuntime:
                         try:
                             receive_task = None
                             response_started_s = None
-                            last_heartbeat_s = None
                             while (
                                 not self._closed.is_set()
                                 and not self._reconnect_requested
@@ -313,37 +308,18 @@ class GeminiRuntime:
                                     response_started_s = None
                                     if self._reconnect_requested:
                                         break
-                                now = time.monotonic()
-                                slow_response = (
-                                    receive_task is not None
-                                    and response_started_s is not None
-                                    and self._active_action is None
-                                    and now - response_started_s >= HEARTBEAT_PERIOD_S
-                                )
                                 heartbeat_due = (
-                                    last_heartbeat_s is None
-                                    or receive_task is None
-                                    or (
-                                        self._followup_requested
-                                        and self._active_action is None
-                                    )
+                                    receive_task is None
                                     or (
                                         self._dialogue
                                         and self._dialogue_in_flight is None
                                     )
-                                    or (
-                                        slow_response
-                                        and last_heartbeat_s is not None
-                                        and now - last_heartbeat_s >= HEARTBEAT_PERIOD_S
-                                    )
                                 )
                                 if heartbeat_due:
-                                    # Heartbeats start reasoning and may interrupt
-                                    # a slow generation. This keeps the model's
-                                    # state current while video continues during
-                                    # a physical action.
+                                    # Heartbeats start a new reasoning turn. Let a
+                                    # native turn or tool follow-up finish unless
+                                    # new dialogue needs to interrupt it.
                                     await self._heartbeat(session, types)
-                                    last_heartbeat_s = time.monotonic()
                                 if receive_task is None:
                                     response_started_s = time.monotonic()
                                     receive_task = asyncio.create_task(
@@ -512,7 +488,6 @@ class GeminiRuntime:
             self._memory_sent = True
         if self._bootstrap_pending:
             self._bootstrap_pending = False
-        self._followup_requested = False
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -630,7 +605,6 @@ class GeminiRuntime:
                         await session.send_tool_response(
                             function_responses=responses
                         )
-                    self._followup_requested = True
             if message.tool_call_cancellation is not None:
                 self._cancel_action("Gemini cancelled it")
 
@@ -1340,7 +1314,7 @@ def _tools():
                 "movement; call move or turn instead. After speaking, wait for new "
                 "dialogue or a completed physical action before speaking again."
             ),
-            "behavior": "NON_BLOCKING",
+            "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {"message": {"type": "STRING"}},
