@@ -653,6 +653,8 @@ class GeminiRuntime:
                     self._response_parts.clear()
                     self._response_thoughts.clear()
                     self._actions.clear()
+                    self._follow_up_sent_at_s = None
+                    self._follow_up_retry_at_s = None
                     self._response_in_flight = False
                     return
                 self._follow_up_retry_at_s = None
@@ -723,6 +725,8 @@ class GeminiRuntime:
                 self._actions.clear()
                 return
             if turn_complete:
+                self._follow_up_sent_at_s = None
+                self._follow_up_retry_at_s = None
                 self._acknowledge_dialogue()
                 self.turn_count += 1
                 self._finish_turn(response_started_s)
