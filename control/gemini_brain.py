@@ -286,7 +286,7 @@ class GeminiRuntime:
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
-                        temperature=0.2,
+                        temperature=0.0,
                         tools=_tools(),
                         system_instruction=_system_instruction(),
                         context_window_compression=(
@@ -578,9 +578,10 @@ class GeminiRuntime:
             if not self._speech_blocked
             else "waiting for new dialogue or a completed physical action"
         )
+        action_state = self._action_state_text()
         parts.append(
             f"[STATE] camera={camera}; telemetry={_telemetry_text(self._telemetry)}; "
-            f"action={self._action_state_text()}; speech={speech}"
+            f"action={action_state}; speech={speech}"
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
@@ -589,10 +590,16 @@ class GeminiRuntime:
                 "[MEMORY] Prior experience; verify it against the current image "
                 f"and telemetry:\n{memory}"
             )
+        if self._last_action_result:
+            heartbeat = (
+                "The last physical action finished. Inspect its result and the "
+                "newest image, then choose the next tool."
+            )
+        else:
+            heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
-            "[HEARTBEAT] Call one tool directly now: move, turn, hover, speak, or "
-            "ack. Do not return an action as text or JSON. If no safe action is "
-            "clear, call hover or ack."
+            f"[HEARTBEAT] {heartbeat} Call one tool directly: move, turn, hover, "
+            "speak, or ack. If no safe action is clear, call hover or ack."
         )
         return "\n".join(parts)
 
