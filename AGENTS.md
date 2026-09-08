@@ -35,7 +35,7 @@ merge and delete it.
 
 - Gemini ER 2 Streaming starts with one situation prompt, then continuously
   decides from images, dialogue, telemetry, memory, and previous outputs.
-- Gemini chooses among its bounded movement, turn, hover, and speech tools;
+- Gemini chooses among its bounded movement, turn, hover, speech, and wait tools;
   the CM5 still limits every physical command.
 - Physical actions must be direct Gemini tool calls; text or JSON action
   descriptions never move the vehicle.

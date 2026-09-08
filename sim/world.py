@@ -622,7 +622,7 @@ async def run(
                     print(
                         f"[Gemini {elapsed_s:5.1f}s] action="
                         f"{clean(control.latest_action)}; "
-                        f"actions={control.action_count}",
+                        f"tool_actions={control.action_count}",
                         flush=True,
                     )
                     last_traced_gemini_action = control.latest_action
@@ -637,7 +637,7 @@ async def run(
                     last_traced_gemini_dialogue = control.dialogue_sent_count
                 if control.turn_count != last_traced_decision:
                     print(
-                        f"[Gemini {elapsed_s:5.1f}s] turn={control.turn_count}; "
+                        f"[Gemini {elapsed_s:5.1f}s] model_turn={control.turn_count}; "
                         f"thought={clean(control.latest_thought)}; "
                         f"response={clean(control.latest_response)}; "
                         f"action={clean(control.latest_action)}; "
@@ -918,8 +918,9 @@ async def run(
             if control.video_frame_count < 2:
                 raise RuntimeError("SITL did not stream Gemini video frames")
             print(
-                "Gemini turns/actions observed: "
-                f"{control.turn_count} turns, {control.action_count} actions."
+                "Gemini model turns/tool actions observed: "
+                f"{control.turn_count} model turns, "
+                f"{control.action_count} tool actions."
             )
             print(f"Gemini live video frames=verified ({control.video_frame_count}).")
         if memory_store is not None:
