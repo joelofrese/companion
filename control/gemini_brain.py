@@ -44,7 +44,7 @@ MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 5.0
 MAX_IMAGE_WIDTH = 640
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
-ACTION_GRACE_S = 3.0
+ACTION_GRACE_S = 5.0
 ACTION_SETTLE_S = 1.0
 MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
