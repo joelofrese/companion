@@ -239,11 +239,12 @@ authoritative behavior trace.
   starts with one situation prompt, then uses the newest image, telemetry,
   dialogue, memory, and measured action results through native compression and
   session resumption. It requests native thought summaries when available and
-  chooses bounded move, turn, hover, and speech tools. Move and turn tools are
-  blocking, so their measured completion and heading arrive before another
-  movement. Physical outcomes are saved as compact calibration memory for later
-  sessions; current image and telemetry remain authoritative. ER2 latency is
-  still variable, and traces expose each completed turn and its latency.
+  chooses bounded move, turn, hover, and speech tools. Movement and turn pulses
+  last at most one second, and their measured completion and heading arrive
+  before another movement. Physical outcomes are saved as compact calibration
+  memory for later sessions; current image and telemetry remain authoritative.
+  ER2 latency is still variable, and traces expose each completed turn and its
+  latency.
 - Deterministic in-process brain fixtures remain only for repeatable simulation
   checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,

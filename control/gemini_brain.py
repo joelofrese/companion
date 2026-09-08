@@ -27,13 +27,13 @@ START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
-MAX_MOVE_S = 2.0
+MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_S = 0.25
 # A short pulse lets the model look again instead of estimating an exact angle.
 DEFAULT_TURN_S = 0.75
-MAX_TURN_S = 2.0
+MAX_TURN_S = 1.0
 # A full half-turn is enough to scan the surroundings before translating.
 MAX_IN_PLACE_TURN_DEG = 180.0
 # Keep the yaw rate slow while making one visual correction useful.
@@ -1316,7 +1316,7 @@ def _tools():
                         "type": "NUMBER",
                         "description": (
                             f"A duration from {MIN_MOVE_S} through {MAX_MOVE_S} "
-                            "seconds."
+                            "seconds. Use a short pulse and inspect the result."
                         ),
                         "minimum": MIN_MOVE_S,
                         "maximum": MAX_MOVE_S,
@@ -1362,7 +1362,8 @@ def _tools():
                         "description": (
                             f"Optional short yaw pulse from {MIN_TURN_S:.2f} "
                             f"through {MAX_TURN_S:.1f} seconds. Omit it for the "
-                            f"normal {DEFAULT_TURN_S:.2f}-second pulse."
+                            f"normal {DEFAULT_TURN_S:.2f}-second pulse; do not ask "
+                            "the developer for an exact duration."
                         ),
                         "minimum": MIN_TURN_S,
                         "maximum": MAX_TURN_S,
@@ -1422,13 +1423,16 @@ def _system_instruction() -> str:
         "measured state, then report completion.\n\n"
         "The camera faces forward: image-left and image-right are vehicle-left and "
         "vehicle-right. Move only with a clear path and valid TOF range. Prefer short, "
-        "slow translation. Treat a requested object or person that is visible as the "
+        "slow translation in short pulses. Treat a requested object or person that is "
+        "visible as the "
         "movement target: move forward when it is centered, or use a small lateral "
         "velocity and yaw rate for a smooth arc when it is offset. Do not turn to search "
         "for a target that is already visible. Turn only when the view or path needs "
         "reorientation. A turn is a short yaw pulse: look again after each pulse and "
         "correct from the new image and heading instead of estimating a large angle in "
-        "advance. If the path is clear and TOF is well beyond the stop limit, translate "
+        "advance. Use the normal short turn pulse unless a different short correction "
+        "is clearly needed; do not ask the developer for exact timing. If the path is "
+        "clear and TOF is well beyond the stop limit, translate "
         "instead of repeatedly turning in place. Hover when no safe step is clear. Do "
         "not repeat the same in-place direction without a new visual reason. Trust the "
         "newest image and telemetry over memory.\n\n"
