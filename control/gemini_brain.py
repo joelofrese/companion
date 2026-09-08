@@ -97,7 +97,6 @@ class GeminiRuntime:
         self._latest_frame_at_s: Optional[float] = None
         self._last_frame_sent_at_s: Optional[float] = None
         self._frame_count = 0
-        self._last_frame_sent_count = 0
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._dialogue_in_flight: Optional[str] = None
@@ -454,7 +453,6 @@ class GeminiRuntime:
                 video=types.Blob(data=image_bytes, mime_type="image/jpeg")
             )
             self._last_frame_sent_at_s = now
-            self._last_frame_sent_count = self._frame_count
         self.video_frame_count += 1
 
     async def _heartbeat_loop(self, session, types):
@@ -867,7 +865,7 @@ class GeminiRuntime:
     def _started_action_response(self, action: ActiveAction) -> dict:
         """Tell Gemini that a physical action started without waiting for it."""
 
-        return {
+        response = {
             "status": "started",
             "action": self._action_label(action),
             "heading_deg": _heading_value(self._telemetry.heading_rad),
@@ -877,6 +875,12 @@ class GeminiRuntime:
                 "unavailable until this action completes and a fresh camera frame arrives"
             ),
         }
+        if action.kind == "turn":
+            response.update(
+                requested_angle_deg=_turn_angle_deg(action),
+                target_heading_deg=_target_heading_value(action),
+            )
+        return response
 
     def _busy_response(self):
         self._refresh_action()
@@ -989,6 +993,10 @@ class GeminiRuntime:
         actual = self._heading_change_deg(action)
         if actual is not None:
             details.append(f"observed heading change={actual:+.1f} degrees")
+        if action.kind == "turn":
+            target = _target_heading_value(action)
+            if target is not None:
+                details.append(f"target heading={target:+.1f} degrees")
         if self._action_is_blocked(action):
             details.append("paused until safety telemetry permits movement")
         details.append("move and turn tools unavailable until completion")
@@ -1143,6 +1151,10 @@ class GeminiRuntime:
         result = f"{self._action_label(action)} {status}"
         if actual_heading_deg is not None:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
+        if action.kind == "turn":
+            final_heading = _heading_value(self._telemetry.heading_rad)
+            if final_heading is not None:
+                result += f"; final heading {final_heading:+.1f} degrees"
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
         position_delta = self._position_delta(action)
@@ -1164,6 +1176,10 @@ class GeminiRuntime:
         actual = self._heading_change_deg(action)
         if actual is not None:
             result += f"; observed heading change {actual:+.1f} degrees"
+        if action.kind == "turn":
+            final_heading = _heading_value(self._telemetry.heading_rad)
+            if final_heading is not None:
+                result += f"; final heading {final_heading:+.1f} degrees"
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
             position_delta = self._position_delta(action)
@@ -1368,6 +1384,8 @@ def _system_instruction() -> str:
         "from the newest view and measured state, then inspect the result before making "
         "another correction. Use heading and remembered requested-versus-observed "
         "motion to calibrate, but trust the current view and telemetry over estimates. "
+        "For a turn, use the returned target and final heading rather than relying on "
+        "the earlier image or an assumed rotation. "
         "After a turn, reassess the new view. If it has not made useful progress, do "
         "not repeat the same scan indefinitely; try a clear lateral opening or hover. "
         "Prefer small turns and use a larger one only for a clear reason. Hover when "
@@ -1568,6 +1586,20 @@ def _turn_completion_rad(requested_rad: float) -> float:
     """Require meaningful progress even for the smallest allowed turn."""
 
     return max(requested_rad * 0.5, requested_rad - HEADING_TOLERANCE_RAD)
+
+
+def _target_heading_value(action: ActiveAction):
+    """Return the requested turn's target heading in the vehicle's angle range."""
+
+    if action.start_heading_rad is None or not _finite(action.start_heading_rad):
+        return None
+    change_rad = math.radians(_turn_angle_deg(action))
+    if action.direction == "left":
+        change_rad = -change_rad
+    target_rad = (action.start_heading_rad + change_rad + math.pi) % (
+        2.0 * math.pi
+    ) - math.pi
+    return math.degrees(target_rad)
 
 
 def _turn_angle_deg(action: ActiveAction) -> float:
