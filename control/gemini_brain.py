@@ -907,6 +907,7 @@ class GeminiRuntime:
             "action": self._action_label(action),
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
+            "scheduling": "WHEN_IDLE",
             "movement_tools": (
                 "unavailable until this action completes and a fresh camera frame arrives"
             ),
