@@ -11,7 +11,8 @@ from typing import Any, Callable, Optional
 from vision.video_stream import close_subprocess
 
 
-POSE_UPDATE_S = 0.1
+# Keep the visual fixture smooth without competing with sensor updates.
+POSE_UPDATE_S = 0.25
 
 
 class GazeboTopicReader:
