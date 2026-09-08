@@ -974,9 +974,7 @@ async def run(
                 )
             has_experience = bool(
                 not gemini
-                or control.action_count
-                or control.latest_thought
-                or control.latest_response
+                or control.experience_count
             )
             if not has_experience:
                 print("Gemini produced no new experience to persist.")

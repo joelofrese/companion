@@ -120,6 +120,7 @@ class GeminiRuntime:
         self.dialogue_sent_count = 0
         self.dialogue_count = 0
         self.video_frame_count = 0
+        self.experience_count = 0
         self._response_parts = []
         self._response_thoughts = []
         self._actions = []
@@ -1331,6 +1332,7 @@ class GeminiRuntime:
     def _remember_action(self, action: str):
         if self.memory_store is not None:
             self.memory_store.remember(f"experience=action {action}")
+            self.experience_count += 1
 
     def _finish_turn(self, response_started_s):
         thought = _model_text(self._response_thoughts)
@@ -1356,6 +1358,7 @@ class GeminiRuntime:
             and action not in summary
         ):
             self.memory_store.remember(f"experience=summary {summary}")
+            self.experience_count += 1
 
 
 def _tools():
