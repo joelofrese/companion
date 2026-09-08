@@ -39,12 +39,10 @@ merge and delete it.
   the CM5 still limits every physical command.
 - Physical actions must be direct Gemini tool calls; text or JSON action
   descriptions never move the vehicle.
-- A move may include a small yaw rate for a smooth arc; `turn` remains the
-  in-place reorientation action and can request a measured broad turn up to
-  90 degrees.
-- Prefer small visual corrections and smooth translation/yaw arcs; infer turn
-  amounts from the current image and measured heading instead of asking the
-  user to provide them.
+- A move may include a small yaw rate for a smooth arc; `turn` is a short,
+  measured in-place yaw pulse.
+- Prefer small visual corrections and smooth translation/yaw arcs; choose each
+  pulse from the current image and measured heading instead of asking the user.
 - A half-turn in place may scan the scene; translation resets the scan before
   more turning.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
