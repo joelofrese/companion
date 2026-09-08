@@ -150,7 +150,8 @@ Camera-only runs still stop because they have no TOF reading. Use `--depth` when
 the brain should be allowed to move.
 Use `--trace` to print brain observations, every completed Gemini turn with its
 native thought summary, response, action, and latency, plus command reasons.
-Native thought summaries are optional; raw private reasoning is not exposed. Use
+The session requests native thought summaries when available; raw private
+reasoning is not exposed. Use
 `--snapshot PATH` to save a settled rendered frame for visual inspection. Use
 `--world`, `--duration`, `--request`,
 `--intent`, and `--memory` to vary the world, run length, dialogue, initial
@@ -234,32 +235,17 @@ authoritative behavior trace.
 - The `objects` world provides a readable room with simple furniture and visual
   landmarks for free-roaming ER2 tasks; it remains a simulation fixture, not a
   DEXI 3 hardware claim.
-- Gemini ER 2 Streaming is the current production path and persistent brain
-  for simulation and the CM5. It starts with one situation prompt and one direct
-  tool heartbeat, keeps that situation active as context, then uses native context
-  compression and session resumption while continuously choosing bounded move,
-  turn, hover, and speech actions. Native thought-part tracing remains available
-  when ER 2 emits summaries. Explicit thinking is not enabled because direct tool
-  calls are the priority; actions remain separately visible. Move and turn actions are blocking and
-  serialized while their live state, completion, and heading are reported.
-  Speech is a blocking tool call that returns immediately, but waits for new
-  dialogue or a completed physical action before repeating. Tool results and
-  physical completion feed a fresh state and image before the next movement decision;
-  translating arcs also report their measured heading change. Exploration remains
-  active until the user changes it. The compact prompt gives ER 2 the newest image,
-  telemetry, action state, and dialogue, then asks for one direct function call.
-  The streaming loop sends the newest frame once per second and waits for each
-  model or physical tool cycle before sending the next state heartbeat. A
-  physical action remains serialized by the blocking tool response. The resumed
-  session keeps
-  the same situation, active request, and memory while the body holds zero.
-  Physical action outcomes are saved as compact measured calibration memory;
-  later sessions receive it as prior experience while current image and
-  telemetry remain authoritative.
-  Open-world runs show accurate measured actions, but ER2 response latency
-  remains variable; traces expose every completed turn and its latency so
-  future improvements can follow observed behavior.
-  Deterministic in-process brain fixtures remain only for repeatable simulation checks.
+- Gemini ER 2 Streaming is the production brain for simulation and the CM5. It
+  starts with one situation prompt, then uses the newest image, telemetry,
+  dialogue, memory, and measured action results through native compression and
+  session resumption. It requests native thought summaries when available and
+  chooses bounded move, turn, hover, and speech tools. Move and turn tools are
+  blocking, so their measured completion and heading arrive before another
+  movement. Physical outcomes are saved as compact calibration memory for later
+  sessions; current image and telemetry remain authoritative. ER2 latency is
+  still variable, and traces expose each completed turn and its latency.
+- Deterministic in-process brain fixtures remain only for repeatable simulation
+  checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
   bounded commands, safety intervention, landing, and disarm.
 - Faulted runs stop when camera input stalls and resume after fresh frames return.

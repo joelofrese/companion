@@ -273,6 +273,9 @@ class GeminiRuntime:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
                         temperature=0.0,
+                        thinking_config=types.ThinkingConfig(
+                            include_thoughts=True
+                        ),
                         tools=_tools(),
                         system_instruction=_system_instruction(),
                         context_window_compression=(
