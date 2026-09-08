@@ -150,7 +150,7 @@ Camera-only runs still stop because they have no TOF reading. Use `--depth` when
 the brain should be allowed to move.
 Use `--trace` to print brain observations, every completed Gemini turn with its
 native thought summary, response, action, and latency, plus command reasons.
-The session requests native thought summaries when available; raw private
+Traced simulations request native thought summaries when available; raw private
 reasoning is not exposed. Use
 `--snapshot PATH` to save a settled rendered frame for visual inspection. Use
 `--world`, `--duration`, `--request`,
@@ -243,9 +243,10 @@ authoritative behavior trace.
   Movement and turn pulses last at most one second, and their measured completion
   and heading arrive before another movement. Physical outcomes are saved as
   compact calibration memory for later sessions; current image and telemetry
-  remain authoritative. Thought summaries are requested only for traced
-  simulations so normal flight favors response time. ER2 latency is still
-  variable, and traces expose each completed turn and its latency.
+  remain authoritative. Medium thinking balances ER2 response quality and
+  latency; thought summaries are requested only for traced simulations. ER2
+  latency is still variable, and traces expose each completed turn and its
+  latency.
 - Deterministic in-process brain fixtures remain only for repeatable simulation
   checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
