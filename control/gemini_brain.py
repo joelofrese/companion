@@ -38,8 +38,8 @@ MAX_RIGHT_SPEED_M_S = 0.20
 MIN_TURN_DEG = 5.0
 DEFAULT_TURN_DEG = 12.0
 MAX_TURN_DEG = 45.0
-# A full half-turn is enough to scan the surroundings before translating.
-MAX_IN_PLACE_TURN_DEG = 180.0
+# A quarter-turn is enough to inspect one side before translating.
+MAX_IN_PLACE_TURN_DEG = 90.0
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 15.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -903,7 +903,8 @@ class GeminiRuntime:
             return {
                 "status": "unavailable",
                 "reason": (
-                    "the in-place visual sweep has reached its 180-degree limit; "
+                    "the in-place visual sweep has reached its "
+                    f"{MAX_IN_PLACE_TURN_DEG:.0f}-degree limit; "
                     "translate before turning further"
                 ),
                 "movement_tools": "move and hover available; turn available after translation",
