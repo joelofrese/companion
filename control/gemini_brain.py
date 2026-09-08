@@ -38,6 +38,8 @@ MAX_VERTICAL_SPEED_M_S = 0.20
 # The model asks for a relative angle; the runtime stops from measured heading.
 MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 45.0
+# A turn without an angle is a small controller-like correction.
+DEFAULT_TURN_DEG = 15.0
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -591,7 +593,7 @@ class GeminiRuntime:
             "If a user request is present, treat it as the active task until it is "
             "completed, changed, or unsafe; do not replace it with general exploration. "
             "If nothing needs to change, wait for the next image or dialogue; do not "
-            "invent movement."
+            "invent movement or repeat a completed answer."
         )
         return "\n".join(parts)
 
@@ -858,17 +860,19 @@ class GeminiRuntime:
                 "status": "rejected",
                 "reason": "direction must be left or right",
             }
-        angle_deg = _number_between(
-            args, "angle_deg", MIN_TURN_DEG, MAX_TURN_DEG
-        )
-        if angle_deg is None:
-            return {
-                "status": "rejected",
-                "reason": (
-                    "angle_deg is required and must be "
-                    f"{MIN_TURN_DEG} to {MAX_TURN_DEG}"
-                ),
-            }
+        angle_deg = DEFAULT_TURN_DEG
+        if "angle_deg" in args:
+            angle_deg = _number_between(
+                args, "angle_deg", MIN_TURN_DEG, MAX_TURN_DEG
+            )
+            if angle_deg is None:
+                return {
+                    "status": "rejected",
+                    "reason": (
+                        "angle_deg must be "
+                        f"{MIN_TURN_DEG} to {MAX_TURN_DEG} when provided"
+                    ),
+                }
         busy = self._busy_response()
         if busy is not None:
             return busy
@@ -1042,7 +1046,7 @@ class GeminiRuntime:
         if self._action_is_blocked(action):
             details.append("paused until safety telemetry permits movement")
         details.append("move and turn tools unavailable until completion")
-        details.append("hover may interrupt")
+        details.append("hover may interrupt only for an explicit stop request")
         return "; ".join(details)
 
     def _refresh_action(self):
@@ -1386,15 +1390,17 @@ def _tools():
                     "angle_deg": {
                         "type": "NUMBER",
                         "description": (
-                            f"Required relative heading change from {MIN_TURN_DEG:.0f} "
-                            f"through {MAX_TURN_DEG:.0f} degrees. Choose the "
-                            "smallest useful correction."
+                            f"Optional relative heading change from {MIN_TURN_DEG:.0f} "
+                            f"through {MAX_TURN_DEG:.0f} degrees. Omit it for a "
+                            f"small {DEFAULT_TURN_DEG:.0f}-degree correction; choose "
+                            "an explicit angle only when a larger change of view is "
+                            "useful."
                         ),
                         "minimum": MIN_TURN_DEG,
                         "maximum": MAX_TURN_DEG,
                     },
                 },
-                "required": ["direction", "angle_deg"],
+                "required": ["direction"],
             },
         },
         {
@@ -1438,7 +1444,11 @@ def _system_instruction() -> str:
         "Choose tools directly: `move`, `turn`, `hover`, or `speak`.\n\n"
         "A user request is the immediate task. Keep pursuing it until it is completed, "
         "changed, or unsafe. Use general exploration only when there is no more specific "
-        "request.\n\n"
+        "request. Decide when the request is complete and do not add a new goal. For a "
+        "find or identify request, report the target when it is clearly visible and "
+        "hover; do not keep scanning or move closer unless the request also says to "
+        "approach, go to, follow, or inspect it. After a request is complete, stay "
+        "quiet until new dialogue or a meaningful scene change.\n\n"
         "The camera faces forward. Image-left is vehicle-left and image-right is "
         "vehicle-right. The TOF sensor looks forward only. Move only with fresh vision "
         "and valid TOF data. Positive forward motion needs a clear path. When forward "
@@ -1455,9 +1465,11 @@ def _system_instruction() -> str:
         "inspect the newer image and continue the active task if it is not complete. "
         "When the requested target is visible and the path is clear, make progress "
         "toward it instead of continuing to scan. "
-        "Use short, slow body-frame pulses and small relative turns, usually 10 to 25 "
-        "degrees; use a larger turn only when a clear change of view needs it. Let a "
-        "normal turn finish instead of hovering early, then use its measured final "
+        "Use short, slow body-frame pulses and the smallest useful relative turn. Omit "
+        f"the turn angle for a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use an "
+        "explicit larger angle only when a clear change of view needs it. Let a "
+        "normal turn finish instead of hovering early unless an explicit stop is "
+        "needed, then use its measured final "
         "heading. Choose the next pulse from the newest view and measured state, then "
         "inspect the result before making another correction. Use heading and remembered "
         "requested-versus-observed motion to calibrate, but trust the current view and "
