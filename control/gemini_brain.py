@@ -1462,6 +1462,9 @@ def _system_instruction() -> str:
         "valid TOF data, and a clear path. When forward is blocked, choose a visible "
         "side opening and translate through it; do not repeatedly turn in place or "
         "press forward into the obstacle. "
+        "A turn changes the view but not the vehicle's position. If a requested target "
+        "is not visible after turning, change position through a visible opening before "
+        "concluding it is absent. "
         "Use short, slow body-frame pulses and relative turns. Choose the next pulse "
         "from the newest view and measured state, then inspect the result before making "
         "another correction. Use heading and remembered requested-versus-observed "
@@ -1515,6 +1518,7 @@ def _telemetry_text(telemetry: Telemetry) -> str:
     command = telemetry.last_command or VelocityCommand()
     return "; ".join(
         (
+            f"forward_path={_path_status(telemetry.obstacle_distance_m)}",
             f"obstacle={_number(telemetry.obstacle_distance_m)}",
             "command=" + ",".join(
                 _number(value)
@@ -1536,6 +1540,14 @@ def _telemetry_text(telemetry: Telemetry) -> str:
             f"heading_deg={_heading_number(telemetry.heading_rad)}",
         )
     )
+
+
+def _path_status(distance_m: Optional[float]) -> str:
+    """Describe only the forward TOF reading in plain language."""
+
+    if not _obstacle_is_valid(distance_m):
+        return "unknown"
+    return "clear" if distance_m > OBSTACLE_STOP_M else "blocked"
 
 
 def _number(value) -> str:
