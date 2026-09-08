@@ -962,9 +962,16 @@ async def run(
             latest_memory = (
                 persisted_memory.splitlines()[-1] if persisted_memory else ""
             )
-            required_memory = ("obstacle=", "command=", "velocity=", "heading_deg=")
-            if not gemini:
-                required_memory = ("intent=",) + required_memory
+            if gemini:
+                required_memory = ("experience=",)
+            else:
+                required_memory = (
+                    "intent=",
+                    "obstacle=",
+                    "command=",
+                    "velocity=",
+                    "heading_deg=",
+                )
             has_experience = bool(
                 not gemini
                 or control.action_count

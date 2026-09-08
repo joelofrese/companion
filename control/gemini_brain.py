@@ -535,7 +535,7 @@ class GeminiRuntime:
         memory = ""
         if not self._memory_sent:
             if self.memory_store is not None:
-                memory = self.memory_store.context()
+                memory = self.memory_store.context("experience=")
         parts = []
         if self._bootstrap_pending:
             parts.append(f"[START] Situation: {self.situation}")
@@ -1330,9 +1330,7 @@ class GeminiRuntime:
 
     def _remember_action(self, action: str):
         if self.memory_store is not None:
-            self.memory_store.remember(
-                f"{_telemetry_text(self._telemetry)}; action={action}"
-            )
+            self.memory_store.remember(f"experience=action {action}")
 
     def _finish_turn(self, response_started_s):
         thought = _model_text(self._response_thoughts)
@@ -1357,9 +1355,7 @@ class GeminiRuntime:
             and summary not in ("", "none")
             and action not in summary
         ):
-            self.memory_store.remember(
-                f"{_telemetry_text(self._telemetry)}; summary={summary}"
-            )
+            self.memory_store.remember(f"experience=summary {summary}")
 
 
 def _tools():

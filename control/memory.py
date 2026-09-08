@@ -28,10 +28,13 @@ class CompanionMemory:
             if line.strip()
         ][-MAX_MEMORY_LINES:]
 
-    def context(self) -> str:
-        """Return recent experience for the companion brain."""
+    def context(self, prefix: str = "") -> str:
+        """Return recent experience, optionally limited to one record type."""
 
-        return "\n".join(self._lines[-MEMORY_CONTEXT_LINES:])
+        lines = self._lines
+        if prefix:
+            lines = [line for line in lines if line.startswith(prefix)]
+        return "\n".join(lines[-MEMORY_CONTEXT_LINES:])
 
     def remember(self, entry: str):
         """Save one new memory and keep the file bounded."""
