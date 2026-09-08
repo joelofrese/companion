@@ -40,7 +40,7 @@ MAX_IN_PLACE_TURN_DEG = 180.0
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 15.0
 MIN_TURN_RATE_DEG_S = 1.5
-TURN_SLOW_THRESHOLD_DEG = 5.0
+TURN_SLOW_THRESHOLD_DEG = 10.0
 MAX_IMAGE_WIDTH = 640
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 5.0
