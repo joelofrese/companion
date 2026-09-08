@@ -1481,11 +1481,11 @@ def _system_instruction() -> str:
         "not repeat the same scan indefinitely; try a clear lateral opening or hover. "
         "Prefer small turns and use a larger one only for a clear reason. Hover when "
         "no safe useful step is clear.\n\n"
-        "Move and turn are blocking physical actions. Choose one physical movement at a "
-        "time and wait for its measured completion and a newer camera frame before the "
-        "next movement. A requested duration or angle is intent, not proof. Do not ask "
-        "the developer for exact timing. Speak after a real observation, event, or user "
-        "request. The CM5 limits every physical command."
+        "Move and turn start non-blocking physical actions. Choose one physical movement "
+        "at a time; keep observing while it runs, then wait for its measured completion "
+        "and a newer camera frame before the next movement. A requested duration or angle "
+        "is intent, not proof. Do not ask the developer for exact timing. Speak after a "
+        "real observation, event, or user request. The CM5 limits every physical command."
     )
 
 
