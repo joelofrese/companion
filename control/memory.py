@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 MAX_MEMORY_LINES = 64
-MAX_MEMORY_CHARS = 240
+MAX_MEMORY_CHARS = 360
 MEMORY_CONTEXT_LINES = 8
 
 
@@ -39,32 +39,8 @@ class CompanionMemory:
         entry = " ".join(entry.split())[:MAX_MEMORY_CHARS]
         if not entry:
             return
-        if self._lines and _memory_key(self._lines[-1]) == _memory_key(entry):
-            if self._lines[-1] == entry:
-                return
-            self._lines[-1] = entry
-        else:
-            self._lines = (self._lines + [entry])[-MAX_MEMORY_LINES:]
+        if self._lines and self._lines[-1] == entry:
+            return
+        self._lines = (self._lines + [entry])[-MAX_MEMORY_LINES:]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text("\n".join(self._lines) + "\n", encoding="utf-8")
-
-
-def _memory_key(entry: str) -> str:
-    """Ignore changing telemetry when grouping one repeated experience."""
-
-    if entry.startswith("obstacle="):
-        _, separator, action = entry.partition("; action=")
-        if separator:
-            return "action=" + action.partition("; summary=")[0]
-        _, separator, summary = entry.partition("; summary=")
-        if separator:
-            return "summary=" + summary
-        return "telemetry"
-
-    before, separator, after = entry.partition("; obstacle=")
-    if not separator:
-        return entry
-    summary = after.partition("; summary=")
-    if not summary[1]:
-        return before
-    return before + summary[1] + summary[2]
