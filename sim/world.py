@@ -242,6 +242,7 @@ async def run(
             control = GeminiRuntime(
                 situation=initial_intent,
                 memory=memory_store,
+                include_thoughts=trace,
             )
             if dialogue_request is not None:
                 control.add_dialogue(dialogue_request)
@@ -1348,7 +1349,7 @@ if __name__ == "__main__":
         action="store_true",
         help="use live Gemini ER 2 instead of the deterministic brain fixture",
     )
-    parser.add_argument("--memory", type=Path, help="persist conscious experience across runs")
+    parser.add_argument("--memory", type=Path, help="persist experience across runs")
     parser.add_argument(
         "--snapshot",
         type=Path,

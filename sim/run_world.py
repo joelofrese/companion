@@ -440,7 +440,7 @@ def main(argv=None):
     parser.add_argument(
         "--memory",
         type=Path,
-        help="persist conscious experience across exploratory runs",
+        help="persist experience across exploratory runs",
     )
     parser.add_argument(
         "--snapshot",

@@ -84,12 +84,14 @@ class GeminiRuntime:
         situation: str = DEFAULT_SITUATION,
         memory: Optional[CompanionMemory] = None,
         api_key: Optional[str] = None,
+        include_thoughts: bool = False,
     ):
         if not isinstance(situation, str) or not situation.strip():
             raise ValueError("situation must be a non-empty string")
         self.situation = situation.strip()
         self.memory_store = memory
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
+        self.include_thoughts = include_thoughts
         self._latest_frame = None
         self._latest_frame_at_s: Optional[float] = None
         self._last_frame_sent_at_s: Optional[float] = None
@@ -274,7 +276,7 @@ class GeminiRuntime:
                         response_modalities=["TEXT"],
                         temperature=0.0,
                         thinking_config=types.ThinkingConfig(
-                            include_thoughts=True
+                            include_thoughts=self.include_thoughts
                         ),
                         tools=_tools(),
                         system_instruction=_system_instruction(),
@@ -1432,10 +1434,13 @@ def _system_instruction() -> str:
         "correct from the new image and heading instead of estimating a large angle in "
         "advance. Use the normal short turn pulse unless a different short correction "
         "is clearly needed; do not ask the developer for exact timing. If the path is "
-        "clear and TOF is well beyond the stop limit, translate "
-        "instead of repeatedly turning in place. Hover when no safe step is clear. Do "
-        "not repeat the same in-place direction without a new visual reason. Trust the "
-        "newest image and telemetry over memory.\n\n"
+        "clear and TOF is well beyond the stop limit, translate instead of repeatedly "
+        "turning in place. When an obstacle blocks the forward path, turn in short "
+        "pulses to inspect; once a clear side path is visible and forward range permits "
+        "movement, translate around it with a small lateral move or smooth arc. A "
+        "heading change alone is not progress, so do not keep turning when the view is "
+        "unchanged. Hover when no safe step is clear. Trust the newest image and "
+        "telemetry over memory.\n\n"
         "Move and turn are blocking physical actions. Wait for their measured result "
         "before choosing another movement. A requested duration is intent, "
         "not proof; use observed translation, heading, telemetry, and action state to "

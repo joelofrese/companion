@@ -162,9 +162,10 @@ invalid-command, brain-shutdown, and Gemini-reconnect schedule into an
 exploratory run. Add `--headless` for unattended runs without the Gazebo GUI.
 
 The companion-owned `objects` world adds a simple room, table, chair, colored
-shapes, and a primitive mannequin for visual exploration. The runner starts the
-vehicle at zero yaw, warms the Gazebo camera after vehicle spawn, and leaves the
-camera user-controlled. Camera and depth explorations default to this world;
+shapes, a primitive mannequin, and a narrow central obstacle for visual
+exploration and detours. The runner starts the vehicle at zero yaw, warms the
+Gazebo camera after vehicle spawn, and leaves the camera user-controlled.
+Camera and depth explorations default to this world;
 other exploratory runs use the empty stock world.
 Oversized simulation frames are reduced to the real 640-pixel camera width
 before the brain sees them. Gazebo's forward camera keeps its native horizontal
@@ -238,13 +239,13 @@ authoritative behavior trace.
 - Gemini ER 2 Streaming is the production brain for simulation and the CM5. It
   starts with one situation prompt, then uses the newest image, telemetry,
   dialogue, memory, and measured action results through native compression and
-  session resumption. It requests native thought summaries when available and
-  chooses bounded move, turn, hover, and speech tools. Movement and turn pulses
-  last at most one second, and their measured completion and heading arrive
-  before another movement. Physical outcomes are saved as compact calibration
-  memory for later sessions; current image and telemetry remain authoritative.
-  ER2 latency is still variable, and traces expose each completed turn and its
-  latency.
+  session resumption. It chooses bounded move, turn, hover, and speech tools.
+  Movement and turn pulses last at most one second, and their measured completion
+  and heading arrive before another movement. Physical outcomes are saved as
+  compact calibration memory for later sessions; current image and telemetry
+  remain authoritative. Thought summaries are requested only for traced
+  simulations so normal flight favors response time. ER2 latency is still
+  variable, and traces expose each completed turn and its latency.
 - Deterministic in-process brain fixtures remain only for repeatable simulation
   checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
