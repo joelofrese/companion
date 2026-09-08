@@ -33,10 +33,10 @@ MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
-MIN_TURN_S = 0.25
-# A short pulse lets the model look again instead of estimating an exact angle.
-DEFAULT_TURN_S = 0.75
-MAX_TURN_S = 1.0
+# The model asks for a relative angle; the runtime stops from measured heading.
+MIN_TURN_DEG = 5.0
+DEFAULT_TURN_DEG = 12.0
+MAX_TURN_DEG = 45.0
 # A full half-turn is enough to scan the surroundings before translating.
 MAX_IN_PLACE_TURN_DEG = 180.0
 # Keep the yaw rate slow while making one visual correction useful.
@@ -874,22 +874,22 @@ class GeminiRuntime:
 
     async def _turn(self, args: dict) -> dict:
         direction = str(args.get("direction", "")).strip().lower()
-        duration_s = args.get("duration_s")
         if direction not in ("left", "right"):
             return {
                 "status": "rejected",
                 "reason": "direction must be left or right",
             }
-        if duration_s is None:
-            duration_s = DEFAULT_TURN_S
+        angle_deg = args.get("angle_deg")
+        if angle_deg is None:
+            angle_deg = DEFAULT_TURN_DEG
         else:
-            duration_s = _number_between(
-                args, "duration_s", MIN_TURN_S, MAX_TURN_S
+            angle_deg = _number_between(
+                args, "angle_deg", MIN_TURN_DEG, MAX_TURN_DEG
             )
-        if duration_s is None:
+        if angle_deg is None:
             return {
                 "status": "rejected",
-                "reason": f"duration_s must be {MIN_TURN_S} to {MAX_TURN_S}",
+                "reason": f"angle_deg must be {MIN_TURN_DEG} to {MAX_TURN_DEG}",
             }
         busy = self._busy_response()
         if busy is not None:
@@ -898,8 +898,8 @@ class GeminiRuntime:
         if observation is not None:
             return observation
         now = time.monotonic()
-        duration_s = float(duration_s)
-        angle_deg = duration_s * TURN_RATE_DEG_S
+        angle_deg = float(angle_deg)
+        duration_s = angle_deg / TURN_RATE_DEG_S
         if self._in_place_turn_deg + angle_deg > MAX_IN_PLACE_TURN_DEG:
             remaining_deg = max(
                 0.0,
@@ -1006,7 +1006,7 @@ class GeminiRuntime:
             if action.yaw_rate_deg_s:
                 label += f" yaw={action.yaw_rate_deg_s:+.1f}deg/s"
             return label
-        return f"turn {action.direction} for {action.duration_s:.1f}s"
+        return f"turn {action.direction} {_turn_angle_deg(action):.0f}deg"
 
     def _action_state_text(self) -> str:
         self._refresh_action()
@@ -1240,8 +1240,7 @@ class GeminiRuntime:
         if action.start_heading_rad is not None:
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
         if action.kind == "turn":
-            response["requested_duration_s"] = action.duration_s
-            response["expected_heading_change_deg"] = _turn_angle_deg(action)
+            response["requested_angle_deg"] = _turn_angle_deg(action)
             response["visual_effect"] = (
                 "the scene should have moved toward image-right after a left turn"
                 if action.direction == "left"
@@ -1384,11 +1383,12 @@ def _tools():
         {
             "name": "turn",
             "description": (
-                "Apply a short, slow in-place yaw pulse. Choose the direction from "
+                "Apply a slow in-place yaw correction. Choose the direction from "
                 "the newest image and heading: image-left means left and image-right "
-                "means right. Use a short duration, then inspect the new image and "
-                "measured heading before choosing another pulse. Use move with a yaw "
-                "rate when translating and turning together would make a smoother arc."
+                "means right. Optionally choose a relative angle; the controller uses "
+                "measured heading to stop there. Inspect the new image and heading "
+                "before choosing another correction. Use move with a yaw rate when "
+                "translating and turning together would make a smoother arc."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1403,16 +1403,15 @@ def _tools():
                             "to the current nose, not the room."
                         ),
                     },
-                    "duration_s": {
+                    "angle_deg": {
                         "type": "NUMBER",
                         "description": (
-                            f"Optional short yaw pulse from {MIN_TURN_S:.2f} "
-                            f"through {MAX_TURN_S:.1f} seconds. Omit it for the "
-                            f"normal {DEFAULT_TURN_S:.2f}-second pulse; do not ask "
-                            "the developer for an exact duration."
+                            f"Optional relative heading change from {MIN_TURN_DEG:.0f} "
+                            f"through {MAX_TURN_DEG:.0f} degrees. Omit it for the "
+                            f"normal {DEFAULT_TURN_DEG:.0f}-degree correction."
                         ),
-                        "minimum": MIN_TURN_S,
-                        "maximum": MAX_TURN_S,
+                        "minimum": MIN_TURN_DEG,
+                        "maximum": MAX_TURN_DEG,
                     },
                 },
                 "required": ["direction"],
@@ -1477,10 +1476,10 @@ def _system_instruction() -> str:
         "one correction toward it, then inspect the new view; do not turn past it. If no "
         "target is visible and the path is clear, use a short translation to reveal a "
         "new view instead of repeating in-place turns. Turn only when the view or path "
-        "needs reorientation. A turn is a short yaw pulse: look again after each pulse "
-        "and correct from the new image and heading instead of estimating a large angle "
-        "in advance. Use the normal short turn pulse unless a different short correction "
-        "is clearly needed; do not ask the developer for exact timing. When an "
+        "needs reorientation. A turn is a measured yaw correction: look again after each "
+        "correction and use the new image and heading instead of estimating a large angle "
+        "in advance. Use a small angle unless a broader reorientation is clearly needed; "
+        "do not ask the developer for exact timing. When an "
         "obstacle blocks the forward path, turn in short "
         "pulses to inspect; once a clear side path is visible and forward range permits "
         "movement, translate around it with a small lateral move or smooth arc. A "
@@ -1489,7 +1488,7 @@ def _system_instruction() -> str:
         "telemetry over memory.\n\n"
         "Move and turn are blocking physical actions. Choose only one physical movement "
         "at a time; wait for its measured result and a fresh camera frame before choosing "
-        "another. A requested duration is intent, "
+        "another. A requested duration or angle is intent, "
         "not proof; use observed translation, heading, telemetry, and action state to "
         "choose the next correction. Do not ask the user for an exact turn amount or "
         "narrate instead of acting. Speak after a real observation, event, or user request. "
@@ -1657,6 +1656,6 @@ def _turn_completion_rad(requested_rad: float) -> float:
 
 
 def _turn_angle_deg(action: ActiveAction) -> float:
-    """Return the heading change expected from one timed yaw pulse."""
+    """Return the requested relative heading change for one turn."""
 
     return action.duration_s * TURN_RATE_DEG_S

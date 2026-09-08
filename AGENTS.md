@@ -36,8 +36,8 @@ merge and delete it.
   results.
 - Gemini chooses direct `move`, `turn`, `hover`, `speak`, or `ack` tools. Text
   or JSON action descriptions never move the vehicle.
-- `move` and `turn` are short, slow body-frame pulses. A move may include a
-  small yaw rate for a smooth arc; a turn is an in-place yaw pulse.
+- `move` is a short, slow body-frame pulse. It may include a small yaw rate
+  for a smooth arc. `turn` accepts a relative angle and settles from heading.
 - Physical move and turn calls complete with measured motion, heading, fresh
   telemetry, and a newer camera frame before another movement is chosen. Hover
   may interrupt an action for an explicit stop.
