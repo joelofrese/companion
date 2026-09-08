@@ -1498,7 +1498,9 @@ def _system_instruction() -> str:
         "unsafe. Trust current image and telemetry over memory.\n\n"
         "Move and turn are blocking physical actions. Wait for their measured result "
         "before choosing another movement. The result includes heading, telemetry, and "
-        "whether movement is available. Do not narrate a plan instead of acting. Speak "
+        "whether movement is available. Treat a requested duration or angle as intent, "
+        "not proof of the outcome; use the observed translation and heading change to "
+        "calibrate the next action. Do not narrate a plan instead of acting. Speak "
         "after a real observation or event, not as a substitute for a safe movement. "
         "The CM5 limits every physical command."
     )
