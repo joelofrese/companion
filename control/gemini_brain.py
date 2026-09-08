@@ -37,8 +37,6 @@ MAX_RIGHT_SPEED_M_S = 0.20
 # The model asks for a relative angle; the runtime stops from measured heading.
 MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 45.0
-# A quarter-turn is enough to inspect one side before translating.
-MAX_IN_PLACE_TURN_DEG = 90.0
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -108,7 +106,6 @@ class GeminiRuntime:
         self._latest_user_request = self.situation
         self._speech_blocked = False
         self._active_action: Optional[ActiveAction] = None
-        self._in_place_turn_deg = 0.0
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -863,7 +860,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._in_place_turn_deg = 0.0
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -896,22 +892,6 @@ class GeminiRuntime:
         now = time.monotonic()
         angle_deg = float(angle_deg)
         duration_s = angle_deg / TURN_RATE_DEG_S
-        if self._in_place_turn_deg + angle_deg > MAX_IN_PLACE_TURN_DEG:
-            remaining_deg = max(
-                0.0,
-                MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg,
-            )
-            return {
-                "status": "unavailable",
-                "reason": (
-                    "the in-place visual sweep has reached its "
-                    f"{MAX_IN_PLACE_TURN_DEG:.0f}-degree limit; "
-                    "translate before turning further"
-                ),
-                "movement_tools": "move and hover available; turn available after translation",
-                "remaining_scan_deg": remaining_deg,
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         action = ActiveAction(
             "turn",
             direction,
@@ -927,7 +907,6 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._in_place_turn_deg += angle_deg
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1039,21 +1018,11 @@ class GeminiRuntime:
                 state = self._last_action_result
             else:
                 state = "none"
-            if self._in_place_turn_deg:
-                state += (
-                    "; in-place turn since translation="
-                    f"{self._in_place_turn_deg:.1f} degrees"
-                )
             return f"{state}; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
         ]
-        if action.kind == "turn":
-            details.append(
-                "in-place turn since translation="
-                f"{self._in_place_turn_deg:.1f} degrees"
-            )
         if action.kind == "move":
             details.append(self._translation_text(action))
         actual = self._heading_change_deg(action)
@@ -1282,7 +1251,6 @@ class GeminiRuntime:
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
         if action.kind == "turn":
             response["requested_angle_deg"] = _turn_angle_deg(action)
-            response["in_place_turn_since_translation_deg"] = self._in_place_turn_deg
             response["visual_effect"] = (
                 "the scene should have moved toward image-right after a left turn"
                 if action.direction == "left"
