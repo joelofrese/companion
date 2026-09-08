@@ -218,7 +218,7 @@ safety holds pause its timing; the action state reports the command, phase,
 remaining time, and heading. The movement tool also sends Gemini a native
 completion response, which lets ER2 continue naturally. A quiet post-action turn
 gets one more state prompt after eight seconds, then starts a fresh session if it
-remains silent; ordinary turns use a 20-second stall timeout.
+remains silent; ordinary turns use a 30-second stall timeout.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -254,7 +254,7 @@ authoritative behavior trace.
   the next state heartbeat. After a physical action, the ordered tool response
   itself requests continuation. A quiet post-action turn gets one retry after
   eight seconds, then a fresh session if it remains silent; ordinary turns use
-  the 20-second timeout. The resumed session keeps
+  the 30-second timeout. The resumed session keeps
   the same situation, active request, and memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
