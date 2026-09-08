@@ -24,8 +24,9 @@ THINKING_LEVEL = "minimal"
 VIDEO_PERIOD_S = 1.0
 # Allow a slow first ER2 decision to start normally.
 INITIAL_RESPONSE_TIMEOUT_S = 30.0
-# Recover a later silent decision before it consumes the rest of a flight.
-RESPONSE_TIMEOUT_S = 15.0
+# Give later ER2 decisions the same bounded time as the first decision; a slow
+# response should not be mistaken for a dead session and lose the task context.
+RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -1328,10 +1329,8 @@ def _tools():
             "description": (
                 "Move slowly in the body frame for a short duration. Forward is "
                 "positive and right is positive. Use a clear path and valid range "
-                "reading. When a visible subject is off-center and the path is clear, "
-                "a small lateral velocity and yaw rate can make a smooth arc while "
-                "keeping it in view. Inspect the next image and measured result after "
-                "the move."
+                "reading. Combine lateral velocity and yaw rate for a smooth arc when "
+                "useful. Inspect the next image and measured result after the move."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1398,9 +1397,7 @@ def _tools():
                         "type": "STRING",
                         "enum": ["left", "right"],
                         "description": (
-                            "Choose left when the target is on image-left and "
-                            "right when it is on image-right. This is relative "
-                            "to the current nose, not the room."
+                            "Relative to the current nose, not the room."
                         ),
                     },
                     "angle_deg": {
@@ -1468,7 +1465,10 @@ def _system_instruction() -> str:
         "from the newest view and measured state, then inspect the result before making "
         "another correction. Use heading and remembered requested-versus-observed "
         "motion to calibrate, but trust the current view and telemetry over estimates. "
-        "Hover when no safe useful step is clear.\n\n"
+        "After a turn, reassess the new view. If it has not made useful progress, do "
+        "not repeat the same scan indefinitely; translate through a clear opening or "
+        "hover. Prefer small turns and use a larger one only for a clear reason. Hover "
+        "when no safe useful step is clear.\n\n"
         "Move and turn are blocking physical actions. Choose one physical movement at a "
         "time and wait for its measured completion and a newer camera frame before the "
         "next movement. A requested duration or angle is intent, not proof. Do not ask "
