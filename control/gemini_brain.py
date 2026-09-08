@@ -714,6 +714,10 @@ class GeminiRuntime:
                 result = {
                     "status": "hovering",
                     "cancelled_action": cancelled or "none",
+                    "cancelled_result": (
+                        self._last_action_result if cancelled else "none"
+                    ),
+                    "heading_deg": _heading_value(self._telemetry.heading_rad),
                     "telemetry": _telemetry_text(self._telemetry),
                 }
         elif name == "speak":
@@ -886,7 +890,7 @@ class GeminiRuntime:
             "action": self._action_label(action),
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
-            "scheduling": "WHEN_IDLE",
+            "scheduling": "INTERRUPT",
             "movement_tools": (
                 "unavailable until this action completes and a fresh camera frame arrives"
             ),
@@ -1376,7 +1380,8 @@ def _tools():
             "description": (
                 "Stop horizontal motion and hold position when the task is complete, "
                 "while waiting, when the scene is unclear, or when you want to "
-                "interrupt your current movement."
+                "interrupt an action for a clear reason. Let a normal move or turn "
+                "finish unless stopping is needed."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
@@ -1428,16 +1433,19 @@ def _system_instruction() -> str:
         "inspect the newer image and continue the active task if it is not complete. "
         "When the requested target is visible and the path is clear, make progress "
         "toward it instead of continuing to scan. "
-        "Use short, slow body-frame pulses and relative turns. Choose the next pulse "
-        "from the newest view and measured state, then inspect the result before making "
-        "another correction. Use heading and remembered requested-versus-observed "
-        "motion to calibrate, but trust the current view and telemetry over estimates. "
+        "Use short, slow body-frame pulses and small relative turns, usually 10 to 25 "
+        "degrees; use a larger turn only when a clear change of view needs it. Let a "
+        "normal turn finish instead of hovering early, then use its measured final "
+        "heading. Choose the next pulse from the newest view and measured state, then "
+        "inspect the result before making another correction. Use heading and remembered "
+        "requested-versus-observed motion to calibrate, but trust the current view and "
+        "telemetry over estimates. "
         "For a turn, use the returned target and final heading rather than relying on "
         "the earlier image or an assumed rotation. "
-        "After a turn, reassess the new view. If it has not made useful progress, do "
-        "not repeat the same scan indefinitely; try a clear lateral opening or hover. "
-        "Prefer small turns and use a larger one only for a clear reason. Hover when "
-        "no safe useful step is clear.\n\n"
+        "After one turn at the same position, reassess. If the target is still absent "
+        "or the view has not improved, do not repeat the same-direction scan; move "
+        "through a clear lateral opening or hover. Hover when no safe useful step is "
+        "clear, or when stopping is genuinely needed.\n\n"
         "Move and turn start non-blocking physical actions. Choose one physical movement "
         "at a time; keep observing while it runs, then wait for its measured completion "
         "and a newer camera frame before the next movement. A requested duration or angle "
