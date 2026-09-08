@@ -20,8 +20,8 @@ from control.velocity import VelocityCommand, ned_to_body
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "low"
-# Give the streaming model two fresh views per second for closed-loop moves.
-VIDEO_PERIOD_S = 0.5
+# ER 2 Streaming accepts at most one JPEG per second.
+VIDEO_PERIOD_S = 1.0
 # Allow a slow first ER2 decision to start normally.
 INITIAL_RESPONSE_TIMEOUT_S = 30.0
 # Give later ER2 decisions the same bounded time as the first decision; a slow
