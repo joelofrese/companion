@@ -1590,12 +1590,6 @@ def _move_direction(forward_m_s: float, right_m_s: float, down_m_s: float) -> st
     return "down" if down_m_s > 0.0 else "up"
 
 
-def _obstacle_is_clear(distance_m: Optional[float]) -> bool:
-    """Return whether the forward range reading permits movement."""
-
-    return _obstacle_is_valid(distance_m) and distance_m > OBSTACLE_STOP_M
-
-
 def _move_is_allowed(action: ActiveAction, distance_m: Optional[float]) -> bool:
     """Allow non-forward motion when only the forward path is blocked."""
 
