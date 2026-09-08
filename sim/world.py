@@ -191,7 +191,11 @@ async def run(
     north_velocity_m_s = None
     east_velocity_m_s = None
     down_velocity_m_s = None
+    north_position_m = None
+    east_position_m = None
+    down_position_m = None
     velocity_telemetry_seen = False
+    position_telemetry_seen = False
     vehicle_velocity_fresh = True
     current_heading_deg = None
     initial_yaw_deg = None
@@ -282,13 +286,13 @@ async def run(
 
         def vehicle_velocity():
             if not vehicle_velocity_fresh:
-                return (None, None, None, None)
+                return (None, None, None, None, None, None, None)
             if (
                 north_velocity_m_s is None
                 or east_velocity_m_s is None
                 or down_velocity_m_s is None
             ):
-                return (None, None, None, None)
+                return (None, None, None, None, None, None, None)
             heading_rad = math.radians(current_heading_deg)
             forward, right, down = ned_to_body(
                 north_velocity_m_s,
@@ -296,7 +300,15 @@ async def run(
                 down_velocity_m_s,
                 heading_rad,
             )
-            return (forward, right, down, heading_rad)
+            return (
+                forward,
+                right,
+                down,
+                heading_rad,
+                north_position_m,
+                east_position_m,
+                down_position_m,
+            )
 
         stack = SimulatedSafetyStack(
             drone,
@@ -325,7 +337,7 @@ async def run(
         minimum_depth_distance = math.inf
 
         def brain_telemetry():
-            nonlocal velocity_telemetry_seen
+            nonlocal velocity_telemetry_seen, position_telemetry_seen
             telemetry = sender.telemetry()
             if any(
                 value is not None
@@ -336,6 +348,15 @@ async def run(
                 )
             ):
                 velocity_telemetry_seen = True
+            if all(
+                value is not None and math.isfinite(value)
+                for value in (
+                    telemetry.position_north_m,
+                    telemetry.position_east_m,
+                    telemetry.position_down_m,
+                )
+            ):
+                position_telemetry_seen = True
             return telemetry
 
         def read_step(elapsed_s: float):
@@ -520,10 +541,16 @@ async def run(
             nonlocal max_right_velocity, min_right_velocity
             nonlocal max_down_velocity, min_down_velocity
             nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
-            async for velocity in drone.telemetry.velocity_ned():
+            nonlocal north_position_m, east_position_m, down_position_m
+            async for position_velocity in drone.telemetry.position_velocity_ned():
+                velocity = position_velocity.velocity
+                position = position_velocity.position
                 north_velocity_m_s = velocity.north_m_s
                 east_velocity_m_s = velocity.east_m_s
                 down_velocity_m_s = velocity.down_m_s
+                north_position_m = position.north_m
+                east_position_m = position.east_m
+                down_position_m = position.down_m
                 forward, right, down = ned_to_body(
                     velocity.north_m_s,
                     velocity.east_m_s,
@@ -827,6 +854,9 @@ async def run(
         if not velocity_telemetry_seen:
             raise RuntimeError("SITL did not feed CM5 velocity telemetry to the brain")
         print("Brain velocity telemetry=verified.")
+        if not position_telemetry_seen:
+            raise RuntimeError("SITL did not feed CM5 local position telemetry to the brain")
+        print("Brain local position telemetry=verified.")
         if initial_yaw_deg is None:
             raise RuntimeError("SITL did not provide heading telemetry")
         max_yaw_rate_deg_s = max(

@@ -103,7 +103,9 @@ async def prepare(drone):
             f"vehicle did not become ready to arm within {PREPARE_TIMEOUT_S:.0f}s"
         ) from error
     print("Ready.")
-    await drone.telemetry.set_rate_velocity_ned(VELOCITY_TELEMETRY_RATE_HZ)
+    await drone.telemetry.set_rate_position_velocity_ned(
+        VELOCITY_TELEMETRY_RATE_HZ
+    )
     await drone.telemetry.set_rate_attitude_euler(ATTITUDE_TELEMETRY_RATE_HZ)
     # Keep the vehicle's current heading during PX4's automatic takeoff.
     await drone.param.set_param_int("MPC_YAW_MODE", TAKEOFF_YAW_MODE)

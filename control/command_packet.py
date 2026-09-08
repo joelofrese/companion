@@ -9,7 +9,7 @@ from typing import Optional
 from control.velocity import VelocityCommand
 
 
-PROTOCOL_VERSION = 5
+PROTOCOL_VERSION = 6
 MAX_PACKET_BYTES = 512
 
 
@@ -92,7 +92,7 @@ class CommandPacket:
 
 @dataclass(frozen=True)
 class TelemetryPacket:
-    """Return the newest CM5 sensor, velocity, and heading readings to the brain."""
+    """Return the newest CM5 sensor and vehicle readings to the brain."""
 
     sequence: int
     obstacle_distance_m: Optional[float]
@@ -100,6 +100,9 @@ class TelemetryPacket:
     right_velocity_m_s: Optional[float] = None
     down_velocity_m_s: Optional[float] = None
     heading_rad: Optional[float] = None
+    position_north_m: Optional[float] = None
+    position_east_m: Optional[float] = None
+    position_down_m: Optional[float] = None
 
     def encode(self) -> bytes:
         if (
@@ -119,6 +122,13 @@ class TelemetryPacket:
             raise ValueError("velocity telemetry must be finite or none")
         if self.heading_rad is not None and not _finite(self.heading_rad):
             raise ValueError("heading telemetry must be finite or none")
+        positions = (
+            self.position_north_m,
+            self.position_east_m,
+            self.position_down_m,
+        )
+        if any(value is not None and not _finite(value) for value in positions):
+            raise ValueError("position telemetry must be finite or none")
         payload = {
             "type": "telemetry",
             "version": PROTOCOL_VERSION,
@@ -129,6 +139,9 @@ class TelemetryPacket:
                 "right_velocity_m_s": self.right_velocity_m_s,
                 "down_velocity_m_s": self.down_velocity_m_s,
                 "heading_rad": self.heading_rad,
+                "position_north_m": self.position_north_m,
+                "position_east_m": self.position_east_m,
+                "position_down_m": self.position_down_m,
             },
         }
         encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -156,6 +169,14 @@ class TelemetryPacket:
                 )
             )
             heading_rad = telemetry.get("heading_rad")
+            positions = tuple(
+                telemetry.get(name)
+                for name in (
+                    "position_north_m",
+                    "position_east_m",
+                    "position_down_m",
+                )
+            )
         except (
             AttributeError,
             KeyError,
@@ -180,7 +201,9 @@ class TelemetryPacket:
             raise ValueError("invalid velocity telemetry")
         if heading_rad is not None and not _finite(heading_rad):
             raise ValueError("invalid heading telemetry")
-        return cls(sequence, distance, *velocities, heading_rad)
+        if any(value is not None and not _finite(value) for value in positions):
+            raise ValueError("invalid position telemetry")
+        return cls(sequence, distance, *velocities, heading_rad, *positions)
 
 
 def _finite(value: object) -> bool:

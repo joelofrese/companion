@@ -59,7 +59,7 @@ async def run():
         return 2.0 if elapsed_s < 0.12 else 0.5
 
     def cm5_velocity():
-        return (0.12, -0.04, 0.03, 0.75)
+        return (0.12, -0.04, 0.03, 0.75, 1.2, -2.3, 0.4)
 
     async def frame_reader():
         nonlocal frame_count
@@ -137,6 +137,9 @@ async def run():
             or telemetry.right_velocity_m_s != -0.04
             or telemetry.down_velocity_m_s != 0.03
             or telemetry.heading_rad != 0.75
+            or telemetry.position_north_m != 1.2
+            or telemetry.position_east_m != -2.3
+            or telemetry.position_down_m != 0.4
         ):
             raise RuntimeError(f"Brain did not receive CM5 velocity telemetry: {telemetry}")
         obstacle_cleared = True
@@ -176,6 +179,9 @@ async def run():
             or restarted_telemetry.right_velocity_m_s != -0.04
             or restarted_telemetry.down_velocity_m_s != 0.03
             or restarted_telemetry.heading_rad != 0.75
+            or restarted_telemetry.position_north_m != 1.2
+            or restarted_telemetry.position_east_m != -2.3
+            or restarted_telemetry.position_down_m != 0.4
         ):
             raise RuntimeError(
                 "Brain did not receive fresh telemetry after CM5 restart: "

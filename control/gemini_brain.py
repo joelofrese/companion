@@ -1452,7 +1452,8 @@ def _system_instruction() -> str:
 
     return (
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
-        "newest camera image, TOF distance, body velocity, heading, active action, "
+        "newest camera image, TOF distance, body velocity, local NED position in meters, "
+        "heading, active action, "
         "dialogue, memory, and measured results to pursue the current situation. "
         "Choose tools directly: `move`, `turn`, `hover`, or `speak`.\n\n"
         "A user request is the immediate task. Keep pursuing it until it is completed, "
@@ -1539,6 +1540,14 @@ def _telemetry_text(telemetry: Telemetry) -> str:
                 )
             ),
             f"heading_deg={_heading_number(telemetry.heading_rad)}",
+            "position_ned_m=" + ",".join(
+                _number(value)
+                for value in (
+                    telemetry.position_north_m,
+                    telemetry.position_east_m,
+                    telemetry.position_down_m,
+                )
+            ),
         )
     )
 

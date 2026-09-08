@@ -90,8 +90,12 @@ async def run(image_path: str, expect_person: bool = False):
     north_velocity_m_s = None
     east_velocity_m_s = None
     down_velocity_m_s = None
+    north_position_m = None
+    east_position_m = None
+    down_position_m = None
     current_heading_deg = None
     velocity_telemetry_seen = False
+    position_telemetry_seen = False
     frames_received = 0
     video_fault_reported = False
     target_loss_reported = False
@@ -142,10 +146,18 @@ async def run(image_path: str, expect_person: bool = False):
         def body_velocity():
             values = (north_velocity_m_s, east_velocity_m_s, down_velocity_m_s)
             if any(value is None for value in values):
-                return (None, None, None, None)
+                return (None, None, None, None, None, None, None)
             heading_rad = math.radians(current_heading_deg)
             forward, right, down = ned_to_body(*values, heading_rad)
-            return (forward, right, down, heading_rad)
+            return (
+                forward,
+                right,
+                down,
+                heading_rad,
+                north_position_m,
+                east_position_m,
+                down_position_m,
+            )
 
         stack = SimulatedSafetyStack(
             drone,
@@ -203,7 +215,7 @@ async def run(image_path: str, expect_person: bool = False):
         flight_started_at = time.monotonic()
 
         def brain_telemetry():
-            nonlocal velocity_telemetry_seen
+            nonlocal velocity_telemetry_seen, position_telemetry_seen
             telemetry = sender.telemetry()
             if any(
                 value is not None
@@ -214,6 +226,15 @@ async def run(image_path: str, expect_person: bool = False):
                 )
             ):
                 velocity_telemetry_seen = True
+            if all(
+                value is not None and math.isfinite(value)
+                for value in (
+                    telemetry.position_north_m,
+                    telemetry.position_east_m,
+                    telemetry.position_down_m,
+                )
+            ):
+                position_telemetry_seen = True
             return telemetry
 
         mind_task = asyncio.create_task(
@@ -273,10 +294,16 @@ async def run(image_path: str, expect_person: bool = False):
             nonlocal max_forward_velocity, min_forward_velocity
             nonlocal max_right_velocity, min_right_velocity
             nonlocal north_velocity_m_s, east_velocity_m_s, down_velocity_m_s
-            async for velocity in drone.telemetry.velocity_ned():
+            nonlocal north_position_m, east_position_m, down_position_m
+            async for position_velocity in drone.telemetry.position_velocity_ned():
+                velocity = position_velocity.velocity
+                position = position_velocity.position
                 north_velocity_m_s = velocity.north_m_s
                 east_velocity_m_s = velocity.east_m_s
                 down_velocity_m_s = velocity.down_m_s
+                north_position_m = position.north_m
+                east_position_m = position.east_m
+                down_position_m = position.down_m
                 forward, right, _ = ned_to_body(
                     velocity.north_m_s,
                     velocity.east_m_s,
@@ -300,8 +327,13 @@ async def run(image_path: str, expect_person: bool = False):
             raise RuntimeError("full stack did not retain a conscious visual summary")
         if not velocity_telemetry_seen:
             raise RuntimeError("full stack did not feed CM5 velocity telemetry to the brain")
+        if not position_telemetry_seen:
+            raise RuntimeError(
+                "full stack did not feed CM5 local position telemetry to the brain"
+            )
         print("Conscious brain decision=verified through full brain/CM5 stack.")
         print("Brain velocity telemetry=verified through full brain/CM5 stack.")
+        print("Brain local position telemetry=verified through full brain/CM5 stack.")
         print("Conscious visual memory=verified through full brain/CM5 stack.")
         print("Brain visual observation=verified through full brain/CM5 stack.")
         try:

@@ -39,6 +39,9 @@ class UdpCommandSender:
         self._right_velocity_m_s = None
         self._down_velocity_m_s = None
         self._heading_rad = None
+        self._position_north_m = None
+        self._position_east_m = None
+        self._position_down_m = None
         self._telemetry_received_at_s = None
         self._last_command = None
 
@@ -82,6 +85,9 @@ class UdpCommandSender:
             right_velocity_m_s=self._right_velocity_m_s,
             down_velocity_m_s=self._down_velocity_m_s,
             heading_rad=self._heading_rad,
+            position_north_m=self._position_north_m,
+            position_east_m=self._position_east_m,
+            position_down_m=self._position_down_m,
         )
 
     def _read_telemetry(self):
@@ -107,6 +113,9 @@ class UdpCommandSender:
             self._right_velocity_m_s = packet.right_velocity_m_s
             self._down_velocity_m_s = packet.down_velocity_m_s
             self._heading_rad = packet.heading_rad
+            self._position_north_m = packet.position_north_m
+            self._position_east_m = packet.position_east_m
+            self._position_down_m = packet.position_down_m
             self._telemetry_received_at_s = time.monotonic()
 
     def close(self):

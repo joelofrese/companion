@@ -32,8 +32,8 @@ merge and delete it.
 ## Control
 
 - One Gemini ER 2 Streaming session starts with one situation prompt and keeps
-  deciding from the newest image, dialogue, telemetry, memory, and action
-  results.
+  deciding from the newest image, dialogue, local position, heading, other
+  telemetry, memory, and action results.
 - A new user request is the active task until it is completed, changed, or
   unsafe. Explore generally only when there is no more specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
@@ -75,7 +75,7 @@ PX4 SITL with Gazebo is the primary development environment and authority for
 software flight behavior. Exercise the full control path, perception, varied
 worlds, faults, recovery, safety, long runs, landing, and disarm. Verify actual
 output or telemetry for connection, readiness, arming, setpoints, motion,
-safety intervention, landing, and disarm.
+safety intervention, local position, landing, and disarm.
 
 Do not add unit tests. Prefer small end-to-end checks and real simulator
 behavior so the code stays flexible.
@@ -145,7 +145,7 @@ editable memory file contains only prior experience across runs. The newest
 ## Current state
 
 - Deterministic PX4/Gazebo missions and local UDP loopback verify the command
-  path, faults, recovery, safety, landing, and disarm.
+  path, telemetry, faults, recovery, safety, landing, and disarm.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
 - ER 2 chooses movement, turn, hover, or speech tools.

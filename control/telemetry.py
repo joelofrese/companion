@@ -16,3 +16,6 @@ class Telemetry:
     right_velocity_m_s: Optional[float] = None
     down_velocity_m_s: Optional[float] = None
     heading_rad: Optional[float] = None
+    position_north_m: Optional[float] = None
+    position_east_m: Optional[float] = None
+    position_down_m: Optional[float] = None

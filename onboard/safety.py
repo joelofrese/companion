@@ -90,6 +90,7 @@ class LatestVelocity:
             raise ValueError("velocity timeout must be positive")
         self._velocity = (math.nan, math.nan, math.nan)
         self._heading = math.nan
+        self._position = (math.nan, math.nan, math.nan)
         self._clock = clock
         self._timeout_s = timeout_s
         self._updated_at_s = None
@@ -100,15 +101,26 @@ class LatestVelocity:
             getattr(message, name, math.nan) for name in ("vx", "vy", "vz")
         )
         heading = getattr(message, "heading", math.nan)
+        position = tuple(
+            getattr(message, name, math.nan) for name in ("x", "y", "z")
+        )
+        position_valid = (
+            all(_finite_real(value) for value in position)
+            and getattr(message, "xy_valid", True)
+            and getattr(message, "z_valid", True)
+        )
         if (
             not all(_finite_real(value) for value in velocity)
             or not _finite_real(heading)
         ):
             velocity = (math.nan, math.nan, math.nan)
             heading = math.nan
+        if not position_valid:
+            position = (math.nan, math.nan, math.nan)
         with self._lock:
             self._velocity = velocity
             self._heading = heading
+            self._position = position
             self._updated_at_s = self._clock()
 
     def _read(self):
@@ -123,7 +135,7 @@ class LatestVelocity:
                 or not _finite_real(self._heading)
             ):
                 return None
-            return (*self._velocity, self._heading)
+            return (*self._velocity, self._heading, *self._position)
 
     def read(self):
         """Return fresh velocity in forward, right, down coordinates."""
@@ -131,7 +143,7 @@ class LatestVelocity:
         state = self._read()
         if state is None:
             return (None, None, None)
-        north, east, down, heading = state
+        north, east, down, heading, _, _, _ = state
         return ned_to_body(north, east, down, heading)
 
     def read_telemetry(self):
@@ -139,10 +151,26 @@ class LatestVelocity:
 
         state = self._read()
         if state is None:
-            return (None, None, None, None)
-        north, east, down, heading = state
-        forward, right, down = ned_to_body(north, east, down, heading)
-        return (forward, right, down, heading)
+            return (None, None, None, None, None, None, None)
+        (
+            north,
+            east,
+            down,
+            heading,
+            position_north,
+            position_east,
+            position_down,
+        ) = state
+        forward, right, down_velocity = ned_to_body(north, east, down, heading)
+        return (
+            forward,
+            right,
+            down_velocity,
+            heading,
+            position_north,
+            position_east,
+            position_down,
+        )
 
     def heading(self):
         """Return the fresh PX4 heading in radians."""
