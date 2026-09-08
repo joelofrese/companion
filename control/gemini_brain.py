@@ -354,11 +354,9 @@ class GeminiRuntime:
                                     self._response_thoughts.clear()
                                     self._actions.clear()
                                     self._last_model_activity_s = None
-                                    # A silent turn is not a healthy resumable session.
-                                    # Restart with the situation and compact memory.
-                                    self._session_handle = None
-                                    self._memory_sent = False
-                                    self._bootstrap_pending = True
+                                    # Reconnect the existing session when its native
+                                    # handle is still valid. A rejected handle falls
+                                    # back to the situation and compact memory.
                                     self._reconnect_requested = True
                                     break
                         finally:
