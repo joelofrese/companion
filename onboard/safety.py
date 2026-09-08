@@ -250,6 +250,11 @@ class OnboardSafetyEnvelope:
         if obstacle_distance_m <= OBSTACLE_STOP_M:
             if self._is_in_place_turn(self._command):
                 return VelocityCommand(yaw_rate_deg_s=self._command.yaw_rate_deg_s)
+            if (
+                self._command != VelocityCommand()
+                and self._command.forward_m_s <= 0.0
+            ):
+                return self._command
             return VelocityCommand(forward_m_s=-BACKOFF_SPEED_M_S)
         return self._command
 

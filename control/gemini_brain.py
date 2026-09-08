@@ -220,7 +220,7 @@ class GeminiRuntime:
         if action is None or action.phase != "running":
             return VelocityCommand()
         if action.kind == "move":
-            if _obstacle_is_clear(telemetry.obstacle_distance_m):
+            if _move_is_allowed(action, telemetry.obstacle_distance_m):
                 return VelocityCommand(
                     forward_m_s=action.forward_m_s,
                     right_m_s=action.right_m_s,
@@ -1131,7 +1131,8 @@ class GeminiRuntime:
     def _action_is_blocked(self, action: ActiveAction) -> bool:
         if not _obstacle_is_valid(self._telemetry.obstacle_distance_m):
             return True
-        if action.kind != "turn" and not _obstacle_is_clear(
+        if action.kind != "turn" and not _move_is_allowed(
+            action,
             self._telemetry.obstacle_distance_m
         ):
             return True
@@ -1275,10 +1276,10 @@ def _tools():
             "description": (
                 "Move slowly in the body frame for a short duration. Forward is "
                 "positive, right is positive, and up is positive. Use a clear path "
-                "and valid range "
-                "reading. The range sensor looks forward only: when forward is blocked, "
-                "use a visible side opening instead of repeatedly turning or pressing "
-                "forward. Use vertical velocity only for a small visually clear "
+                "and valid range reading. Positive forward motion needs a clear path. "
+                "The range sensor looks forward only: when forward is blocked, use a "
+                "visible side opening or move backward instead of pressing forward. "
+                "Use vertical velocity only for a small visually clear "
                 "adjustment, never as an altitude target. Combine lateral velocity "
                 "and yaw rate for a smooth arc when useful. Inspect the next image "
                 "and measured result after the move."
@@ -1418,10 +1419,10 @@ def _system_instruction() -> str:
         "changed, or unsafe. Use general exploration only when there is no more specific "
         "request.\n\n"
         "The camera faces forward. Image-left is vehicle-left and image-right is "
-        "vehicle-right. The TOF sensor looks forward only. Move only with fresh vision, "
-        "valid TOF data, and a clear path. When forward is blocked, choose a visible "
-        "side opening and translate through it; do not repeatedly turn in place or "
-        "press forward into the obstacle. "
+        "vehicle-right. The TOF sensor looks forward only. Move only with fresh vision "
+        "and valid TOF data. Positive forward motion needs a clear path. When forward "
+        "is blocked, choose a visible side opening or move backward; do not repeatedly "
+        "turn in place or press forward into the obstacle. "
         "Body-frame up is positive and down is negative; use vertical velocity only "
         "for a short visually clear adjustment, never as an altitude target. "
         "A turn changes the view but not the vehicle's position. If a requested target "
@@ -1583,6 +1584,14 @@ def _obstacle_is_clear(distance_m: Optional[float]) -> bool:
     """Return whether the forward range reading permits movement."""
 
     return _obstacle_is_valid(distance_m) and distance_m > OBSTACLE_STOP_M
+
+
+def _move_is_allowed(action: ActiveAction, distance_m: Optional[float]) -> bool:
+    """Allow non-forward motion when only the forward path is blocked."""
+
+    return _obstacle_is_valid(distance_m) and (
+        action.forward_m_s <= 0.0 or distance_m > OBSTACLE_STOP_M
+    )
 
 
 def _obstacle_is_valid(distance_m: Optional[float]) -> bool:

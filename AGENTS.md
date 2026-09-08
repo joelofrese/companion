@@ -54,8 +54,9 @@ merge and delete it.
   current model or physical action; dialogue may interrupt, and a bounded
   timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
-  rejects unsafe commands, protects against obstacles, and is the final
-  vehicle-side authority. PX4 stabilizes the vehicle and controls the motors.
+  rejects unsafe commands, stops positive forward motion at a close obstacle,
+  and is the final vehicle-side authority. PX4 stabilizes the vehicle and
+  controls the motors.
 
 The brain sends only slow body-frame translation and yaw-rate commands. Vertical
 translation is a velocity pulse, never an altitude command. It never sends
