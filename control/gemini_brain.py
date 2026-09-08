@@ -19,7 +19,7 @@ from control.velocity import VelocityCommand
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
-THINKING_LEVEL = "medium"
+THINKING_LEVEL = "minimal"
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Allow a slow ER2 decision to finish before recovering a silent session.

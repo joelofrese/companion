@@ -243,10 +243,8 @@ authoritative behavior trace.
   Movement and turn pulses last at most one second, and their measured completion
   and heading arrive before another movement. Physical outcomes are saved as
   compact calibration memory for later sessions; current image and telemetry
-  remain authoritative. Medium thinking balances ER2 response quality and
-  latency; thought summaries are requested only for traced simulations. ER2
-  latency is still variable, and traces expose each completed turn and its
-  latency.
+  remain authoritative. Minimal thinking prioritizes timely short decisions;
+  traces expose each completed turn and its latency.
 - Deterministic in-process brain fixtures remain only for repeatable simulation
   checks.
 - Gemini faulted depth runs verify stale-action cancellation, session recovery,
