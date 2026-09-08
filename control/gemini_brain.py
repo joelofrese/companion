@@ -864,7 +864,7 @@ class GeminiRuntime:
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
-        return await self._wait_for_action(action)
+        return self._started_action_response(action)
 
     async def _turn(self, args: dict) -> dict:
         direction = str(args.get("direction", "")).strip().lower()
@@ -911,12 +911,20 @@ class GeminiRuntime:
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
-        return await self._wait_for_action(action)
+        return self._started_action_response(action)
 
-    async def _wait_for_action(self, action: ActiveAction) -> dict:
-        if action.completion is None:
-            return {"status": "cancelled", "reason": "action had no completion handle"}
-        return await asyncio.shield(action.completion)
+    def _started_action_response(self, action: ActiveAction) -> dict:
+        """Tell Gemini that a physical action started without waiting for it."""
+
+        return {
+            "status": "started",
+            "action": self._action_label(action),
+            "heading_deg": _heading_value(self._telemetry.heading_rad),
+            "telemetry": _telemetry_text(self._telemetry),
+            "movement_tools": (
+                "unavailable until this action completes and a fresh camera frame arrives"
+            ),
+        }
 
     def _busy_response(self):
         self._refresh_action()
@@ -1344,7 +1352,7 @@ def _tools():
                 "forward. Combine lateral velocity and yaw rate for a smooth arc when "
                 "useful. Inspect the next image and measured result after the move."
             ),
-            "behavior": "BLOCKING",
+            "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -1401,7 +1409,7 @@ def _tools():
                 "before choosing another correction. Use move with a yaw rate when "
                 "translating and turning together would make a smoother arc."
             ),
-            "behavior": "BLOCKING",
+            "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
