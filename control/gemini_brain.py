@@ -497,7 +497,11 @@ class GeminiRuntime:
                 if self._bootstrap_pending:
                     self._bootstrap_pending = False
             return
-        dialogue = self._dialogue[0] if self._dialogue else ""
+        dialogue = (
+            self._dialogue[0]
+            if self._dialogue and self._dialogue_in_flight is None
+            else ""
+        )
         action_result = self._last_action_result
         self._response_in_flight = True
         if dialogue:
@@ -649,6 +653,7 @@ class GeminiRuntime:
                 if content.interrupted:
                     # Keep completed tool effects, but let the next heartbeat
                     # start a clean decision cycle.
+                    self._acknowledge_dialogue()
                     self._response_parts.clear()
                     self._response_thoughts.clear()
                     self._actions.clear()
@@ -1452,6 +1457,8 @@ def _system_instruction() -> str:
 Use the newest camera image, forward TOF distance, body velocity, local NED
 position, heading, current action, dialogue, memory, and measured results.
 Choose direct tools: `move`, `turn`, `hover`, or `speak`.
+Use `speak` for user-facing replies. Call tools directly; do not write a tool
+call or movement JSON as plain text.
 
 Treat a user request as the active task until it is complete, changed, or
 unsafe. Explore generally only when there is no specific request. For a find
