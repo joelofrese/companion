@@ -667,7 +667,12 @@ class GeminiRuntime:
                 for call in tool_call.function_calls:
                     args = call.args or {}
                     result = await self._execute(call.name, args)
-                    if call.name == "ack" and result.get("status") == "acknowledged":
+                    if result.get("status") in ("rejected", "unavailable"):
+                        continue_after_tool = True
+                    elif (
+                        call.name == "ack"
+                        and result.get("status") == "acknowledged"
+                    ):
                         continue_after_tool = True
                     elif call.name == "speak" and result.get("status") in (
                         "spoken",
@@ -1491,11 +1496,14 @@ def _system_instruction() -> str:
         "view and measured state, and speak about completion only after that check.\n\n"
         "The camera faces forward. Image-left is left of the vehicle and image-right "
         "is right. Choose each direction from the newest image and heading. Move only "
-        "when the path and TOF range are clear. Prefer slow, short actions and inspect "
-        "the newest image and measured result after every physical action. In an active "
-        "situation, make deliberate progress when the current view supports it; turn "
-        "to inspect, move through clear space, and hover when the scene is unclear or "
-        "unsafe. Trust current image and telemetry over memory.\n\n"
+        "when the path and TOF range are clear. If a named target is already visible "
+        "roughly ahead with a clear path, move toward it; turn only when the view or "
+        "path needs reorientation. Prefer slow, short actions and inspect the newest "
+        "image and measured result after every physical action. In an active situation, "
+        "make deliberate progress when the current view supports it; turn to inspect, "
+        "move through clear space, and hover when the scene is unclear or unsafe. Use "
+        "ack only when no safe physical step is genuinely clear. Trust current image and "
+        "telemetry over memory.\n\n"
         "Move and turn are blocking physical actions. Wait for their measured result "
         "before choosing another movement. The result includes heading, telemetry, and "
         "whether movement is available. Treat a requested duration or angle as intent, "

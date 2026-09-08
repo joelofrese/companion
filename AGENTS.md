@@ -49,6 +49,8 @@ merge and delete it.
   telemetry arrive before the next movement, and a newer camera frame is
   required before another physical action. Safety holds pause the action until
   movement is allowed.
+- Rejected or unavailable tool calls get one bounded continuation so Gemini can
+  choose another available action.
 - Camera frames stream once per second. A normal state heartbeat starts the next
   model decision only after the current decision or physical tool cycle finishes,
   so it does not interrupt Gemini's reasoning. New dialogue is sent immediately
