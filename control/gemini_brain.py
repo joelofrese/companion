@@ -709,7 +709,14 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "hover":
-            if self._active_action is None and not self._stop_requested:
+            busy = (
+                self._busy_response()
+                if self._active_action is not None
+                else None
+            )
+            if busy is not None:
+                result = busy
+            elif not self._stop_requested:
                 result = {
                     "status": "already_hovering",
                     "reason": "the vehicle is already holding position",
@@ -1181,9 +1188,38 @@ class GeminiRuntime:
         )
 
     def _complete_action(self, status: str, actual_heading_deg: Optional[float] = None):
+        self._finish_action(status, actual_heading_deg)
+
+    def _cancel_action(self, reason: str) -> str:
+        return self._finish_action(f"cancelled by {reason}")
+
+    def _finish_action(
+        self,
+        status: str,
+        actual_heading_deg: Optional[float] = None,
+    ) -> str:
+        """Record one physical action and its measured result."""
+
         action = self._active_action
         if action is None:
-            return
+            return ""
+        label = self._action_label(action)
+        result = self._format_action_result(
+            action,
+            status,
+            actual_heading_deg=actual_heading_deg,
+        )
+        self._save_action_result(result)
+        return label
+
+    def _format_action_result(
+        self,
+        action: ActiveAction,
+        status: str,
+        actual_heading_deg: Optional[float] = None,
+    ) -> str:
+        """Describe one action with the measurements available at its end."""
+
         if actual_heading_deg is None and action.start_heading_rad is not None:
             actual_heading_deg = self._heading_change_deg(action)
         result = f"{self._action_label(action)} {status}"
@@ -1201,35 +1237,11 @@ class GeminiRuntime:
         position_delta = self._position_delta(action)
         if position_delta is not None:
             result += f"; {self._position_text(position_delta)}"
-        self._last_action_result = result
-        self._recent_action_results.append(result)
-        self._action_finished_at_s = time.monotonic()
-        if action.kind in ("move", "turn"):
-            self._speech_blocked = False
-        self._record_action(result)
-        self._remember_action(result)
-        self._active_action = None
+        return result
 
-    def _cancel_action(self, reason: str) -> str:
-        action = self._active_action
-        if action is None:
-            return ""
-        result = f"{self._action_label(action)} cancelled by {reason}"
-        actual = self._heading_change_deg(action)
-        if actual is not None:
-            result += f"; observed heading change {actual:+.1f} degrees"
-        if action.kind == "turn":
-            target_heading = _target_heading_value(action)
-            if target_heading is not None:
-                result += f"; target heading {target_heading:+.1f} degrees"
-            final_heading = _heading_value(self._telemetry.heading_rad)
-            if final_heading is not None:
-                result += f"; final heading {final_heading:+.1f} degrees"
-        if action.kind == "move":
-            result += f"; {self._translation_text(action)}"
-            position_delta = self._position_delta(action)
-            if position_delta is not None:
-                result += f"; {self._position_text(position_delta)}"
+    def _save_action_result(self, result: str):
+        """Publish one measured result to the live and persistent context."""
+
         self._last_action_result = result
         self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
@@ -1237,7 +1249,6 @@ class GeminiRuntime:
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
-        return self._action_label(action)
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
@@ -1390,9 +1401,9 @@ def _tools():
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position when the task is complete, "
-                "while waiting, when the scene is unclear, or when you want to "
-                "interrupt an action for a clear reason. Let a normal move or turn "
-                "finish unless stopping is needed."
+                "while waiting, or when the scene is unclear. Let a normal move or "
+                "turn finish; interrupt an active action only for an explicit stop "
+                "request."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
