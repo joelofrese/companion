@@ -75,7 +75,6 @@ class ActiveAction:
     blocked_since_s: Optional[float] = None
     observed_forward_m: float = 0.0
     observed_right_m: float = 0.0
-    completion: Optional[asyncio.Future] = None
 
 
 class GeminiRuntime:
@@ -643,41 +642,9 @@ class GeminiRuntime:
             tool_call = message.tool_call
             if tool_call is not None:
                 responses = []
-                movement_finished = False
                 for call in tool_call.function_calls:
                     args = call.args or {}
-                    if movement_finished and call.name in ("move", "turn"):
-                        result = {
-                            "status": "unavailable",
-                            "reason": (
-                                "one physical movement is allowed per decision; "
-                                "inspect the completed action and newest camera "
-                                "frame before choosing another"
-                            ),
-                            "movement_tools": "unavailable until the next decision",
-                            "telemetry": _telemetry_text(self._telemetry),
-                        }
-                    else:
-                        result = await self._execute(call.name, args)
-                    if call.name in ("move", "turn") and result.get("status") in (
-                        "completed",
-                        "timed out before target",
-                        "cancelled",
-                    ):
-                        movement_finished = True
-                        fresh_frame = await self._wait_for_fresh_action_frame()
-                        result["camera_frame"] = self._last_frame_sent_count
-                        result["camera_observation"] = (
-                            "a fresh camera frame captured after the action was "
-                            "sent immediately before this result"
-                            if fresh_frame
-                            else "no fresh camera frame arrived before the result"
-                        )
-                        result["movement_tools"] = (
-                            "available now"
-                            if fresh_frame
-                            else "unavailable until a fresh camera frame arrives"
-                        )
+                    result = await self._execute(call.name, args)
                     responses.append(
                         types.FunctionResponse(
                             name=call.name,
@@ -844,7 +811,6 @@ class GeminiRuntime:
             yaw_rate_deg_s=yaw_rate_deg_s,
             last_update_s=now,
             last_sample_s=now,
-            completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
         self._last_action_result = ""
@@ -891,7 +857,6 @@ class GeminiRuntime:
             ),
             start_position_ned=_position_ned(self._telemetry),
             last_update_s=now,
-            completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
         self._last_action_result = ""
@@ -1187,12 +1152,9 @@ class GeminiRuntime:
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
             self._speech_blocked = False
-        response = self._action_response(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
-        if action.completion is not None and not action.completion.done():
-            action.completion.set_result(response)
 
     def _cancel_action(self, reason: str) -> str:
         action = self._active_action
@@ -1210,82 +1172,10 @@ class GeminiRuntime:
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
-        response = self._action_response(action, "cancelled", result, actual)
         self._record_action(result)
         self._remember_action(result)
         self._active_action = None
-        if action.completion is not None and not action.completion.done():
-            action.completion.set_result(response)
         return self._action_label(action)
-
-    def _action_response(
-        self,
-        action: ActiveAction,
-        status: str,
-        result: str,
-        actual_heading_deg: Optional[float],
-    ) -> dict:
-        movement_tools = "available now"
-        if (
-            self._action_finished_at_s is not None
-            and (
-                self._latest_frame_at_s is None
-                or self._latest_frame_at_s <= self._action_finished_at_s
-            )
-        ):
-            movement_tools = "available after a fresh camera frame"
-        response = {
-            "status": status,
-            "action": result,
-            "heading_deg": _heading_value(self._telemetry.heading_rad),
-            "telemetry": _telemetry_text(self._telemetry),
-            "movement_tools": movement_tools,
-        }
-        if actual_heading_deg is not None:
-            response["observed_heading_change_deg"] = actual_heading_deg
-        if action.start_heading_rad is not None:
-            response["heading_before_deg"] = _heading_value(action.start_heading_rad)
-        if action.kind == "turn":
-            response["requested_angle_deg"] = _turn_angle_deg(action)
-            response["visual_effect"] = (
-                "the scene should have moved toward image-right after a left turn"
-                if action.direction == "left"
-                else "the scene should have moved toward image-left after a right turn"
-            )
-        if action.kind == "move":
-            response["observed_translation_m"] = {
-                "forward": action.observed_forward_m,
-                "right": action.observed_right_m,
-            }
-            response["yaw_rate_deg_s"] = action.yaw_rate_deg_s
-        position_delta = self._position_delta(action)
-        if position_delta is not None:
-            response["observed_position_delta_m"] = {
-                "forward": position_delta[0],
-                "right": position_delta[1],
-                "down": position_delta[2],
-            }
-        return response
-
-    def _fresh_frame_sent_after_action(self) -> bool:
-        finished_at_s = self._action_finished_at_s
-        return (
-            finished_at_s is not None
-            and self._latest_frame_at_s is not None
-            and self._latest_frame_at_s > finished_at_s
-            and self._last_frame_sent_at_s is not None
-            and self._last_frame_sent_at_s > finished_at_s
-        )
-
-    async def _wait_for_fresh_action_frame(self) -> bool:
-        deadline = time.monotonic() + 2.0 * VIDEO_PERIOD_S
-        while (
-            not self._fresh_frame_sent_after_action()
-            and not self._closed.is_set()
-            and time.monotonic() < deadline
-        ):
-            await asyncio.sleep(0.05)
-        return self._fresh_frame_sent_after_action()
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
