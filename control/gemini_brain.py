@@ -115,7 +115,6 @@ class GeminiRuntime:
         self.action_count = 0
         self.dialogue_sent_count = 0
         self.dialogue_count = 0
-        self.turn_count = 0
         self.video_frame_count = 0
         self._response_parts = []
         self._response_thoughts = []
@@ -740,7 +739,6 @@ class GeminiRuntime:
                 self._follow_up_sent_at_s = None
                 self._follow_up_retry_at_s = None
                 self._acknowledge_dialogue()
-                self.turn_count += 1
                 self._finish_turn(response_started_s)
                 self._response_in_flight = False
                 return
