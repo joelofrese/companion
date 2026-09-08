@@ -143,8 +143,8 @@ JPEG, telemetry, dialogue, and action results remain the live context.
   path, faults, recovery, safety, landing, and disarm.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
-- ER 2 chooses non-blocking movement, turn, hover, speech, and acknowledgement
-  tools; move and turn results include measured completion and heading.
+- ER 2 chooses movement, turn, hover, speech, and acknowledgement tools; physical
+  move and turn calls report measured completion and heading.
 - Minimal native ER 2 thinking currently gives the most timely simulation
   decisions observed so far; latency and visual decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware

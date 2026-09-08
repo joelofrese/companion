@@ -635,14 +635,28 @@ class GeminiRuntime:
             tool_call = message.tool_call
             if tool_call is not None:
                 responses = []
+                movement_finished = False
                 for call in tool_call.function_calls:
                     args = call.args or {}
-                    result = await self._execute(call.name, args)
+                    if movement_finished and call.name in ("move", "turn"):
+                        result = {
+                            "status": "unavailable",
+                            "reason": (
+                                "one physical movement is allowed per decision; "
+                                "inspect the completed action and newest camera "
+                                "frame before choosing another"
+                            ),
+                            "movement_tools": "unavailable until the next decision",
+                            "telemetry": _telemetry_text(self._telemetry),
+                        }
+                    else:
+                        result = await self._execute(call.name, args)
                     if call.name in ("move", "turn") and result.get("status") in (
                         "completed",
                         "timed out before target",
                         "cancelled",
                     ):
+                        movement_finished = True
                         fresh_frame = await self._wait_for_fresh_action_frame()
                         result["camera_frame"] = self._last_frame_sent_count
                         result["camera_observation"] = (
@@ -1453,20 +1467,23 @@ def _system_instruction() -> str:
         "visible as the "
         "movement target: move forward when it is centered, or use a small lateral "
         "velocity and yaw rate for a smooth arc when it is offset. Do not turn to search "
-        "for a target that is already visible. Turn only when the view or path needs "
-        "reorientation. A turn is a short yaw pulse: look again after each pulse and "
-        "correct from the new image and heading instead of estimating a large angle in "
-        "advance. Use the normal short turn pulse unless a different short correction "
-        "is clearly needed; do not ask the developer for exact timing. If the path is "
-        "clear and TOF is well beyond the stop limit, translate instead of repeatedly "
-        "turning in place. When an obstacle blocks the forward path, turn in short "
+        "for a target that is already visible. If a target is visible at one side, make "
+        "one correction toward it, then inspect the new view; do not turn past it. If no "
+        "target is visible and the path is clear, use a short translation to reveal a "
+        "new view instead of repeating in-place turns. Turn only when the view or path "
+        "needs reorientation. A turn is a short yaw pulse: look again after each pulse "
+        "and correct from the new image and heading instead of estimating a large angle "
+        "in advance. Use the normal short turn pulse unless a different short correction "
+        "is clearly needed; do not ask the developer for exact timing. When an "
+        "obstacle blocks the forward path, turn in short "
         "pulses to inspect; once a clear side path is visible and forward range permits "
         "movement, translate around it with a small lateral move or smooth arc. A "
         "heading change alone is not progress, so do not keep turning when the view is "
         "unchanged. Hover when no safe step is clear. Trust the newest image and "
         "telemetry over memory.\n\n"
-        "Move and turn are blocking physical actions. Wait for their measured result "
-        "before choosing another movement. A requested duration is intent, "
+        "Move and turn are blocking physical actions. Choose only one physical movement "
+        "at a time; wait for its measured result and a fresh camera frame before choosing "
+        "another. A requested duration is intent, "
         "not proof; use observed translation, heading, telemetry, and action state to "
         "choose the next correction. Do not ask the user for an exact turn amount or "
         "narrate instead of acting. Speak after a real observation, event, or user request. "
