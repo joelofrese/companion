@@ -150,8 +150,8 @@ editable memory file contains only prior experience across runs. The newest
   decisions, dialogue, memory, movement, and simulated TOF safety.
 - ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls report measured completion and heading.
-- Minimal native ER 2 thinking currently gives the most timely simulation
-  decisions observed so far; latency and visual decisions remain variable.
+- Low native ER 2 thinking currently balances response time and visual reasoning;
+  latency and visual decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
   behavior remains unverified. DEXI 3 has no lidar.
 

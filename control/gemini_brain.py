@@ -19,7 +19,7 @@ from control.velocity import VelocityCommand
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
-THINKING_LEVEL = "minimal"
+THINKING_LEVEL = "low"
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
 # Allow a slow first ER2 decision to start normally.
@@ -41,7 +41,7 @@ MAX_TURN_DEG = 45.0
 # A quarter-turn is enough to inspect one side before translating.
 MAX_IN_PLACE_TURN_DEG = 90.0
 # Keep the yaw rate slow while making one visual correction useful.
-TURN_RATE_DEG_S = 15.0
+TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 10.0
 MAX_IMAGE_WIDTH = 640
