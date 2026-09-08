@@ -22,8 +22,10 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "minimal"
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Allow a slow ER2 decision to finish before recovering a silent session.
-RESPONSE_TIMEOUT_S = 30.0
+# Allow a slow first ER2 decision to start normally.
+INITIAL_RESPONSE_TIMEOUT_S = 30.0
+# Recover a later silent decision before it consumes the rest of a flight.
+RESPONSE_TIMEOUT_S = 15.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -350,7 +352,12 @@ class GeminiRuntime:
                                         - (
                                             self._last_model_activity_s
                                             or response_started_s
-                                        ) > RESPONSE_TIMEOUT_S
+                                        )
+                                        > (
+                                            INITIAL_RESPONSE_TIMEOUT_S
+                                            if self.action_count == 0
+                                            else RESPONSE_TIMEOUT_S
+                                        )
                                     )
                                 ):
                                     print(
