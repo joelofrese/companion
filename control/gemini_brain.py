@@ -36,8 +36,8 @@ DEFAULT_TURN_S = 0.75
 MAX_TURN_S = 2.0
 # A full half-turn is enough to scan the surroundings before translating.
 MAX_IN_PLACE_TURN_DEG = 180.0
-# Keep the yaw rate low enough for PX4 to settle near the requested heading.
-TURN_RATE_DEG_S = 8.0
+# Keep the yaw rate slow while making one visual correction useful.
+TURN_RATE_DEG_S = 15.0
 MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 5.0
 MAX_IMAGE_WIDTH = 640
@@ -964,15 +964,8 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             if self._last_action_result:
-                return (
-                    f"{self._last_action_result}; movement tools available; "
-                    f"in-place scan remaining="
-                    f"{max(0.0, MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg):.0f} degrees"
-                )
-            return (
-                "none; movement tools available; in-place scan remaining="
-                f"{max(0.0, MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg):.0f} degrees"
-            )
+                return f"{self._last_action_result}; movement tools available"
+            return "none; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
@@ -1200,10 +1193,6 @@ class GeminiRuntime:
         if action.kind == "turn":
             response["requested_duration_s"] = action.duration_s
             response["expected_heading_change_deg"] = _turn_angle_deg(action)
-            response["in_place_scan_remaining_deg"] = max(
-                0.0,
-                MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg,
-            )
             response["visual_effect"] = (
                 "the scene should have moved toward image-right after a left turn"
                 if action.direction == "left"
@@ -1430,16 +1419,16 @@ def _system_instruction() -> str:
         "measured state, then report completion.\n\n"
         "The camera faces forward: image-left and image-right are vehicle-left and "
         "vehicle-right. Move only with a clear path and valid TOF range. Prefer short, "
-        "slow translation. If a visible subject is offset and the path is clear, use a "
-        "small lateral velocity and yaw rate for a smooth arc. Turn only when the view "
-        "or path needs reorientation. A turn is a short yaw pulse: look again after "
-        "each pulse and correct from the new image and heading instead of estimating "
-        "a large angle in advance. If the path is clear and TOF is well beyond the "
-        "stop limit, translate instead of repeatedly turning in place. Hover when no "
-        "safe step is clear. When a visible target is ahead on a clear path, keep it "
-        "in view and translate toward it instead of scanning again. Do not repeat the "
-        "same in-place direction without a new visual reason. Trust the newest image "
-        "and telemetry over memory.\n\n"
+        "slow translation. Treat a requested object or person that is visible as the "
+        "movement target: move forward when it is centered, or use a small lateral "
+        "velocity and yaw rate for a smooth arc when it is offset. Do not turn to search "
+        "for a target that is already visible. Turn only when the view or path needs "
+        "reorientation. A turn is a short yaw pulse: look again after each pulse and "
+        "correct from the new image and heading instead of estimating a large angle in "
+        "advance. If the path is clear and TOF is well beyond the stop limit, translate "
+        "instead of repeatedly turning in place. Hover when no safe step is clear. Do "
+        "not repeat the same in-place direction without a new visual reason. Trust the "
+        "newest image and telemetry over memory.\n\n"
         "Move and turn are blocking physical actions. Wait for their measured result "
         "before choosing another movement. A requested duration is intent, "
         "not proof; use observed translation, heading, telemetry, and action state to "
