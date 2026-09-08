@@ -150,8 +150,9 @@ editable memory file contains only prior experience across runs. The newest
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
 - ER 2 chooses movement, turn, hover, or speech tools.
-  Physical move and turn calls report measured completion and heading; moves
-  also report measured local-position change.
+  Physical move and turn calls report measured completion and heading; move
+  results compare requested and observed translation and report local-position
+  change for calibration.
 - Low native ER 2 thinking currently balances response time and visual reasoning;
   latency and visual decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware

@@ -931,6 +931,9 @@ class GeminiRuntime:
 
     def _translation_text(self, action: ActiveAction) -> str:
         return (
+            "requested translation "
+            f"forward={action.forward_m_s * action.duration_s:+.2f}m "
+            f"right={action.right_m_s * action.duration_s:+.2f}m; "
             "observed translation "
             f"forward={action.observed_forward_m:+.2f}m "
             f"right={action.observed_right_m:+.2f}m"
@@ -1152,6 +1155,9 @@ class GeminiRuntime:
         if actual_heading_deg is not None:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
         if action.kind == "turn":
+            target_heading = _target_heading_value(action)
+            if target_heading is not None:
+                result += f"; target heading {target_heading:+.1f} degrees"
             final_heading = _heading_value(self._telemetry.heading_rad)
             if final_heading is not None:
                 result += f"; final heading {final_heading:+.1f} degrees"
@@ -1177,6 +1183,9 @@ class GeminiRuntime:
         if actual is not None:
             result += f"; observed heading change {actual:+.1f} degrees"
         if action.kind == "turn":
+            target_heading = _target_heading_value(action)
+            if target_heading is not None:
+                result += f"; target heading {target_heading:+.1f} degrees"
             final_heading = _heading_value(self._telemetry.heading_rad)
             if final_heading is not None:
                 result += f"; final heading {final_heading:+.1f} degrees"
@@ -1378,6 +1387,8 @@ def _system_instruction() -> str:
         "concluding it is absent. "
         "If an obstacle blocks the target, do not keep rotating around the same spot; "
         "translate through a clear opening and look again. "
+        "A turn alone does not complete a finding or movement task. After it finishes, "
+        "inspect the newer image and continue the active task if it is not complete. "
         "When the requested target is visible and the path is clear, make progress "
         "toward it instead of continuing to scan. "
         "Use short, slow body-frame pulses and relative turns. Choose the next pulse "
