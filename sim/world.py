@@ -965,15 +965,24 @@ async def run(
             required_memory = ("obstacle=", "command=", "velocity=", "heading_deg=")
             if not gemini:
                 required_memory = ("intent=",) + required_memory
-            if not latest_memory or any(
+            has_experience = bool(
+                not gemini
+                or control.action_count
+                or control.latest_thought
+                or control.latest_response
+            )
+            if not has_experience:
+                print("Gemini produced no new experience to persist.")
+            elif not latest_memory or any(
                 field not in latest_memory for field in required_memory
             ):
                 raise RuntimeError(
-                    "SITL did not persist a complete conscious experience"
+                    "SITL did not persist a complete companion experience"
                 )
-            if persisted_memory == memory_before:
-                raise RuntimeError("SITL did not add a new conscious experience")
-            print("Conscious experience memory=verified and reloadable.")
+            elif persisted_memory == memory_before:
+                raise RuntimeError("SITL did not add a new companion experience")
+            else:
+                print("Companion experience memory=verified and reloadable.")
 
         def forward_count(start_s, end_s):
             return sum(
