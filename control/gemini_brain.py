@@ -1302,11 +1302,6 @@ class GeminiRuntime:
         self.latest_thought = thought
         self.latest_response = response
         self.latest_action = action
-        if response and action == "none" and not self._last_action_result:
-            self._last_action_result = (
-                "No physical tool was called; the previous response did not move "
-                "or speak. Call one available tool directly now."
-            )
         summary = thought or response or action
         now = time.monotonic()
         self.latest_response_latency_s = max(0.0, now - response_started_s)
