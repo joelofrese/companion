@@ -48,7 +48,7 @@ merge and delete it.
   visual correction, inspect again, and avoid repeated turning without useful
   progress. The forward-only TOF reading calls for a visible lateral detour
   when the path is blocked. Change position before declaring a requested target
-  absent. A translation resets an in-place scan.
+  absent.
 - Camera frames stream once per second. Heartbeats normally wait for the
   current model or physical action; dialogue may interrupt, and a bounded
   timeout restarts a stalled session.
