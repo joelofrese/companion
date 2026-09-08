@@ -539,8 +539,6 @@ class GeminiRuntime:
         parts = []
         if self._bootstrap_pending:
             parts.append(f"[START] Situation: {self.situation}")
-            if not dialogue and self._latest_user_request != self.situation:
-                parts.append(f"Current request: {self._latest_user_request}")
         camera = (
             "fresh"
             if self._has_fresh_frame()
@@ -561,6 +559,8 @@ class GeminiRuntime:
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
+        elif self._latest_user_request != self.situation:
+            parts.append(f"[TASK] Active user request: {self._latest_user_request}")
         if memory:
             parts.append(
                 "[MEMORY] Prior experience; verify it against the current image "
@@ -1331,7 +1331,9 @@ def _tools():
             "description": (
                 "Move slowly in the body frame for a short duration. Forward is "
                 "positive and right is positive. Use a clear path and valid range "
-                "reading. Combine lateral velocity and yaw rate for a smooth arc when "
+                "reading. The range sensor looks forward only: when forward is blocked, "
+                "use a visible side opening instead of repeatedly turning or pressing "
+                "forward. Combine lateral velocity and yaw rate for a smooth arc when "
                 "useful. Inspect the next image and measured result after the move."
             ),
             "behavior": "BLOCKING",
@@ -1456,7 +1458,10 @@ def _system_instruction() -> str:
         "changed, or unsafe. Use general exploration only when there is no more specific "
         "request.\n\n"
         "The camera faces forward. Image-left is vehicle-left and image-right is "
-        "vehicle-right. Move only with fresh vision, valid TOF data, and a clear path. "
+        "vehicle-right. The TOF sensor looks forward only. Move only with fresh vision, "
+        "valid TOF data, and a clear path. When forward is blocked, choose a visible "
+        "side opening and translate through it; do not repeatedly turn in place or "
+        "press forward into the obstacle. "
         "Use short, slow body-frame pulses and relative turns. Choose the next pulse "
         "from the newest view and measured state, then inspect the result before making "
         "another correction. Use heading and remembered requested-versus-observed "
