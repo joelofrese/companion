@@ -921,6 +921,7 @@ class GeminiRuntime:
                 if _finite(self._telemetry.heading_rad)
                 else None
             ),
+            start_position_ned=_position_ned(self._telemetry),
             last_update_s=now,
             completion=asyncio.get_running_loop().create_future(),
         )
@@ -1213,9 +1214,9 @@ class GeminiRuntime:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
-            position_delta = self._position_delta(action)
-            if position_delta is not None:
-                result += f"; {self._position_text(position_delta)}"
+        position_delta = self._position_delta(action)
+        if position_delta is not None:
+            result += f"; {self._position_text(position_delta)}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
@@ -1292,13 +1293,13 @@ class GeminiRuntime:
                 "right": action.observed_right_m,
             }
             response["yaw_rate_deg_s"] = action.yaw_rate_deg_s
-            position_delta = self._position_delta(action)
-            if position_delta is not None:
-                response["observed_position_delta_m"] = {
-                    "forward": position_delta[0],
-                    "right": position_delta[1],
-                    "down": position_delta[2],
-                }
+        position_delta = self._position_delta(action)
+        if position_delta is not None:
+            response["observed_position_delta_m"] = {
+                "forward": position_delta[0],
+                "right": position_delta[1],
+                "down": position_delta[2],
+            }
         return response
 
     def _fresh_frame_sent_after_action(self) -> bool:
