@@ -9,7 +9,7 @@ MEMORY_CONTEXT_LINES = 8
 
 
 class CompanionMemory:
-    """Keep a bounded record of past conscious decisions."""
+    """Keep a bounded record of prior experience."""
 
     def __init__(self, path):
         if not isinstance(path, (str, Path)) or not str(path).strip():
@@ -29,7 +29,7 @@ class CompanionMemory:
         ][-MAX_MEMORY_LINES:]
 
     def context(self) -> str:
-        """Return the newest memories for the conscious prompt."""
+        """Return recent experience for the companion brain."""
 
         return "\n".join(self._lines[-MEMORY_CONTEXT_LINES:])
 
