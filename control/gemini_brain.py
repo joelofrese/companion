@@ -14,14 +14,14 @@ from PIL import Image
 from control.memory import CompanionMemory
 from control.safety_limits import OBSTACLE_STOP_M
 from control.telemetry import Telemetry
-from control.velocity import VelocityCommand
+from control.velocity import VelocityCommand, ned_to_body
 
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "low"
-# Give the streaming model a fresh view often enough for short closed-loop moves.
-VIDEO_PERIOD_S = 1.0
+# Give the streaming model two fresh views per second for closed-loop moves.
+VIDEO_PERIOD_S = 0.5
 # Allow a slow first ER2 decision to start normally.
 INITIAL_RESPONSE_TIMEOUT_S = 30.0
 # Give later ER2 decisions the same bounded time as the first decision; a slow
@@ -36,7 +36,6 @@ MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 # The model asks for a relative angle; the runtime stops from measured heading.
 MIN_TURN_DEG = 5.0
-DEFAULT_TURN_DEG = 12.0
 MAX_TURN_DEG = 45.0
 # A quarter-turn is enough to inspect one side before translating.
 MAX_IN_PLACE_TURN_DEG = 90.0
@@ -66,6 +65,7 @@ class ActiveAction:
     duration_s: float
     deadline_s: float
     start_heading_rad: Optional[float] = None
+    start_position_ned: Optional[tuple[float, float, float]] = None
     phase: str = "running"
     stable_since_s: Optional[float] = None
     last_heading_rad: Optional[float] = None
@@ -853,6 +853,7 @@ class GeminiRuntime:
                 if yaw_rate_deg_s and _finite(self._telemetry.heading_rad)
                 else None
             ),
+            start_position_ned=_position_ned(self._telemetry),
             forward_m_s=forward_m_s,
             right_m_s=right_m_s,
             yaw_rate_deg_s=yaw_rate_deg_s,
@@ -874,17 +875,16 @@ class GeminiRuntime:
                 "status": "rejected",
                 "reason": "direction must be left or right",
             }
-        angle_deg = args.get("angle_deg")
-        if angle_deg is None:
-            angle_deg = DEFAULT_TURN_DEG
-        else:
-            angle_deg = _number_between(
-                args, "angle_deg", MIN_TURN_DEG, MAX_TURN_DEG
-            )
+        angle_deg = _number_between(
+            args, "angle_deg", MIN_TURN_DEG, MAX_TURN_DEG
+        )
         if angle_deg is None:
             return {
                 "status": "rejected",
-                "reason": f"angle_deg must be {MIN_TURN_DEG} to {MAX_TURN_DEG}",
+                "reason": (
+                    "angle_deg is required and must be "
+                    f"{MIN_TURN_DEG} to {MAX_TURN_DEG}"
+                ),
             }
         busy = self._busy_response()
         if busy is not None:
@@ -988,6 +988,31 @@ class GeminiRuntime:
             "observed translation "
             f"forward={action.observed_forward_m:+.2f}m "
             f"right={action.observed_right_m:+.2f}m"
+        )
+
+    def _position_delta(self, action: ActiveAction):
+        if action.start_position_ned is None:
+            return None
+        current = _position_ned(self._telemetry)
+        if current is None:
+            return None
+        heading = action.start_heading_rad
+        if heading is None:
+            heading = self._telemetry.heading_rad
+        if not _finite(heading):
+            return None
+        north = current[0] - action.start_position_ned[0]
+        east = current[1] - action.start_position_ned[1]
+        down = current[2] - action.start_position_ned[2]
+        return ned_to_body(north, east, down, heading)
+
+    @staticmethod
+    def _position_text(position_delta) -> str:
+        return (
+            "measured position change "
+            f"forward={position_delta[0]:+.2f}m "
+            f"right={position_delta[1]:+.2f}m "
+            f"down={position_delta[2]:+.2f}m"
         )
 
     def _action_label(self, action: Optional[ActiveAction] = None) -> str:
@@ -1188,6 +1213,9 @@ class GeminiRuntime:
             result += f"; observed heading change {actual_heading_deg:+.1f} degrees"
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
+            position_delta = self._position_delta(action)
+            if position_delta is not None:
+                result += f"; {self._position_text(position_delta)}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
@@ -1209,6 +1237,9 @@ class GeminiRuntime:
             result += f"; observed heading change {actual:+.1f} degrees"
         if action.kind == "move":
             result += f"; {self._translation_text(action)}"
+            position_delta = self._position_delta(action)
+            if position_delta is not None:
+                result += f"; {self._position_text(position_delta)}"
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
@@ -1261,6 +1292,13 @@ class GeminiRuntime:
                 "right": action.observed_right_m,
             }
             response["yaw_rate_deg_s"] = action.yaw_rate_deg_s
+            position_delta = self._position_delta(action)
+            if position_delta is not None:
+                response["observed_position_delta_m"] = {
+                    "forward": position_delta[0],
+                    "right": position_delta[1],
+                    "down": position_delta[2],
+                }
         return response
 
     def _fresh_frame_sent_after_action(self) -> bool:
@@ -1389,7 +1427,7 @@ def _tools():
             "description": (
                 "Apply a slow in-place yaw correction. Choose the direction from "
                 "the newest image and heading: image-left means left and image-right "
-                "means right. Optionally choose a relative angle; the controller uses "
+                "means right. Choose a relative angle; the controller uses "
                 "measured heading to stop there. Inspect the new image and heading "
                 "before choosing another correction. Use move with a yaw rate when "
                 "translating and turning together would make a smoother arc."
@@ -1408,15 +1446,15 @@ def _tools():
                     "angle_deg": {
                         "type": "NUMBER",
                         "description": (
-                            f"Optional relative heading change from {MIN_TURN_DEG:.0f} "
-                            f"through {MAX_TURN_DEG:.0f} degrees. Omit it for the "
-                            f"normal {DEFAULT_TURN_DEG:.0f}-degree correction."
+                            f"Required relative heading change from {MIN_TURN_DEG:.0f} "
+                            f"through {MAX_TURN_DEG:.0f} degrees. Choose the "
+                            "smallest useful correction."
                         ),
                         "minimum": MIN_TURN_DEG,
                         "maximum": MAX_TURN_DEG,
                     },
                 },
-                "required": ["direction"],
+                "required": ["direction", "angle_deg"],
             },
         },
         {
@@ -1550,6 +1588,17 @@ def _telemetry_text(telemetry: Telemetry) -> str:
             ),
         )
     )
+
+
+def _position_ned(telemetry: Telemetry):
+    """Return a complete local position, or none when it is unavailable."""
+
+    position = (
+        telemetry.position_north_m,
+        telemetry.position_east_m,
+        telemetry.position_down_m,
+    )
+    return position if all(_finite(value) for value in position) else None
 
 
 def _path_status(distance_m: Optional[float]) -> str:

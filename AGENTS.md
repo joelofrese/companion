@@ -41,14 +41,15 @@ merge and delete it.
 - `move` is a short, slow body-frame pulse. It may include a small yaw rate
   for a smooth arc. `turn` accepts a relative angle and settles from heading.
 - Physical move and turn calls complete with measured motion, heading, fresh
-  telemetry, and a newer camera frame before another movement is chosen. Hover
-  may interrupt an action for an explicit stop.
+  telemetry, and a newer camera frame before another movement is chosen. Move
+  results also report measured local-position change. Hover may interrupt an
+  action for an explicit stop.
 - Choose each pulse from the newest image and measured state. Use a short
   visual correction, inspect again, and avoid repeated turning without useful
   progress. The forward-only TOF reading calls for a visible lateral detour
   when the path is blocked. Change position before declaring a requested target
   absent. A translation resets an in-place scan.
-- Camera frames stream once per second. Heartbeats normally wait for the
+- Camera frames stream twice per second. Heartbeats normally wait for the
   current model or physical action; dialogue may interrupt, and a bounded
   timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
@@ -149,7 +150,8 @@ editable memory file contains only prior experience across runs. The newest
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
 - ER 2 chooses movement, turn, hover, or speech tools.
-  Physical move and turn calls report measured completion and heading.
+  Physical move and turn calls report measured completion and heading; moves
+  also report measured local-position change.
 - Low native ER 2 thinking currently balances response time and visual reasoning;
   latency and visual decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
