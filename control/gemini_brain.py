@@ -114,7 +114,7 @@ class GeminiRuntime:
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
-        self.latest_turn_duration_s: Optional[float] = None
+        self.latest_response_latency_s: Optional[float] = None
         self.action_count = 0
         self.dialogue_sent_count = 0
         self.dialogue_count = 0
@@ -1303,7 +1303,7 @@ class GeminiRuntime:
             )
         summary = thought or response or action
         now = time.monotonic()
-        self.latest_turn_duration_s = max(0.0, now - response_started_s)
+        self.latest_response_latency_s = max(0.0, now - response_started_s)
         if thought:
             self.thought_count += 1
             print(f"Gemini thought: {thought}", flush=True)
@@ -1468,6 +1468,8 @@ def _system_instruction() -> str:
         "measured state, then report completion.\n\n"
         "The camera faces forward: image-left and image-right are vehicle-left and "
         "vehicle-right. Move only with a clear path and valid TOF range. Prefer short, "
+        "stationary objects slide toward image-right after a left turn and toward "
+        "image-left after a right turn; use that change to check the turn direction. "
         "slow translation in short pulses. Treat a requested object or person that is "
         "visible as the "
         "movement target: move forward when it is centered, or use a small lateral "
@@ -1485,7 +1487,8 @@ def _system_instruction() -> str:
         "movement, translate around it with a small lateral move or smooth arc. A "
         "heading change alone is not progress, so do not keep turning when the view is "
         "unchanged. Hover when no safe step is clear. Trust the newest image and "
-        "telemetry over memory.\n\n"
+        "telemetry over memory. Use remembered requested-versus-observed motion to "
+        "calibrate future pulses, but verify every correction in the current view.\n\n"
         "Move and turn are blocking physical actions. Choose only one physical movement "
         "at a time; wait for its measured result and a fresh camera frame before choosing "
         "another. A requested duration or angle is intent, "

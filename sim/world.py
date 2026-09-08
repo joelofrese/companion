@@ -639,17 +639,17 @@ async def run(
                     )
                     last_traced_gemini_dialogue = control.dialogue_sent_count
                 if (
-                    control.latest_turn_duration_s is not None
-                    and control.latest_turn_duration_s != last_traced_gemini_latency
+                    control.latest_response_latency_s is not None
+                    and control.latest_response_latency_s != last_traced_gemini_latency
                 ):
                     print(
                         f"[Gemini {elapsed_s:5.1f}s] model response latency="
-                        f"{control.latest_turn_duration_s:.2f}s; "
+                        f"{control.latest_response_latency_s:.2f}s; "
                         f"thought={clean(control.latest_thought)}; "
                         f"response={clean(control.latest_response)}",
                         flush=True,
                     )
-                    last_traced_gemini_latency = control.latest_turn_duration_s
+                    last_traced_gemini_latency = control.latest_response_latency_s
             else:
                 if control.observation_count != last_traced_observation:
                     observation = control.latest_observation
