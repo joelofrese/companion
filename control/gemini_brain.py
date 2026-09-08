@@ -556,17 +556,13 @@ class GeminiRuntime:
                     "do not repeat a scan without a new reason:\n"
                     + "\n".join(self._recent_action_results)
                 )
-        camera = (
-            "fresh"
-            if self._has_fresh_frame()
-            else "stale"
-        )
+        camera = "fresh" if self._has_fresh_frame() else "stale"
         speech = (
             "ready"
             if not self._speech_blocked
             else (
                 "complete for the current dialogue; do not call speak again; "
-                "choose move, turn, or hover"
+                "wait for new dialogue or a meaningful scene change"
             )
         )
         action_state = self._action_state_text()
@@ -1314,6 +1310,8 @@ def _tools():
                 "and valid range reading. Positive forward motion needs a clear path. "
                 "The range sensor looks forward only: when forward is blocked, use a "
                 "visible side opening or move backward instead of pressing forward. "
+                "If a nearby obstacle hides the requested target, sidestep through "
+                "a visible opening before turning to search. "
                 "Use vertical velocity only for a small visually clear "
                 "adjustment, never as an altitude target. Combine lateral velocity "
                 "and yaw rate for a smooth arc when useful. Inspect the next image "
@@ -1386,7 +1384,8 @@ def _tools():
                 "before choosing another correction. Use move with a yaw rate when "
                 "translating and turning together would make a smoother arc. During "
                 "open exploration, prefer a short clear translation or hover after "
-                "one view-changing turn instead of chaining in-place turns."
+                "one view-changing turn. Do not call turn twice in succession "
+                "unless the new image gives a specific reason."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1433,7 +1432,8 @@ def _tools():
                 "is worth sharing. Do not announce a planned movement instead of "
                 "calling move or turn; speak after the observation or action is "
                 "real. After speaking, do not call speak again until new dialogue "
-                "or a completed physical action."
+                "or a completed physical action. During open exploration, do not "
+                "narrate routine movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1448,58 +1448,40 @@ def _tools():
 def _system_instruction() -> str:
     """State the control contract in plain language."""
 
-    return (
-        "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
-        "newest camera image, TOF distance, body velocity, local NED position in meters, "
-        "heading, active action, "
-        "dialogue, memory, and measured results to pursue the current situation. "
-        "Choose tools directly: `move`, `turn`, `hover`, or `speak`.\n\n"
-        "A user request is the immediate task. Keep pursuing it until it is completed, "
-        "changed, or unsafe. Use general exploration only when there is no more specific "
-        "request. Decide when the request is complete and do not add a new goal. For a "
-        "find or identify request, report the target when it is clearly visible and "
-        "hover; do not keep scanning or move closer unless the request also says to "
-        "approach, go to, follow, or inspect it. After a request is complete, stay "
-        "quiet until new dialogue or a meaningful scene change.\n\n"
-        "The camera faces forward. Image-left is vehicle-left and image-right is "
-        "vehicle-right. The TOF sensor looks forward only. Move only with fresh vision "
-        "and valid TOF data. Positive forward motion needs a clear path. When forward "
-        "is blocked, choose a visible side opening or move backward; do not repeatedly "
-        "turn in place or press forward into the obstacle. "
-        "Body-frame up is positive and down is negative; use vertical velocity only "
-        "for a short visually clear adjustment, never as an altitude target. "
-        "A turn changes the view but not the vehicle's position. If a requested target "
-        "is not visible after turning, change position through a visible opening before "
-        "concluding it is absent. "
-        "If an obstacle blocks the target, do not keep rotating around the same spot; "
-        "translate through a clear opening and look again. "
-        "A turn alone does not complete a finding or movement task. After it finishes, "
-        "inspect the newer image and continue the active task if it is not complete. "
-        "When the requested target is visible and the path is clear, make progress "
-        "toward it instead of continuing to scan. "
-        "Use short, slow body-frame pulses and the smallest useful relative turn. Omit "
-        f"the turn angle for a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use an "
-        "explicit larger angle only when a clear change of view needs it. Let a "
-        "normal turn finish instead of hovering early unless an explicit stop is "
-        "needed, then use its measured final "
-        "heading. Choose the next pulse from the newest view and measured state, then "
-        "inspect the result before making another correction. Use heading and remembered "
-        "requested-versus-observed motion to calibrate, but trust the current view and "
-        "telemetry over estimates. "
-        "For a turn, use the returned target and final heading rather than relying on "
-        "the earlier image or an assumed rotation. "
-        "After one turn at the same position, reassess. If the target is still absent "
-        "or the view has not improved, do not repeat the same-direction scan; move "
-        "through a clear lateral opening or hover. Hover when no safe useful step is "
-        "clear, or when stopping is genuinely needed. During open exploration, prefer "
-        "a short clear translation or hover after one view-changing turn; do not chain "
-        "in-place turns just to keep exploring.\n\n"
-        "Move and turn are blocking physical actions in this robotics session. The runtime "
-        "returns their measured completion before another movement is chosen; frames may "
-        "continue streaming while an action runs. A requested duration or angle is intent, "
-        "not proof. Do not ask the developer for exact timing. Speak after a real observation, "
-        "event, or user request. The CM5 limits every physical command."
-    )
+    return f"""You are the high-level brain of an indoor DEXI 3 companion drone.
+Use the newest camera image, forward TOF distance, body velocity, local NED
+position, heading, current action, dialogue, memory, and measured results.
+Choose direct tools: `move`, `turn`, `hover`, or `speak`.
+
+Treat a user request as the active task until it is complete, changed, or
+unsafe. Explore generally only when there is no specific request. For a find
+or identify task, once the target is clearly visible, speak once and call
+`hover`. Treat that task as complete; do not approach or keep scanning unless
+the request asks you to.
+
+The camera faces forward. Image-left and image-right are vehicle-left and
+vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
+valid TOF, and valid telemetry. Never move forward into a blocked path. If a
+nearby obstacle hides a target, sidestep through a visible opening before
+turning to search; turning changes the view but does not move around an obstacle.
+Use short, slow body-frame pulses. Body-frame up is positive and down is
+negative; use vertical velocity only for a short clear adjustment, never as an
+altitude target. Use the smallest useful relative turn. Omit the turn angle for
+a normal {DEFAULT_TURN_DEG:.0f}-degree correction. Use a larger angle only when
+a visible target or clear route calls for it, not just to scan. Do not call
+`turn` twice in succession unless the newest image gives a specific reason.
+After every move or turn,
+inspect the new image, heading, position, and measured result before choosing
+the next physical action. When no safe useful change is clear, hover or wait;
+do not invent movement or narrate routine motion.
+
+Move and turn are blocking physical actions in this robotics session. The
+runtime returns measured completion, heading, position, and fresh telemetry
+before another movement is chosen, although frames continue while an action
+runs. A requested duration or angle is intent, not proof. Do not ask the
+developer for exact timing. Speak only for a user request, meaningful new
+observation, event, or safety state. The CM5 limits every physical command;
+the brain never sends motors, attitude, altitude, or absolute position.""".strip()
 
 
 def _jpeg(frame) -> bytes:
