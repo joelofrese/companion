@@ -1014,12 +1014,24 @@ class GeminiRuntime:
         action = self._active_action
         if action is None:
             if self._last_action_result:
-                return f"{self._last_action_result}; movement tools available"
-            return "none; movement tools available"
+                state = self._last_action_result
+            else:
+                state = "none"
+            if self._in_place_turn_deg:
+                state += (
+                    "; in-place turn since translation="
+                    f"{self._in_place_turn_deg:.1f} degrees"
+                )
+            return f"{state}; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
         ]
+        if action.kind == "turn":
+            details.append(
+                "in-place turn since translation="
+                f"{self._in_place_turn_deg:.1f} degrees"
+            )
         if action.kind == "move":
             details.append(self._translation_text(action))
         actual = self._heading_change_deg(action)
@@ -1242,6 +1254,7 @@ class GeminiRuntime:
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
         if action.kind == "turn":
             response["requested_angle_deg"] = _turn_angle_deg(action)
+            response["in_place_turn_since_translation_deg"] = self._in_place_turn_deg
             response["visual_effect"] = (
                 "the scene should have moved toward image-right after a left turn"
                 if action.direction == "left"
@@ -1466,9 +1479,9 @@ def _system_instruction() -> str:
         "another correction. Use heading and remembered requested-versus-observed "
         "motion to calibrate, but trust the current view and telemetry over estimates. "
         "After a turn, reassess the new view. If it has not made useful progress, do "
-        "not repeat the same scan indefinitely; translate through a clear opening or "
-        "hover. Prefer small turns and use a larger one only for a clear reason. Hover "
-        "when no safe useful step is clear.\n\n"
+        "not repeat the same scan indefinitely; try a clear lateral opening or hover. "
+        "Prefer small turns and use a larger one only for a clear reason. Hover when "
+        "no safe useful step is clear.\n\n"
         "Move and turn are blocking physical actions. Choose one physical movement at a "
         "time and wait for its measured completion and a newer camera frame before the "
         "next movement. A requested duration or angle is intent, not proof. Do not ask "
