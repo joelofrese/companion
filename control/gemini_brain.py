@@ -189,12 +189,13 @@ class GeminiRuntime:
         self,
         frame,
         timestamp_s: float,
-        telemetry: Telemetry = Telemetry(),
+        telemetry: Optional[Telemetry] = None,
     ) -> VelocityCommand:
         """Store fresh state and return the current bounded action."""
 
         if self._closed.is_set() or self._error is not None:
             return VelocityCommand()
+        telemetry = telemetry or Telemetry()
         if frame is not None:
             self._latest_frame = frame
             self._latest_frame_at_s = time.monotonic()
