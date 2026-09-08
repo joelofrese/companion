@@ -498,6 +498,9 @@ def main(argv=None):
     except RuntimeError as error:
         print(f"simulation runner: {error}", file=sys.stderr)
         return 1
+    except Exception as error:
+        print(f"simulation runner: {error}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
