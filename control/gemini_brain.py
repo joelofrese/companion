@@ -1537,6 +1537,9 @@ def _model_text(parts) -> str:
     """Return useful model text without empty structured-output placeholders."""
 
     value = " ".join("".join(parts).split())
+    empty_structured_value = value.casefold().replace("`", "").replace(" ", "")
+    if empty_structured_value in {"{}", "json{}"}:
+        return ""
     if (
         value.startswith("[START]")
         or value.startswith("[STATE]")
