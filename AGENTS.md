@@ -46,7 +46,7 @@ merge and delete it.
   progress. A translation resets an in-place scan.
 - Camera frames stream once per second. Heartbeats normally wait for the
   current model or physical action; dialogue may interrupt, and a bounded
-  timeout reconnects a stalled session.
+  timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
   rejects unsafe commands, protects against obstacles, and is the final
   vehicle-side authority. PX4 stabilizes the vehicle and controls the motors.
@@ -133,9 +133,10 @@ VLM or detector fallback remains.
 ```
 
 Set `GEMINI_API_KEY`. The brain uses one persistent ER 2 Streaming session
-with native context-window compression and session resumption. Its editable
-memory file contains only prior experience across runs. The newest 640-pixel
-JPEG, telemetry, dialogue, and action results remain the live context.
+with native context-window compression and session resumption for ordinary
+disconnects. A silent model turn restarts from the situation and memory. Its
+editable memory file contains only prior experience across runs. The newest
+640-pixel JPEG, telemetry, dialogue, and action results remain the live context.
 
 ## Current state
 
@@ -143,8 +144,8 @@ JPEG, telemetry, dialogue, and action results remain the live context.
   path, faults, recovery, safety, landing, and disarm.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
-- ER 2 chooses movement, turn, hover, speech, and acknowledgement tools; physical
-  move and turn calls report measured completion and heading.
+- ER 2 chooses movement, turn, hover, speech, and acknowledgement tools.
+  Physical move and turn calls report measured completion and heading.
 - Minimal native ER 2 thinking currently gives the most timely simulation
   decisions observed so far; latency and visual decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware

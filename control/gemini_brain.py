@@ -373,9 +373,15 @@ class GeminiRuntime:
                                     self._response_thoughts.clear()
                                     self._actions.clear()
                                     self._last_model_activity_s = None
-                                    # Reconnect the existing session when its native
-                                    # handle is still valid. A rejected handle falls
-                                    # back to the situation and compact memory.
+                                    # A stalled generation can remain stalled when
+                                    # resumed. Keep native resumption for ordinary
+                                    # disconnects, but restart a silent session from
+                                    # the situation and compact memory.
+                                    self._session_handle = None
+                                    self._memory_sent = False
+                                    self._bootstrap_pending = True
+                                    self._dialogue_in_flight = None
+                                    self._dialogue_send_complete = False
                                     self._reconnect_requested = True
                                     break
                         finally:
