@@ -1474,6 +1474,8 @@ def _system_instruction() -> str:
         "A turn changes the view but not the vehicle's position. If a requested target "
         "is not visible after turning, change position through a visible opening before "
         "concluding it is absent. "
+        "If an obstacle blocks the target, do not keep rotating around the same spot; "
+        "translate through a clear opening and look again. "
         "When the requested target is visible and the path is clear, make progress "
         "toward it instead of continuing to scan. "
         "Use short, slow body-frame pulses and relative turns. Choose the next pulse "
