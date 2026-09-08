@@ -23,8 +23,6 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 VIDEO_PERIOD_S = 1.0
 # Recover a silent decision before the drone waits too long to act.
 RESPONSE_TIMEOUT_S = 15.0
-# Give ER2 one bounded continuation prompt before declaring a quiet action turn stalled.
-FOLLOW_UP_RETRY_S = 8.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -128,9 +126,6 @@ class GeminiRuntime:
         self.session_reconnect_count = 0
         self._reconnect_requested = False
         self._last_model_activity_s: Optional[float] = None
-        self._follow_up_sent_at_s: Optional[float] = None
-        self._follow_up_retry_at_s: Optional[float] = None
-        self._follow_up_attempted = False
         self._response_in_flight = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
@@ -274,9 +269,6 @@ class GeminiRuntime:
                     self._dialogue_in_flight = None
                     self._dialogue_send_complete = False
                 self._response_in_flight = False
-                self._follow_up_sent_at_s = None
-                self._follow_up_retry_at_s = None
-                self._follow_up_attempted = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -347,12 +339,6 @@ class GeminiRuntime:
                                             self._last_model_activity_s
                                             or response_started_s
                                         ) > RESPONSE_TIMEOUT_S
-                                        or (
-                                            self._follow_up_retry_at_s is not None
-                                            and time.monotonic()
-                                            - self._follow_up_retry_at_s
-                                            > FOLLOW_UP_RETRY_S
-                                        )
                                     )
                                 ):
                                     print(
@@ -463,10 +449,9 @@ class GeminiRuntime:
         """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
-        # Heartbeat text is a new user turn and interrupts model generation.
-        # Keep streaming frames, but let each decision or blocking tool cycle
-        # finish before prompting for another one. New dialogue is the one
-        # intentional exception: it should reach the companion promptly.
+        # Keep frames continuous, but let the current model or blocking tool
+        # cycle finish. State text is a new user turn and interrupts reasoning;
+        # dialogue is the one intentional exception.
         if self._response_in_flight:
             if self._dialogue and self._dialogue_in_flight is None:
                 action_result = self._last_action_result
@@ -477,14 +462,8 @@ class GeminiRuntime:
                     self._memory_sent = True
                 if self._bootstrap_pending:
                     self._bootstrap_pending = False
-                return
-            await self._retry_action_follow_up(session)
             return
-        if await self._retry_action_follow_up(session):
-            return
-        dialogue = ""
-        if self._dialogue and self._dialogue_in_flight is None:
-            dialogue = self._dialogue[0]
+        dialogue = self._dialogue[0] if self._dialogue else ""
         action_result = self._last_action_result
         self._response_in_flight = True
         if dialogue:
@@ -512,8 +491,6 @@ class GeminiRuntime:
 
         self._dialogue_in_flight = dialogue
         self._dialogue_send_complete = False
-        self._follow_up_sent_at_s = None
-        self._follow_up_retry_at_s = None
         try:
             async with self._send_lock:
                 await session.send_realtime_input(
@@ -529,32 +506,6 @@ class GeminiRuntime:
             self._dialogue_send_complete = True
             self.dialogue_sent_count += 1
             self._last_model_activity_s = time.monotonic()
-
-    async def _retry_action_follow_up(self, session):
-        """Prompt once more when ER2 goes quiet after a completed action."""
-
-        sent_at_s = self._follow_up_sent_at_s
-        if sent_at_s is None:
-            return False
-        quiet_since_s = max(
-            sent_at_s,
-            self._last_model_activity_s or sent_at_s,
-        )
-        if time.monotonic() - quiet_since_s < FOLLOW_UP_RETRY_S:
-            return False
-        async with self._send_lock:
-            if self._follow_up_sent_at_s != sent_at_s:
-                return False
-            self._follow_up_sent_at_s = None
-            self._follow_up_retry_at_s = time.monotonic()
-            self._follow_up_attempted = True
-            self._response_in_flight = True
-            print(
-                "Gemini action continuation was quiet; requesting one fresh state.",
-                flush=True,
-            )
-            await session.send_realtime_input(text=self._heartbeat_text(""))
-        return True
 
     def _heartbeat_text(self, dialogue: str) -> str:
         memory = ""
@@ -591,7 +542,12 @@ class GeminiRuntime:
                 "[MEMORY] Prior experience; verify it against the current image "
                 f"and telemetry:\n{memory}"
             )
-        if self._last_action_result:
+        if self._active_action is not None:
+            heartbeat = (
+                "A physical action is still running. Observe its progress, but do "
+                "not call move or turn until its measured result is returned."
+            )
+        elif self._last_action_result:
             heartbeat = (
                 "The last physical action finished. Inspect its result and the "
                 "newest image, then choose the next tool."
@@ -657,37 +613,19 @@ class GeminiRuntime:
                     self._response_parts.clear()
                     self._response_thoughts.clear()
                     self._actions.clear()
-                    self._follow_up_sent_at_s = None
-                    self._follow_up_retry_at_s = None
                     self._response_in_flight = False
                     return
-                self._follow_up_retry_at_s = None
             tool_call = message.tool_call
             if tool_call is not None:
                 responses = []
-                completed_action = False
-                continue_after_tool = False
                 for call in tool_call.function_calls:
                     args = call.args or {}
                     result = await self._execute(call.name, args)
-                    if result.get("status") in ("rejected", "unavailable"):
-                        continue_after_tool = True
-                    elif call.name == "speak" and result.get("status") in (
-                        "spoken",
-                        "already_spoken",
-                    ):
-                        continue_after_tool = True
-                    elif (
-                        call.name == "ack"
-                        and result.get("status") == "acknowledged"
-                    ):
-                        continue_after_tool = True
                     if call.name in ("move", "turn") and result.get("status") in (
                         "completed",
                         "timed out before target",
                         "cancelled",
                     ):
-                        completed_action = True
                         fresh_frame = await self._wait_for_fresh_action_frame()
                         result["camera_frame"] = self._last_frame_sent_count
                         result["camera_observation"] = (
@@ -713,20 +651,7 @@ class GeminiRuntime:
                         await session.send_tool_response(
                             function_responses=responses
                         )
-                        if (
-                            (completed_action or continue_after_tool)
-                            and not self._reconnect_requested
-                        ):
-                            print(
-                                "Gemini tool finished; waiting for continuation.",
-                                flush=True,
-                            )
                     self._last_model_activity_s = time.monotonic()
-                    if (
-                        (completed_action or continue_after_tool)
-                        and not self._reconnect_requested
-                    ):
-                        self._follow_up_sent_at_s = self._last_model_activity_s
             if message.tool_call_cancellation is not None:
                 self._cancel_action("Gemini cancelled it")
 
@@ -736,8 +661,6 @@ class GeminiRuntime:
                 self._actions.clear()
                 return
             if turn_complete:
-                self._follow_up_sent_at_s = None
-                self._follow_up_retry_at_s = None
                 self._acknowledge_dialogue()
                 self._finish_turn(response_started_s)
                 self._response_in_flight = False
@@ -755,8 +678,6 @@ class GeminiRuntime:
         self._dialogue_send_complete = False
 
     async def _execute(self, name: str, args: dict) -> dict:
-        self._follow_up_sent_at_s = None
-        self._follow_up_retry_at_s = None
         if name == "move":
             result = await self._move(args)
         elif name == "turn":
@@ -1221,7 +1142,6 @@ class GeminiRuntime:
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
             self._speech_blocked = False
-            self._follow_up_attempted = False
         response = self._action_response(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._remember_action(result)
@@ -1242,7 +1162,6 @@ class GeminiRuntime:
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
-        self._follow_up_attempted = False
         response = self._action_response(action, "cancelled", result, actual)
         self._record_action(result)
         self._remember_action(result)
@@ -1339,13 +1258,6 @@ class GeminiRuntime:
         self.latest_thought = thought
         self.latest_response = response
         self.latest_action = action
-        if (
-            action == "none"
-            and not response
-            and self._last_action_result
-            and not self._follow_up_attempted
-        ):
-            self._follow_up_sent_at_s = time.monotonic()
         if response and action == "none" and not self._last_action_result:
             self._last_action_result = (
                 "No physical tool was called; the previous response did not move "

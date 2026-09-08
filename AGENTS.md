@@ -51,14 +51,12 @@ merge and delete it.
   streaming while one move or turn completes; its measured result and fresh
   telemetry arrive before the next movement, and a newer camera frame is
   required before another physical action. Safety holds pause the action until
-  movement is allowed.
-- Rejected or unavailable tool calls get one bounded continuation so Gemini can
-  choose another available action.
-- Camera frames stream once per second. A normal state heartbeat starts the next
-  model decision only after the current decision or physical tool cycle finishes,
-  so it does not interrupt Gemini's reasoning. New dialogue is sent immediately
-  and may interrupt that reasoning; a bounded response timeout reconnects only a
-  genuinely stalled session.
+  movement is allowed. Rejected or unavailable calls return their reason so
+  Gemini can choose another available action.
+- Camera frames stream once per second. A state heartbeat starts the next model
+  decision after the current model or physical tool cycle finishes, so it does
+  not interrupt Gemini's reasoning. New dialogue is sent immediately and takes
+  priority; a bounded response timeout reconnects a genuinely stalled session.
 - A spoken response answers one user message; new dialogue may interrupt it, and
   Gemini waits for new dialogue or a completed physical action before speaking
   again.
@@ -216,14 +214,12 @@ prior experience across runs. The session receives the newest 640-pixel JPEG onc
 per second. A state heartbeat starts the next model decision after the current
 model or physical tool cycle finishes; this avoids interrupting unfinished
 reasoning while keeping the camera stream continuous. New dialogue may interrupt
-an in-flight model turn. Movement and turn tools
-return their observed completion before Gemini chooses another movement. One
-physical move or turn stays active until its duration or observed heading settles;
-safety holds pause its timing; the action state reports the command, phase,
-remaining time, and heading. The movement tool also sends Gemini a native
-completion response, which lets ER2 continue naturally. A quiet post-action turn
-gets one more state prompt after eight seconds, then starts a fresh session if it
-remains silent; ordinary turns use a 30-second stall timeout.
+an in-flight model turn. Movement and turn tools return their observed completion
+before Gemini chooses another movement. One physical move or turn stays active
+until its duration or observed heading settles; safety holds pause its timing; the
+action state reports the command, phase, remaining time, and heading. A bounded
+silent-response timeout reconnects the session when ER2 stops producing a
+decision.
 An explicit stop dialogue cancels active movement immediately; the hover tool
 acknowledges the stop. The CM5 handles safety overrides, expires commands, and
 limits every physical command.
@@ -254,12 +250,10 @@ authoritative behavior trace.
   translating arcs also report their measured heading change. Exploration remains
   active until the user changes it. The compact prompt gives ER 2 the newest image,
   telemetry, action state, and dialogue, then asks for one direct function call.
-  The streaming loop sends
-  the newest frame once per second and waits for each model/tool cycle before sending
-  the next state heartbeat. After a physical action, the ordered tool response
-  itself requests continuation. A quiet post-action turn gets one retry after
-  eight seconds, then a fresh session if it remains silent; ordinary turns use
-  the 30-second timeout. The resumed session keeps
+  The streaming loop sends the newest frame once per second and waits for each
+  model or physical tool cycle before sending the next state heartbeat. A
+  physical action remains serialized by the blocking tool response. The resumed
+  session keeps
   the same situation, active request, and memory while the body holds zero.
   Physical action outcomes are saved as compact measured calibration memory;
   later sessions receive it as prior experience while current image and
