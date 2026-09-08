@@ -580,6 +580,8 @@ class GeminiRuntime:
             heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
             f"[HEARTBEAT] {heartbeat} Call move, turn, hover, or speak when useful. "
+            "If a user request is present, treat it as the active task until it is "
+            "completed, changed, or unsafe; do not replace it with general exploration. "
             "If nothing needs to change, wait for the next image or dialogue; do not "
             "invent movement."
         )
@@ -1450,6 +1452,9 @@ def _system_instruction() -> str:
         "newest camera image, TOF distance, body velocity, heading, active action, "
         "dialogue, memory, and measured results to pursue the current situation. "
         "Choose tools directly: `move`, `turn`, `hover`, or `speak`.\n\n"
+        "A user request is the immediate task. Keep pursuing it until it is completed, "
+        "changed, or unsafe. Use general exploration only when there is no more specific "
+        "request.\n\n"
         "The camera faces forward. Image-left is vehicle-left and image-right is "
         "vehicle-right. Move only with fresh vision, valid TOF data, and a clear path. "
         "Use short, slow body-frame pulses and relative turns. Choose the next pulse "
