@@ -36,8 +36,8 @@ MIN_TURN_DEG = 2.0
 # Let the model omit precision it cannot reliably estimate from one image.
 DEFAULT_TURN_DEG = 8.0
 MAX_TURN_DEG = 90.0
-# Keep open-ended exploration from spinning in place.
-MAX_TURNS_WITHOUT_MOVE = 2
+# A full half-turn is enough to scan the surroundings before translating.
+MAX_IN_PLACE_TURN_DEG = 180.0
 # Keep the yaw rate low enough for PX4 to settle near the requested heading.
 TURN_RATE_DEG_S = 8.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -104,7 +104,7 @@ class GeminiRuntime:
         self._latest_user_request = self.situation
         self._speech_blocked = False
         self._active_action: Optional[ActiveAction] = None
-        self._turns_since_move = 0
+        self._in_place_turn_deg = 0.0
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -131,6 +131,7 @@ class GeminiRuntime:
         self._last_model_activity_s: Optional[float] = None
         self._follow_up_sent_at_s: Optional[float] = None
         self._follow_up_retry_at_s: Optional[float] = None
+        self._follow_up_attempted = False
         self._response_in_flight = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
@@ -276,6 +277,7 @@ class GeminiRuntime:
                 self._response_in_flight = False
                 self._follow_up_sent_at_s = None
                 self._follow_up_retry_at_s = None
+                self._follow_up_attempted = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -546,6 +548,7 @@ class GeminiRuntime:
                 return False
             self._follow_up_sent_at_s = None
             self._follow_up_retry_at_s = time.monotonic()
+            self._follow_up_attempted = True
             self._response_in_flight = True
             print(
                 "Gemini action continuation was quiet; requesting one fresh state.",
@@ -574,7 +577,7 @@ class GeminiRuntime:
             if not self._speech_blocked
             else (
                 "complete for the current dialogue; do not call speak again; "
-                "choose move, turn, hover, or ack"
+                "choose move, turn, or hover"
             )
         )
         action_state = self._action_state_text()
@@ -598,7 +601,7 @@ class GeminiRuntime:
             heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
             f"[HEARTBEAT] {heartbeat} Call one tool directly: move, turn, hover, "
-            "speak, or ack. If no safe action is clear, call hover or ack."
+            "or speak. If no safe action is clear, call hover."
         )
         return "\n".join(parts)
 
@@ -668,11 +671,6 @@ class GeminiRuntime:
                     args = call.args or {}
                     result = await self._execute(call.name, args)
                     if result.get("status") in ("rejected", "unavailable"):
-                        continue_after_tool = True
-                    elif (
-                        call.name == "ack"
-                        and result.get("status") == "acknowledged"
-                    ):
                         continue_after_tool = True
                     elif call.name == "speak" and result.get("status") in (
                         "spoken",
@@ -759,12 +757,6 @@ class GeminiRuntime:
             result = await self._move(args)
         elif name == "turn":
             result = await self._turn(args)
-        elif name == "ack":
-            self._record_action("ack")
-            result = {
-                "status": "acknowledged",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         elif name == "hover":
             if (
                 self._active_action is None
@@ -804,7 +796,7 @@ class GeminiRuntime:
                     "status": "already_spoken",
                     "reason": (
                         "a response was already spoken for this dialogue; do not "
-                        "call speak again. Choose move, turn, hover, or ack. "
+                        "call speak again. Choose move, turn, or hover. "
                         "Speech becomes available after new dialogue or a completed "
                         "physical action"
                     ),
@@ -894,7 +886,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._turns_since_move = 0
+        self._in_place_turn_deg = 0.0
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -926,20 +918,23 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
-        if self._turns_since_move >= MAX_TURNS_WITHOUT_MOVE:
+        now = time.monotonic()
+        angle_deg = float(angle_deg)
+        if self._in_place_turn_deg + angle_deg > MAX_IN_PLACE_TURN_DEG:
+            remaining_deg = max(
+                0.0,
+                MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg,
+            )
             return {
                 "status": "unavailable",
                 "reason": (
-                    "two consecutive turns completed without a translation; "
-                    "choose move or hover, then turn again only after a move"
+                    "the in-place visual sweep has reached its 180-degree limit; "
+                    "translate before turning further"
                 ),
-                "movement_tools": (
-                    "move and hover available; turn unavailable until a move completes"
-                ),
+                "movement_tools": "move and hover available; turn available after translation",
+                "remaining_scan_deg": remaining_deg,
                 "telemetry": _telemetry_text(self._telemetry),
             }
-        now = time.monotonic()
-        angle_deg = float(angle_deg)
         action = ActiveAction(
             "turn",
             direction,
@@ -954,7 +949,7 @@ class GeminiRuntime:
             completion=asyncio.get_running_loop().create_future(),
         )
         self._active_action = action
-        self._turns_since_move += 1
+        self._in_place_turn_deg += angle_deg
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1037,14 +1032,16 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
-            availability = (
-                "turn unavailable until a move completes"
-                if self._turns_since_move >= MAX_TURNS_WITHOUT_MOVE
-                else "movement tools available"
-            )
             if self._last_action_result:
-                return f"{self._last_action_result}; {availability}"
-            return f"none; {availability}"
+                return (
+                    f"{self._last_action_result}; movement tools available; "
+                    f"in-place scan remaining="
+                    f"{max(0.0, MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg):.0f} degrees"
+                )
+            return (
+                "none; movement tools available; in-place scan remaining="
+                f"{max(0.0, MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg):.0f} degrees"
+            )
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
@@ -1212,6 +1209,7 @@ class GeminiRuntime:
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
             self._speech_blocked = False
+            self._follow_up_attempted = False
         response = self._action_response(action, status, result, actual_heading_deg)
         self._record_action(result)
         self._remember_action(result)
@@ -1232,6 +1230,7 @@ class GeminiRuntime:
         self._last_action_result = result
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
+        self._follow_up_attempted = False
         response = self._action_response(action, "cancelled", result, actual)
         self._record_action(result)
         self._remember_action(result)
@@ -1269,6 +1268,10 @@ class GeminiRuntime:
             response["heading_before_deg"] = _heading_value(action.start_heading_rad)
         if action.kind == "turn":
             response["requested_angle_deg"] = action.amount
+            response["in_place_scan_remaining_deg"] = max(
+                0.0,
+                MAX_IN_PLACE_TURN_DEG - self._in_place_turn_deg,
+            )
             response["visual_effect"] = (
                 "the scene should have moved toward image-right after a left turn"
                 if action.direction == "left"
@@ -1324,6 +1327,13 @@ class GeminiRuntime:
         self.latest_thought = thought
         self.latest_response = response
         self.latest_action = action
+        if (
+            action == "none"
+            and not response
+            and self._last_action_result
+            and not self._follow_up_attempted
+        ):
+            self._follow_up_sent_at_s = time.monotonic()
         if response and action == "none" and not self._last_action_result:
             self._last_action_result = (
                 "No physical tool was called; the previous response did not move "
@@ -1450,15 +1460,6 @@ def _tools():
             },
         },
         {
-            "name": "ack",
-            "description": (
-                "Acknowledge the newest image and telemetry without moving or "
-                "speaking. Use this while waiting or when no safe action is clear."
-            ),
-            "behavior": "BLOCKING",
-            "parameters": {"type": "OBJECT", "properties": {}},
-        },
-        {
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position when the task is complete, "
@@ -1494,7 +1495,7 @@ def _system_instruction() -> str:
         "newest camera image, TOF distance, body velocity, heading, active action, "
         "dialogue, measured result, and prior calibration memory. Make physical "
         "decisions through the function interface: choose one of `move`, `turn`, "
-        "`hover`, `speak`, or `ack` for each decision. Use the interface directly "
+        "`hover`, or `speak` for each decision. Use the interface directly "
         "rather than an ordinary text response. Keep the user's situation or request "
         "active until it is complete or changed. For a concrete request, seeing a "
         "target is not completion: keep moving toward it when safe, verify the new "
@@ -1507,7 +1508,7 @@ def _system_instruction() -> str:
         "image and measured result after every physical action. In an active situation, "
         "make deliberate progress when the current view supports it; turn to inspect, "
         "move through clear space, and hover when the scene is unclear or unsafe. Use "
-        "ack only when no safe physical step is genuinely clear. Trust current image and "
+        "hover when no safe physical step is genuinely clear. Trust current image and "
         "telemetry over memory.\n\n"
         "Move and turn are blocking physical actions. Wait for their measured result "
         "before choosing another movement. The result includes heading, telemetry, and "

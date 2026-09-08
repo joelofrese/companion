@@ -45,8 +45,8 @@ merge and delete it.
 - Prefer small visual corrections and smooth translation/yaw arcs; infer turn
   amounts from the current image and measured heading instead of asking the
   user to provide them.
-- After two consecutive turns without a translation, turn is unavailable until
-  a move completes.
+- A half-turn in place may scan the scene; translation resets the scan before
+  more turning.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
   streaming while one move or turn completes; its measured result and fresh
   telemetry arrive before the next movement, and a newer camera frame is
