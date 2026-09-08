@@ -1356,8 +1356,10 @@ def _tools():
             "description": (
                 "Move slowly in the body frame for a short duration. Forward is "
                 "positive and right is positive. Use a clear path and valid range "
-                "reading. A small yaw rate can make a smooth arc. Inspect the next "
-                "image and the measured result after the move."
+                "reading. When a visible subject is off-center and the path is clear, "
+                "a small lateral velocity and yaw rate can make a smooth arc while "
+                "keeping it in view. Inspect the next image and measured result after "
+                "the move."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1412,8 +1414,11 @@ def _tools():
                 "Turn in place slowly by a measured relative angle. Choose the "
                 "direction from the newest image and heading: image-left means left "
                 "and image-right means right. Omit the angle for the normal "
-                f"{DEFAULT_TURN_DEG:.0f}-degree correction. Inspect the next image "
-                "and measured heading before choosing another movement."
+                f"{DEFAULT_TURN_DEG:.0f}-degree correction; infer the needed correction "
+                "yourself rather than asking the user for an exact angle. Use a "
+                "larger angle only when the current view genuinely needs broad "
+                "reorientation. Inspect the next image and measured heading before "
+                "choosing another movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1508,9 +1513,13 @@ def _system_instruction() -> str:
         "before choosing another movement. The result includes heading, telemetry, and "
         "whether movement is available. Treat a requested duration or angle as intent, "
         "not proof of the outcome; use the observed translation and heading change to "
-        "calibrate the next action. Do not narrate a plan instead of acting. Speak "
-        "after a real observation or event, not as a substitute for a safe movement. "
-        "The CM5 limits every physical command."
+        "calibrate the next action. Operate like a closed-loop pilot: choose a small "
+        "correction from the current view, compare the measured result, and correct "
+        "again when needed. The user should not need to supply a turn angle. If a "
+        "visible subject is off-center but the path is clear, prefer a slow arc with "
+        "small translation and yaw over a large in-place turn, then reobserve. Do not "
+        "narrate a plan instead of acting. Speak after a real observation or event, "
+        "not as a substitute for a safe movement. The CM5 limits every physical command."
     )
 
 

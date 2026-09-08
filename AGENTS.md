@@ -42,6 +42,9 @@ merge and delete it.
 - A move may include a small yaw rate for a smooth arc; `turn` remains the
   in-place reorientation action and can request a measured broad turn up to
   90 degrees.
+- Prefer small visual corrections and smooth translation/yaw arcs; infer turn
+  amounts from the current image and measured heading instead of asking the
+  user to provide them.
 - After two consecutive turns without a translation, turn is unavailable until
   a move completes.
 - Gemini's physical tools use its blocking robotics contract. Camera frames keep
