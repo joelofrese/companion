@@ -34,6 +34,7 @@ MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
+MAX_VERTICAL_SPEED_M_S = 0.20
 # The model asks for a relative angle; the runtime stops from measured heading.
 MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 45.0
@@ -69,12 +70,14 @@ class ActiveAction:
     last_heading_rad: Optional[float] = None
     forward_m_s: float = 0.0
     right_m_s: float = 0.0
+    down_m_s: float = 0.0
     yaw_rate_deg_s: float = 0.0
     last_update_s: Optional[float] = None
     last_sample_s: Optional[float] = None
     blocked_since_s: Optional[float] = None
     observed_forward_m: float = 0.0
     observed_right_m: float = 0.0
+    observed_down_m: float = 0.0
 
 
 class GeminiRuntime:
@@ -221,6 +224,7 @@ class GeminiRuntime:
                 return VelocityCommand(
                     forward_m_s=action.forward_m_s,
                     right_m_s=action.right_m_s,
+                    down_m_s=action.down_m_s,
                     yaw_rate_deg_s=action.yaw_rate_deg_s,
                 )
             return VelocityCommand()
@@ -754,6 +758,14 @@ class GeminiRuntime:
         right_m_s = _number_between(
             args, "right_m_s", -MAX_RIGHT_SPEED_M_S, MAX_RIGHT_SPEED_M_S
         )
+        up_m_s = 0.0
+        if "up_m_s" in args:
+            up_m_s = _number_between(
+                args,
+                "up_m_s",
+                -MAX_VERTICAL_SPEED_M_S,
+                MAX_VERTICAL_SPEED_M_S,
+            )
         duration_s = _number_between(args, "duration_s", MIN_MOVE_S, MAX_MOVE_S)
         yaw_rate_deg_s = 0.0
         if "yaw_rate_deg_s" in args:
@@ -766,6 +778,7 @@ class GeminiRuntime:
         if (
             forward_m_s is None
             or right_m_s is None
+            or up_m_s is None
             or duration_s is None
             or yaw_rate_deg_s is None
         ):
@@ -776,15 +789,17 @@ class GeminiRuntime:
                     f"{MAX_FORWARD_SPEED_M_S} to {MAX_FORWARD_SPEED_M_S}; "
                     "right_m_s must be "
                     f"-{MAX_RIGHT_SPEED_M_S} to {MAX_RIGHT_SPEED_M_S}; "
+                    "up_m_s must be "
+                    f"-{MAX_VERTICAL_SPEED_M_S} to {MAX_VERTICAL_SPEED_M_S}; "
                     "yaw_rate_deg_s must be "
                     f"-{TURN_RATE_DEG_S} to {TURN_RATE_DEG_S}; "
                     f"duration_s must be {MIN_MOVE_S} to {MAX_MOVE_S}"
                 ),
             }
-        if forward_m_s == 0.0 and right_m_s == 0.0:
+        if forward_m_s == 0.0 and right_m_s == 0.0 and up_m_s == 0.0:
             return {
                 "status": "rejected",
-                "reason": "at least one body-frame velocity must be non-zero",
+                "reason": "at least one body-frame translation must be non-zero",
             }
         busy = self._busy_response()
         if busy is not None:
@@ -795,7 +810,7 @@ class GeminiRuntime:
         now = time.monotonic()
         action = ActiveAction(
             "move",
-            _move_direction(forward_m_s, right_m_s),
+            _move_direction(forward_m_s, right_m_s, -up_m_s),
             duration_s,
             now + duration_s,
             start_heading_rad=(
@@ -806,6 +821,7 @@ class GeminiRuntime:
             start_position_ned=_position_ned(self._telemetry),
             forward_m_s=forward_m_s,
             right_m_s=right_m_s,
+            down_m_s=-up_m_s,
             yaw_rate_deg_s=yaw_rate_deg_s,
             last_update_s=now,
             last_sample_s=now,
@@ -934,9 +950,11 @@ class GeminiRuntime:
             "requested translation "
             f"forward={action.forward_m_s * action.duration_s:+.2f}m "
             f"right={action.right_m_s * action.duration_s:+.2f}m; "
+            f"up={-action.down_m_s * action.duration_s:+.2f}m; "
             "observed translation "
             f"forward={action.observed_forward_m:+.2f}m "
-            f"right={action.observed_right_m:+.2f}m"
+            f"right={action.observed_right_m:+.2f}m "
+            f"up={-action.observed_down_m:+.2f}m"
         )
 
     def _position_delta(self, action: ActiveAction):
@@ -975,6 +993,8 @@ class GeminiRuntime:
             )
             if action.yaw_rate_deg_s:
                 label += f" yaw={action.yaw_rate_deg_s:+.1f}deg/s"
+            if action.down_m_s:
+                label += f" up={-action.down_m_s:+.2f}m/s"
             return label
         return f"turn {action.direction} {_turn_angle_deg(action):.0f}deg"
 
@@ -1089,6 +1109,8 @@ class GeminiRuntime:
                 )
             if _finite(self._telemetry.right_velocity_m_s):
                 action.observed_right_m += self._telemetry.right_velocity_m_s * elapsed
+            if _finite(self._telemetry.down_velocity_m_s):
+                action.observed_down_m += self._telemetry.down_velocity_m_s * elapsed
         action.last_sample_s = now
 
     def _pause_action_if_blocked(self, action: ActiveAction, now: float):
@@ -1248,11 +1270,14 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short duration. Forward is "
-                "positive and right is positive. Use a clear path and valid range "
+                "positive, right is positive, and up is positive. Use a clear path "
+                "and valid range "
                 "reading. The range sensor looks forward only: when forward is blocked, "
                 "use a visible side opening instead of repeatedly turning or pressing "
-                "forward. Combine lateral velocity and yaw rate for a smooth arc when "
-                "useful. Inspect the next image and measured result after the move."
+                "forward. Use vertical velocity only for a small visually clear "
+                "adjustment, never as an altitude target. Combine lateral velocity "
+                "and yaw rate for a smooth arc when useful. Inspect the next image "
+                "and measured result after the move."
             ),
             "behavior": "NON_BLOCKING",
             "parameters": {
@@ -1277,6 +1302,16 @@ def _tools():
                         ),
                         "minimum": -MAX_RIGHT_SPEED_M_S,
                         "maximum": MAX_RIGHT_SPEED_M_S,
+                    },
+                    "up_m_s": {
+                        "type": "NUMBER",
+                        "description": (
+                            "Vertical body velocity; positive is up and negative is "
+                            f"down, from -{MAX_VERTICAL_SPEED_M_S} through "
+                            f"{MAX_VERTICAL_SPEED_M_S} m/s."
+                        ),
+                        "minimum": -MAX_VERTICAL_SPEED_M_S,
+                        "maximum": MAX_VERTICAL_SPEED_M_S,
                     },
                     "duration_s": {
                         "type": "NUMBER",
@@ -1382,6 +1417,8 @@ def _system_instruction() -> str:
         "valid TOF data, and a clear path. When forward is blocked, choose a visible "
         "side opening and translate through it; do not repeatedly turn in place or "
         "press forward into the obstacle. "
+        "Body-frame up is positive and down is negative; use vertical velocity only "
+        "for a short visually clear adjustment, never as an altitude target. "
         "A turn changes the view but not the vehicle's position. If a requested target "
         "is not visible after turning, change position through a visible opening before "
         "concluding it is absent. "
@@ -1522,14 +1559,16 @@ def _number_between(args: dict, name: str, minimum: float, maximum: float):
     return float(value)
 
 
-def _move_direction(forward_m_s: float, right_m_s: float) -> str:
+def _move_direction(forward_m_s: float, right_m_s: float, down_m_s: float) -> str:
     """Give a movement a compact label for trace output."""
 
     if forward_m_s and right_m_s:
         return "move"
     if forward_m_s:
         return "forward" if forward_m_s > 0.0 else "backward"
-    return "left" if right_m_s < 0.0 else "right"
+    if right_m_s:
+        return "left" if right_m_s < 0.0 else "right"
+    return "down" if down_m_s > 0.0 else "up"
 
 
 def _obstacle_is_clear(distance_m: Optional[float]) -> bool:

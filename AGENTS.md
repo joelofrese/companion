@@ -38,8 +38,9 @@ merge and delete it.
   unsafe. Explore generally only when there is no more specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.
-- `move` is a short, slow body-frame pulse. It may include a small yaw rate
-  for a smooth arc. `turn` accepts a relative angle and settles from heading.
+- `move` is a short, slow body-frame pulse. It may include vertical velocity or
+  a small yaw rate for a smooth arc. `turn` accepts a relative angle and settles
+  from heading.
 - Physical move and turn calls complete with measured motion, heading, fresh
   telemetry, and a newer camera frame before another movement is chosen. Move
   results also report measured local-position change. Hover may interrupt an
@@ -56,8 +57,9 @@ merge and delete it.
   rejects unsafe commands, protects against obstacles, and is the final
   vehicle-side authority. PX4 stabilizes the vehicle and controls the motors.
 
-The brain sends only slow body-frame translation and yaw-rate commands. It
-never sends motor, attitude, altitude, or absolute-position commands.
+The brain sends only slow body-frame translation and yaw-rate commands. Vertical
+translation is a velocity pulse, never an altitude command. It never sends
+motor, attitude, or absolute-position commands.
 
 ## Hardware
 
