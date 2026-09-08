@@ -551,7 +551,7 @@ class GeminiRuntime:
             if not self._speech_blocked
             else (
                 "complete for the current dialogue; do not call speak again; "
-                "choose move, turn, hover, or ack"
+                "choose move, turn, or hover"
             )
         )
         action_state = self._action_state_text()
@@ -579,9 +579,9 @@ class GeminiRuntime:
         else:
             heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
-            f"[HEARTBEAT] {heartbeat} Call one tool directly: move, turn, hover, "
-            "speak, or ack. Use ack when no physical action is needed yet; if no "
-            "safe action is clear, call hover."
+            f"[HEARTBEAT] {heartbeat} Call move, turn, hover, or speak when useful. "
+            "If nothing needs to change, wait for the next image or dialogue; do not "
+            "invent movement."
         )
         return "\n".join(parts)
 
@@ -730,14 +730,6 @@ class GeminiRuntime:
             result = await self._move(args)
         elif name == "turn":
             result = await self._turn(args)
-        elif name == "ack":
-            self._record_action("ack")
-            self.action_count += 1
-            result = {
-                "status": "acknowledged",
-                "reason": "no physical action is needed yet; continue observing",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         elif name == "hover":
             if (
                 self._active_action is None
@@ -777,7 +769,7 @@ class GeminiRuntime:
                     "status": "already_spoken",
                     "reason": (
                         "a response was already spoken for this dialogue; do not "
-                        "call speak again. Choose move, turn, hover, or ack. "
+                        "call speak again. Choose move, turn, or hover. "
                         "Speech becomes available after new dialogue or a completed "
                         "physical action"
                     ),
@@ -1437,15 +1429,6 @@ def _tools():
             "parameters": {"type": "OBJECT", "properties": {}},
         },
         {
-            "name": "ack",
-            "description": (
-                "Acknowledge the newest image and telemetry when no physical action "
-                "is needed yet. Keep observing and wait for a useful change instead "
-                "of inventing movement."
-            ),
-            "parameters": {"type": "OBJECT", "properties": {}},
-        },
-        {
             "name": "speak",
             "description": (
                 "Say one short message when the user asks or a meaningful new event "
@@ -1471,7 +1454,7 @@ def _system_instruction() -> str:
         "You are the high-level brain of an indoor DEXI 3 companion drone. Use the "
         "newest camera image, TOF distance, body velocity, heading, active action, "
         "dialogue, memory, and measured results to pursue the current situation. "
-        "Choose tools directly: `move`, `turn`, `hover`, `speak`, or `ack`.\n\n"
+        "Choose tools directly: `move`, `turn`, `hover`, or `speak`.\n\n"
         "The camera faces forward. Image-left is vehicle-left and image-right is "
         "vehicle-right. Move only with fresh vision, valid TOF data, and a clear path. "
         "Use short, slow body-frame pulses and relative turns. Choose the next pulse "

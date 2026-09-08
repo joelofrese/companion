@@ -34,8 +34,8 @@ merge and delete it.
 - One Gemini ER 2 Streaming session starts with one situation prompt and keeps
   deciding from the newest image, dialogue, telemetry, memory, and action
   results.
-- Gemini chooses direct `move`, `turn`, `hover`, `speak`, or `ack` tools. Text
-  or JSON action descriptions never move the vehicle.
+- Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
+  action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include a small yaw rate
   for a smooth arc. `turn` accepts a relative angle and settles from heading.
 - Physical move and turn calls complete with measured motion, heading, fresh
@@ -144,7 +144,7 @@ editable memory file contains only prior experience across runs. The newest
   path, faults, recovery, safety, landing, and disarm.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
-- ER 2 chooses movement, turn, hover, speech, and acknowledgement tools.
+- ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls report measured completion and heading.
 - Minimal native ER 2 thinking currently gives the most timely simulation
   decisions observed so far; latency and visual decisions remain variable.
