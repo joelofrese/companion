@@ -732,24 +732,10 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "hover":
-            if (
-                self._active_action is None
-                and not self._stop_requested
-            ):
+            if self._active_action is None and not self._stop_requested:
                 result = {
                     "status": "already_hovering",
                     "reason": "the vehicle is already holding position",
-                    "telemetry": _telemetry_text(self._telemetry),
-                }
-            elif self._active_action is not None and not self._stop_requested:
-                result = {
-                    "status": "unavailable",
-                    "reason": (
-                        "the physical action is still running; hover can "
-                        "interrupt it only for an explicit stop request"
-                    ),
-                    "active_action": self._action_label(),
-                    "movement_tools": "unavailable until the action completes",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
             else:
@@ -1438,7 +1424,8 @@ def _tools():
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position when the task is complete, "
-                "while waiting, or when the scene is unclear."
+                "while waiting, when the scene is unclear, or when you want to "
+                "interrupt your current movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
