@@ -266,7 +266,8 @@ class GeminiRuntime:
             while not self._closed.is_set():
                 self._reconnect_requested = False
                 self._session = None
-                if self._session_handle is None:
+                resuming_session = self._session_handle is not None
+                if not resuming_session:
                     self._memory_sent = False
                     self._bootstrap_pending = True
                     self._dialogue_in_flight = None
@@ -296,6 +297,10 @@ class GeminiRuntime:
                         config=config,
                     ) as session:
                         self._session = session
+                        if resuming_session:
+                            # The resumable context already contains the user
+                            # message sent before the previous connection ended.
+                            self._discard_resumed_dialogue()
                         self._last_frame_sent_at_s = None
                         connected = True
                         self._ready.set()
@@ -377,7 +382,7 @@ class GeminiRuntime:
                                 return_exceptions=True,
                             )
                             self._last_model_activity_s = None
-                        if self._dialogue_in_flight is not None:
+                        if self._session_handle is None:
                             self._dialogue_in_flight = None
                             self._dialogue_send_complete = False
                         self._session = None
@@ -679,6 +684,16 @@ class GeminiRuntime:
         if self._dialogue and self._dialogue[0] == self._dialogue_in_flight:
             self._dialogue.popleft()
             self.dialogue_count += 1
+        self._dialogue_in_flight = None
+        self._dialogue_send_complete = False
+
+    def _discard_resumed_dialogue(self):
+        """Forget a message already held by a resumed Gemini session."""
+
+        if not self._dialogue_send_complete or not self._dialogue_in_flight:
+            return
+        if self._dialogue and self._dialogue[0] == self._dialogue_in_flight:
+            self._dialogue.popleft()
         self._dialogue_in_flight = None
         self._dialogue_send_complete = False
 
