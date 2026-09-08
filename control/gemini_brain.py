@@ -1470,13 +1470,18 @@ The camera faces forward. Image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
 valid TOF, and valid telemetry. Never move forward into a blocked path. If a
 nearby obstacle hides a target, sidestep through a visible opening before
-turning to search; turning changes the view but does not move around an obstacle.
+turning to search; if a large nearby object fills the view, move toward a
+visible edge before turning again. Turning changes the view but does not move
+around an obstacle.
 Use short, slow body-frame pulses. Body-frame up is positive and down is
 negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for
 a normal {DEFAULT_TURN_DEG:.0f}-degree correction. Use a larger angle only when
 a visible target or clear route calls for it, not just to scan. Do not call
 `turn` twice in succession unless the newest image gives a specific reason.
+If a visual search is not resolving after a turn, prefer a small clear
+translation to change viewpoint before turning again; do not spend the task
+rotating in place.
 After every move or turn,
 inspect the new image, heading, position, and measured result before choosing
 the next physical action. When no safe useful change is clear, hover or wait;
