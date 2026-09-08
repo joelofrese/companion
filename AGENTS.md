@@ -41,18 +41,19 @@ merge and delete it.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
   a small yaw rate for a smooth arc. `turn` accepts a relative angle and settles
   from heading.
-- Physical move and turn calls complete with measured motion, heading, fresh
-  telemetry, and a newer camera frame before another movement is chosen. Move
-  results also report measured local-position change. Hover may interrupt an
-  action for an explicit stop.
+- Physical move and turn calls are blocking in the ER 2 robotics session. The
+  runtime returns measured motion, heading, fresh telemetry, and a newer camera
+  frame before another movement is chosen. Move results also report measured
+  local-position change. An explicit stop may interrupt an action.
 - Choose each pulse from the newest image and measured state. Use a short
   visual correction, inspect again, and avoid repeated turning without useful
   progress. The forward-only TOF reading calls for a visible lateral detour
   when the path is blocked. Change position before declaring a requested target
   absent.
-- Camera frames stream once per second. Heartbeats normally wait for the
-  current model or physical action; dialogue may interrupt, and a bounded
-  timeout restarts a stalled session.
+- Camera frames stream once per second. Heartbeats continue sending frames while
+  a physical action runs, but the blocking tool keeps ER 2 from choosing another
+  action until its result returns. Dialogue waits for that result unless it is an
+  explicit stop; a bounded timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
   rejects unsafe commands, stops positive forward motion at a close obstacle,
   and is the final vehicle-side authority. PX4 stabilizes the vehicle and
@@ -128,7 +129,7 @@ an approximation of DEXI 3's forward TOF sensor.
 
 The image scenario verifies RTP transport through the deterministic fixture;
 Gazebo camera explorations verify live visual behavior through Gemini. No local
-VLM or detector fallback remains.
+visual decision model remains beside Gemini.
 
 ## Running on hardware
 
@@ -154,7 +155,7 @@ recent measured actions are retained when a fresh session is needed.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
   decisions, dialogue, memory, movement, and simulated TOF safety.
 - ER 2 chooses movement, turn, hover, or speech tools.
-  Physical move and turn calls report measured completion and heading; move
+  Physical move and turn calls block until measured completion and heading; move
   results compare requested and observed translation and report local-position
   change for calibration.
 - Low native ER 2 thinking currently balances response time and visual reasoning;

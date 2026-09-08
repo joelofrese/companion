@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO
 import math
 import os
@@ -80,6 +80,8 @@ class ActiveAction:
     observed_forward_m: float = 0.0
     observed_right_m: float = 0.0
     observed_down_m: float = 0.0
+    completion: Optional[dict] = None
+    done: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 class GeminiRuntime:
@@ -477,10 +479,15 @@ class GeminiRuntime:
 
         await self._send_frame(session, types)
         # Keep frames continuous, but let the current model or blocking tool
-        # cycle finish. State text is a new user turn and interrupts reasoning;
-        # dialogue is the one intentional exception.
+        # cycle finish. State text interrupts reasoning; dialogue may interrupt
+        # ordinary model output but waits while a physical tool owns the turn.
         if self._response_in_flight:
-            if self._dialogue and self._dialogue_in_flight is None:
+            if (
+                self._active_action is None
+                and self._dialogue
+                and self._dialogue_in_flight is None
+            ):
+                # A blocking robotics tool owns the model turn until it returns.
                 action_result = self._last_action_result
                 await self._send_dialogue(session, self._dialogue[0])
                 if action_result and self._last_action_result == action_result:
@@ -514,7 +521,7 @@ class GeminiRuntime:
             self._bootstrap_pending = False
 
     async def _send_dialogue(self, session, dialogue: str):
-        """Send user dialogue even when a model response is still running."""
+        """Send one queued dialogue message into the live session."""
 
         self._dialogue_in_flight = dialogue
         self._dialogue_send_complete = False
@@ -851,7 +858,7 @@ class GeminiRuntime:
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
-        return self._started_action_response(action)
+        return await self._wait_for_action(action)
 
     async def _turn(self, args: dict) -> dict:
         direction = str(args.get("direction", "")).strip().lower()
@@ -899,27 +906,17 @@ class GeminiRuntime:
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
-        return self._started_action_response(action)
+        return await self._wait_for_action(action)
 
-    def _started_action_response(self, action: ActiveAction) -> dict:
-        """Tell Gemini that a physical action started without waiting for it."""
+    async def _wait_for_action(self, action: ActiveAction) -> dict:
+        """Return the measured result required by a blocking robotics tool."""
 
-        response = {
-            "status": "started",
+        await action.done.wait()
+        return action.completion or {
+            "status": "cancelled",
             "action": self._action_label(action),
-            "heading_deg": _heading_value(self._telemetry.heading_rad),
-            "telemetry": _telemetry_text(self._telemetry),
-            "scheduling": "INTERRUPT",
-            "movement_tools": (
-                "unavailable until this action completes and a fresh camera frame arrives"
-            ),
+            "reason": "the action ended without a result",
         }
-        if action.kind == "turn":
-            response.update(
-                requested_angle_deg=_turn_angle_deg(action),
-                target_heading_deg=_target_heading_value(action),
-            )
-        return response
 
     def _busy_response(self):
         self._refresh_action()
@@ -1213,7 +1210,20 @@ class GeminiRuntime:
             status,
             actual_heading_deg=actual_heading_deg,
         )
+        action.completion = {
+            "status": status,
+            "action": label,
+            "result": result,
+            "telemetry": _telemetry_text(self._telemetry),
+        }
+        if action.kind == "turn":
+            action.completion.update(
+                requested_angle_deg=_turn_angle_deg(action),
+                target_heading_deg=_target_heading_value(action),
+                final_heading_deg=_heading_value(self._telemetry.heading_rad),
+            )
         self._save_action_result(result)
+        action.done.set()
         return label
 
     def _format_action_result(
@@ -1309,7 +1319,7 @@ def _tools():
                 "and yaw rate for a smooth arc when useful. Inspect the next image "
                 "and measured result after the move."
             ),
-            "behavior": "NON_BLOCKING",
+            "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -1374,9 +1384,11 @@ def _tools():
                 "means right. Choose a relative angle; the controller uses "
                 "measured heading to stop there. Inspect the new image and heading "
                 "before choosing another correction. Use move with a yaw rate when "
-                "translating and turning together would make a smoother arc."
+                "translating and turning together would make a smoother arc. During "
+                "open exploration, prefer a short clear translation or hover after "
+                "one view-changing turn instead of chaining in-place turns."
             ),
-            "behavior": "NON_BLOCKING",
+            "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -1479,12 +1491,14 @@ def _system_instruction() -> str:
         "After one turn at the same position, reassess. If the target is still absent "
         "or the view has not improved, do not repeat the same-direction scan; move "
         "through a clear lateral opening or hover. Hover when no safe useful step is "
-        "clear, or when stopping is genuinely needed.\n\n"
-        "Move and turn start non-blocking physical actions. Choose one physical movement "
-        "at a time; keep observing while it runs, then wait for its measured completion "
-        "and a newer camera frame before the next movement. A requested duration or angle "
-        "is intent, not proof. Do not ask the developer for exact timing. Speak after a "
-        "real observation, event, or user request. The CM5 limits every physical command."
+        "clear, or when stopping is genuinely needed. During open exploration, prefer "
+        "a short clear translation or hover after one view-changing turn; do not chain "
+        "in-place turns just to keep exploring.\n\n"
+        "Move and turn are blocking physical actions in this robotics session. The runtime "
+        "returns their measured completion before another movement is chosen; frames may "
+        "continue streaming while an action runs. A requested duration or angle is intent, "
+        "not proof. Do not ask the developer for exact timing. Speak after a real observation, "
+        "event, or user request. The CM5 limits every physical command."
     )
 
 
