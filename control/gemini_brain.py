@@ -21,8 +21,8 @@ DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 # Give the streaming model a fresh view often enough for short closed-loop moves.
 VIDEO_PERIOD_S = 1.0
-# Recover a silent decision before the drone waits too long to act.
-RESPONSE_TIMEOUT_S = 15.0
+# Allow a slow ER2 decision to finish before recovering a silent session.
+RESPONSE_TIMEOUT_S = 30.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
