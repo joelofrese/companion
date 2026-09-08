@@ -159,7 +159,7 @@ recent measured actions are retained when a fresh session is needed.
   Physical move and turn calls block until measured completion and heading; move
   results compare requested and observed translation and report local-position
   change for calibration.
-- Low native ER 2 thinking currently balances response time and visual reasoning;
+- Minimal native ER 2 thinking currently balances response time and visual reasoning;
   latency and visual decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
   behavior remains unverified. DEXI 3 has no lidar.
