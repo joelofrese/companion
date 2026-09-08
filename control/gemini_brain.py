@@ -110,6 +110,7 @@ class GeminiRuntime:
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
+        self._recent_action_results = deque(maxlen=3)
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
@@ -539,6 +540,13 @@ class GeminiRuntime:
         parts = []
         if self._bootstrap_pending:
             parts.append(f"[START] Situation: {self.situation}")
+            if self._recent_action_results:
+                parts.append(
+                    "[RECENT ACTIONS] These measured actions happened before this "
+                    "session. Use them as context with the current image and state; "
+                    "do not repeat a scan without a new reason:\n"
+                    + "\n".join(self._recent_action_results)
+                )
         camera = (
             "fresh"
             if self._has_fresh_frame()
@@ -1194,6 +1202,7 @@ class GeminiRuntime:
         if position_delta is not None:
             result += f"; {self._position_text(position_delta)}"
         self._last_action_result = result
+        self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
         if action.kind in ("move", "turn"):
             self._speech_blocked = False
@@ -1222,6 +1231,7 @@ class GeminiRuntime:
             if position_delta is not None:
                 result += f"; {self._position_text(position_delta)}"
         self._last_action_result = result
+        self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
         self._record_action(result)
