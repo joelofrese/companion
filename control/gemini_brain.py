@@ -23,15 +23,9 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "minimal"
 # ER 2 Streaming accepts at most one JPEG per second.
 VIDEO_PERIOD_S = 1.0
-# ER 2 can take tens of seconds to make a first decision. Keep a bounded
-# timeout without treating that normal latency as a failed session.
-INITIAL_RESPONSE_TIMEOUT_S = 60.0
-# Dialogue can start a fresh thought after flight is already underway. Give it
-# the same time as the initial thought instead of dropping a slow reply.
-DIALOGUE_RESPONSE_TIMEOUT_S = 60.0
-# Reconnect a quiet post-start response quickly so text-only output does not
-# consume most of a short flight.
-RESPONSE_TIMEOUT_S = 8.0
+# Give every ER 2 turn enough time for slow reasoning. The vehicle hovers while
+# a turn is quiet; connection errors still reconnect immediately.
+RESPONSE_TIMEOUT_S = 60.0
 # Give a completed action a short chance to produce its next turn before one
 # recovery heartbeat interrupts a quiet turn.
 IDLE_NUDGE_DELAY_S = 2.0
@@ -379,7 +373,7 @@ class GeminiRuntime:
                                             or response_started_s
                                         )
                                         > (
-                                            self._response_timeout_s()
+                                            RESPONSE_TIMEOUT_S
                                         )
                                     )
                                 ):
@@ -664,17 +658,6 @@ class GeminiRuntime:
         return (
             self._latest_frame_at_s is not None
             and time.monotonic() - self._latest_frame_at_s <= MAX_FRAME_AGE_S
-        )
-
-    def _response_timeout_s(self) -> float:
-        """Allow slow initial and dialogue thoughts to finish."""
-
-        if self._dialogue_in_flight is not None:
-            return DIALOGUE_RESPONSE_TIMEOUT_S
-        return (
-            INITIAL_RESPONSE_TIMEOUT_S
-            if self.action_count == 0
-            else RESPONSE_TIMEOUT_S
         )
 
     async def _receive(self, session, types, response_started_s):
