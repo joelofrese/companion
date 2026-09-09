@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+import subprocess
 import time
 
 from mavsdk.telemetry import FlightMode
@@ -224,4 +225,12 @@ async def wait_for_offboard(drone):
 def close_mavsdk(drone):
     """Stop the MAVSDK helper started by the Python binding."""
 
+    process = getattr(drone, "_server_process", None)
     drone._stop_mavsdk_server()
+    if process is None:
+        return
+    try:
+        process.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
