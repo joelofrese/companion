@@ -344,8 +344,8 @@ async def run(
         def brain_telemetry():
             nonlocal velocity_telemetry_seen, position_telemetry_seen
             telemetry = sender.telemetry()
-            if any(
-                value is not None
+            if all(
+                value is not None and math.isfinite(value)
                 for value in (
                     telemetry.forward_velocity_m_s,
                     telemetry.right_velocity_m_s,
