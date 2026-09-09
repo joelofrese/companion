@@ -497,39 +497,14 @@ class GeminiRuntime:
         if self._request_complete and not self._dialogue:
             return
         # Let a fresh state interrupt an ordinary turn after physical movement
-        # finishes, but never interrupt the physical tool itself.
+        # finishes, but let queued dialogue wait for that turn to end. This
+        # prevents an old model turn from acting on a newer request.
         if self._response_in_flight:
-            if self._active_action is not None:
-                return
-            if self._dialogue_in_flight is not None:
-                if not self._last_action_result:
-                    return
-                if (
-                    self._heartbeat_nudge_sent
-                    or self._last_model_activity_s is None
-                    or time.monotonic() - self._last_model_activity_s
-                    < IDLE_NUDGE_DELAY_S
-                ):
-                    return
-                self._heartbeat_nudge_sent = True
-                async with self._send_lock:
-                    try:
-                        await session.send_realtime_input(
-                            text=self._heartbeat_text("")
-                        )
-                    except Exception:
-                        self._heartbeat_nudge_sent = False
-                        raise
-                return
-            if self._dialogue:
-                action_result = self._last_action_result
-                await self._send_dialogue(session, self._dialogue[0])
-                if action_result and self._last_action_result == action_result:
-                    self._last_action_result = ""
-                if not self._memory_sent:
-                    self._memory_sent = True
-                if self._bootstrap_pending:
-                    self._bootstrap_pending = False
+            if (
+                self._active_action is not None
+                or self._dialogue_in_flight is not None
+                or self._dialogue
+            ):
                 return
             if (
                 self._heartbeat_nudge_sent
@@ -807,17 +782,30 @@ class GeminiRuntime:
 
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "ack":
-            self._record_action("ack")
-            result = {
-                "status": "acknowledged",
-                "reason": "the current image and state were inspected; hold position",
-                "task": (
-                    "complete; wait for new dialogue"
-                    if self._request_complete
-                    else "active; reassess on the next fresh frame"
-                ),
-                "telemetry": _telemetry_text(self._telemetry),
-            }
+            if self._dialogue and self._dialogue_in_flight is None:
+                result = {
+                    "status": "unavailable",
+                    "reason": (
+                        "new dialogue is waiting to be processed; wait for the "
+                        "next active turn"
+                    ),
+                }
+            elif self._request_complete:
+                result = {
+                    "status": "unavailable",
+                    "reason": (
+                        "the specific request is complete; wait for new dialogue "
+                        "and do not call another tool"
+                    ),
+                }
+            else:
+                self._record_action("ack")
+                result = {
+                    "status": "acknowledged",
+                    "reason": "the current image and state were inspected; hold position",
+                    "task": "active; reassess on the next fresh frame",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
         elif name == "move":
             result = await self._move(args)
         elif name == "turn":
@@ -882,7 +870,7 @@ class GeminiRuntime:
                 "status": "rejected",
                 "reason": "complete must be true or false when provided",
             }
-        busy = self._busy_response() if self._active_action is not None else None
+        busy = self._busy_response()
         if busy is not None:
             return busy
         if not self._stop_requested:
@@ -1085,6 +1073,16 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
+            if self._dialogue and self._dialogue_in_flight is None:
+                return {
+                    "status": "unavailable",
+                    "reason": (
+                        "new dialogue is waiting to be processed; hold position "
+                        "until it becomes the active turn"
+                    ),
+                    "movement_tools": "unavailable until the new dialogue is processed",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
             if self._request_complete:
                 return {
                     "status": "unavailable",
@@ -1528,8 +1526,8 @@ def _tools():
             "description": (
                 "Acknowledge that the newest image and telemetry were inspected "
                 "and hold position. Use this when no safe useful movement or "
-                "speech is needed yet; it keeps the active task open and asks the "
-                "next heartbeat to reassess. This does not complete any task."
+                "speech is needed yet; it keeps an active task open for the next "
+                "heartbeat. After a task is complete, wait for dialogue instead."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},

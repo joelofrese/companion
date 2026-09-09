@@ -72,12 +72,11 @@ merge and delete it.
   movement to change the viewpoint; use straight movement when the path is clear
   or the target is visible.
 - Camera frames stream once per second, including while a physical action runs.
-  Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
-  blocking tool keeps ER 2 from starting another move or turn until its result
-  returns. A post-action heartbeat can interrupt a quiet turn while keeping the
-  active request.
-  Dialogue waits for a physical result unless it is an explicit stop; a bounded
-  timeout restarts a stalled session.
+  Text starts a reasoning turn; a blocking tool keeps ER 2 from starting another
+  move or turn until its result returns. A post-action heartbeat can interrupt a
+  quiet turn while keeping the active request. Dialogue waits for the current
+  model turn or physical action to finish; an explicit stop cancels movement.
+  A bounded timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
   rejects unsafe commands, removes only positive forward motion at a close
   obstacle, and is the final vehicle-side authority. PX4 stabilizes the vehicle
