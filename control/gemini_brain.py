@@ -1574,6 +1574,10 @@ viewpoint instead of repeating turns. For visual alignment, make one small turn
 or translation, wait for its measured result and the next image, then reassess.
 Never stack turns or repeat a movement from an old view. If the direction is
 uncertain, start with a small turn and correct from the measured heading.
+When approaching a visible target, center it with one small turn if needed.
+Once it is centered and the forward path is clear, keep that heading and use
+short forward pulses. Recheck the image and range after every pulse; if the
+target leaves view, correct from the new image instead of accumulating turns.
 
 `move` and `turn` are blocking. Wait for their measured completion, fresh image,
 telemetry, heading, and position result before another physical movement. Use
