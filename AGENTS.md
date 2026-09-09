@@ -67,6 +67,11 @@ merge and delete it.
   heading and prefer a pure lateral move until its edge is visible.
   If a requested target is visible, keep it in view and approach or align with it
   before scanning elsewhere.
+  Prefer a small 10–20 degree correction when uncertain; use a larger turn only
+  when the current view clearly calls for a broad new view.
+  If a target is still unconfirmed after a turn, prefer lateral or diagonal
+  movement to change the viewpoint; use straight movement when the path is clear
+  or the target is visible.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
   blocking tool keeps ER 2 from starting another move or turn until its result
@@ -173,7 +178,9 @@ are retained when a fresh session is needed.
 - Deterministic PX4/Gazebo missions and local UDP loopback verify the command
   path, telemetry, faults, recovery, safety, landing, and disarm.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
-  decisions, dialogue, memory, movement, and simulated TOF safety.
+  decisions, dialogue, memory, movement, and simulated TOF safety. The objects
+  target task now uses small visual corrections and diagonal progress before
+  completing and landing.
 - ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or

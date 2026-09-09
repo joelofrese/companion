@@ -1509,8 +1509,11 @@ def _tools():
                 "vertical, or turning motion when the forward path is blocked. Use "
                 "yaw rate for a smooth arc when useful. Inspect the fresh image and "
                 "measured result before choosing another physical action. If a "
-                "centered obstruction hides a requested target, hold heading and "
-                "prefer a pure lateral pulse until its edge is visible."
+                "target is still unconfirmed after a turn, prefer a lateral or "
+                "diagonal pulse to change the viewpoint; use straight motion when "
+                "the path is clear or the target is visible. If a centered "
+                "obstruction hides a requested target, hold heading and prefer a "
+                "pure lateral pulse until its edge is visible."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1579,10 +1582,12 @@ def _tools():
             "description": (
                 "Apply a slow in-place yaw correction. Choose left or right from "
                 "the newest image and heading, then choose a relative angle. The "
-                "controller stops from measured heading. Inspect the new image and "
-                "heading before another physical action. Use move with yaw rate for "
-                "a smooth translating turn. Before another in-place turn, use a "
-                "measured translation to change the viewpoint."
+                "controller stops from measured heading. Prefer a small 10-20 degree "
+                "correction when uncertain. Use a larger turn only when the current "
+                "view clearly calls for a broad new view; do not repeat wide scans. "
+                "Inspect the new image and heading before another physical action. "
+                "Use move with yaw rate for a smooth translating turn. Before another "
+                "in-place turn, use a measured translation to change the viewpoint."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1695,7 +1700,12 @@ cannot reveal what is behind it. When a centered obstruction blocks the path,
 hold heading and prefer a pure lateral move until its edge is visible.
 If a requested target is visible, keep it in view and approach or align with it
 before scanning elsewhere.
-Choose a useful relative turn from the current view and measured heading. Inspect
+If a target is still unconfirmed after a turn, prefer lateral or diagonal movement
+to change the viewpoint; use straight movement when the path is clear or the target
+is visible.
+Choose a useful relative turn from the current view and measured heading. Prefer a
+small 10-20 degree correction when uncertain. Use a larger turn only when the
+current view clearly calls for a broad new view; do not repeat wide scans. Inspect
 the new view before another action. Before another in-place turn, use a measured
 translation to change the viewpoint. For follow or stay-with requests, act to
 keep a visible person in view rather than waiting or speaking readiness.
