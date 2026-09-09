@@ -41,7 +41,7 @@ MAX_RIGHT_SPEED_M_S = 0.20
 MAX_VERTICAL_SPEED_M_S = 0.20
 # The model asks for a relative angle; the runtime stops from measured heading.
 MIN_TURN_DEG = 5.0
-MAX_TURN_DEG = 90.0
+MAX_TURN_DEG = 30.0
 # A turn without an angle is a small controller-like correction.
 DEFAULT_TURN_DEG = 15.0
 # Keep the yaw rate slow while making one visual correction useful.
@@ -1582,9 +1582,9 @@ def _tools():
             "description": (
                 "Apply a slow in-place yaw correction. Choose left or right from "
                 "the newest image and heading, then choose a relative angle. The "
-                "controller stops from measured heading. Prefer a small 10-20 degree "
-                "correction when uncertain. Use a larger turn only when the current "
-                "view clearly calls for a broad new view; do not repeat wide scans. "
+                "controller stops from measured heading. For routine exploration "
+                "or uncertainty, use a small 10-20 degree turn. Use the maximum "
+                "only for a clear visual reason; do not repeat broad scans. "
                 "Inspect the new image and heading before another physical action. "
                 "Use move with yaw rate for a smooth translating turn. Before another "
                 "in-place turn, use a measured translation to change the viewpoint."
@@ -1704,9 +1704,9 @@ before scanning elsewhere.
 If a target is still unconfirmed after a turn, prefer lateral or diagonal movement
 to change the viewpoint; use straight movement when the path is clear or the target
 is visible.
-Choose a useful relative turn from the current view and measured heading. Prefer a
-small 10-20 degree correction when uncertain. Use a larger turn only when the
-current view clearly calls for a broad new view; do not repeat wide scans. Inspect
+Choose a useful relative turn from the current view and measured heading. For routine
+exploration or uncertainty, use a small 10-20 degree turn. Use the maximum only for
+a clear visual reason; do not repeat broad scans. Inspect
 the new view before another action. Before another in-place turn, use a measured
 translation to change the viewpoint. For follow or stay-with requests, act to
 keep a visible person in view rather than waiting or speaking readiness.
@@ -1716,8 +1716,9 @@ Move and turn are blocking physical actions. The runtime keeps sending frames
 while one runs, then returns measured completion, heading, position, telemetry,
 and a fresh frame before another movement is chosen. Requested duration and angle
 are intent, not proof. Use measured motion and heading to calibrate later
-pulses; if the vehicle moved less or more than expected, adjust instead of
-repeating the same command. When no safe useful change is clear, hover or wait.
+pulses. If another pulse has the same purpose, change its speed or duration
+when the measured displacement differed; repeat a pulse only when the newest
+image still calls for it. When no safe useful change is clear, hover or wait.
 Speak briefly for dialogue or a meaningful event, not for routine movement. The
 CM5 limits every command; never send motors, attitude, altitude, or
 absolute-position commands.""".strip()
