@@ -25,8 +25,8 @@ VIDEO_PERIOD_S = 1.0
 # ER 2 can take tens of seconds to make a first decision. Keep a bounded
 # timeout without treating that normal latency as a failed session.
 INITIAL_RESPONSE_TIMEOUT_S = 60.0
-# A connection error still reconnects immediately; silence gets this bound.
-RESPONSE_TIMEOUT_S = 90.0
+# Reconnect a quiet post-start response after this bounded wait.
+RESPONSE_TIMEOUT_S = 20.0
 # Give a completed action time to produce its next turn before one recovery
 # heartbeat interrupts a turn that may simply be slow.
 IDLE_NUDGE_DELAY_S = 10.0
@@ -56,8 +56,8 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
-# A ten-centimeter shift is enough to create a new viewpoint.
-MIN_TRANSLATION_RESET_M = 0.10
+# A small measured shift is enough to create a new viewpoint.
+MIN_TRANSLATION_RESET_M = 0.05
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -366,6 +366,10 @@ class GeminiRuntime:
                                 elif (
                                     response_started_s is not None
                                     and self._active_action is None
+                                    and not (
+                                        self._request_complete
+                                        and not self._dialogue
+                                    )
                                     and (
                                         time.monotonic()
                                         - (
@@ -652,8 +656,9 @@ class GeminiRuntime:
             f"[HEARTBEAT] {heartbeat} Call move, turn, hover, or speak when useful. "
             "If a user request is present, treat it as the active task until it is "
             "completed, changed, or unsafe; do not replace it with general exploration. "
-            "If nothing needs to change, wait for the next image or dialogue; do not "
-            "invent movement or repeat a completed answer."
+            "If nothing needs to change, wait for the next image or dialogue. During "
+            "open exploration, choose a small viewpoint change after the current view "
+            "has been inspected; do not invent movement or repeat a completed answer."
         )
         return "\n".join(parts)
 
@@ -1707,12 +1712,12 @@ cannot reveal what is behind it. When a centered obstruction blocks the path,
 hold heading and prefer a pure lateral move until its edge is visible.
 If a requested target is visible, keep it in view and approach or align with it
 before scanning elsewhere.
-Choose the smallest useful relative turn, usually 10-20 degrees. Use 30 degrees
-or more only for a clear reorientation, and inspect its new view before turning
-again; do not repeat wide scans. After an in-place turn, use a measured lateral or
-diagonal translation before moving straight or turning again; an ineffective move
-does not reset this rule. If a person is visible for a follow or stay-with
-request, act to keep them in view rather than waiting or speaking readiness.
+Choose the smallest useful relative turn, usually 10-20 degrees. Use a larger
+turn only when the new view clearly requires it, and inspect that view before
+turning again; do not repeat wide scans. After an in-place turn, use a measured
+lateral or diagonal translation before moving straight or turning again; an
+ineffective move does not reset this rule. For follow or stay-with requests, act
+to keep a visible person in view rather than waiting or speaking readiness.
 
 Action results:
 Move and turn are blocking physical actions. The runtime keeps sending frames

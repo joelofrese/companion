@@ -61,10 +61,10 @@ merge and delete it.
   remains unconfirmed, prefer a small lateral or diagonal move to change the
   viewpoint. If an obstruction still fills the view, continue measured lateral
   or diagonal movement before turning again. Choose the smallest useful turn,
-  usually 10–20 degrees. Use 30 degrees or more only for a clear reorientation,
-  and do not repeat wide scans. After an in-place turn, use a measured lateral or
-  diagonal translation before moving straight or turning again; an ineffective
-  move does not reset this rule.
+  usually 10–20 degrees. Use a larger turn only when the new view clearly
+  requires it, and do not repeat wide scans. After an in-place turn, use a
+  measured lateral or diagonal translation before moving straight or turning
+  again; an ineffective move does not reset this rule.
   If a requested target is hidden by an obstruction, translate until the
   obstruction no longer fills the relevant view; repeated in-place turns cannot
   reveal what is behind it. When a centered obstruction blocks the path, hold
