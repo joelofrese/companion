@@ -1524,10 +1524,9 @@ def _tools():
         {
             "name": "ack",
             "description": (
-                "Acknowledge that the newest image and telemetry were inspected "
-                "and hold position. Use this when no safe useful movement or "
-                "speech is needed yet; it keeps an active task open for the next "
-                "heartbeat. After a task is complete, wait for dialogue instead."
+                "Acknowledge the newest image and telemetry and hold position. "
+                "Use this when no safe useful action is needed yet; it keeps an "
+                "active task open. After a task is complete, wait for dialogue."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
@@ -1536,18 +1535,12 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short pulse. Forward, right, "
-                "and up are positive. Use fresh vision, valid telemetry, and a clear "
-                "path. The range sensor looks forward only, so use lateral, backward, "
-                "vertical, or turning motion when the forward path is blocked. Use "
-                "yaw rate for a smooth arc when useful. Inspect the fresh image and "
-                "measured result before choosing another physical action. If a "
-                "target is still unconfirmed after a turn, prefer a lateral or "
-                "diagonal pulse to change the viewpoint; use straight motion when "
-                "the path is clear or the target is visible. If a centered "
-                "obstruction hides a requested target, hold heading and prefer a "
-                "pure lateral pulse until its edge is visible. If the requested "
-                "outcome is visible or the target is near, stop and report it "
-                "instead of repeating forward motion."
+                "and up are positive. Choose the direction from the newest image "
+                "and telemetry. The range sensor looks forward only; do not move "
+                "forward when that path is blocked. Inspect the measured result "
+                "and a fresh image before another physical movement. A turn changes "
+                "the view but not position; if an obstruction hides a target, "
+                "translate to change the viewpoint instead of repeating turns."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1614,13 +1607,11 @@ def _tools():
         {
             "name": "turn",
             "description": (
-                "Apply a slow in-place yaw correction. Choose left or right from "
-                "the newest image and heading, then choose a relative angle. The "
-                "controller stops from measured heading. For routine exploration "
-                "or uncertainty, use a small 10-20 degree turn. Use the maximum "
-                "only for a clear visual reason; do not repeat broad scans. "
-                "Inspect the new image and heading before another physical action. "
-                "Use move with yaw rate for a smooth translating turn."
+                "Turn slowly in place relative to the current nose. Choose the "
+                "direction and relative angle from the newest image and heading. "
+                "The controller stops from measured heading. Inspect the new image "
+                "and measured result before another physical movement. Use move "
+                "with yaw rate for a smooth translating turn."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1653,10 +1644,10 @@ def _tools():
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position when waiting or when the "
-                "scene is unclear. Set complete=true only after a specific request's "
-                "physical outcome is observed. Otherwise this is only a pause: keep "
-                "the task active and reassess the next fresh frame. Let a normal move "
-                "or turn finish; interrupt one only for an explicit stop request."
+                "scene is unclear. Set complete=true only after a specific one-time "
+                "request's outcome is observed. Otherwise keep the task active. "
+                "Let a normal move or turn finish; interrupt one only for an "
+                "explicit stop request."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1665,12 +1656,9 @@ def _tools():
                     "complete": {
                         "type": "BOOLEAN",
                         "description": (
-                            "Set true only when the current specific user request "
-                            "is finished. Omit it or set false when pausing, "
-                            "waiting, or reassessing. Broad exploration, patrol, "
-                            "following, staying-with, watching, and searching are "
-                            "ongoing tasks; do not complete them after one local "
-                            "area or action."
+                            "Set true only when a specific one-time user request "
+                            "is finished. Omit it or set false when pausing or "
+                            "reassessing. Ongoing requests remain active."
                         ),
                     }
                 },
@@ -1679,13 +1667,11 @@ def _tools():
         {
             "name": "speak",
             "description": (
-                "Call this function to say one short user-facing message for a request "
-                "or meaningful new event; a text response is not spoken. Do not announce "
-                "planned movement instead of calling move or turn. Speech is not "
-                "completion for an ongoing task; keep acting and reassessing. Report a "
-                "physical outcome only after observing it. After a specific request is "
-                "complete, speak if useful and call hover with complete=true. Do not "
-                "narrate routine exploration."
+                "Call this function to say one short user-facing message; a text "
+                "response is not spoken. Speech does not complete an ongoing task. "
+                "Report physical outcomes only after observing them. After a "
+                "specific request is complete, speak if useful and call hover with "
+                "complete=true. Do not narrate routine movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1700,38 +1686,34 @@ def _tools():
 def _system_instruction() -> str:
     """State the control contract in plain language."""
 
-    return f"""You are the high-level brain of an indoor DEXI 3 companion drone.
+    return """You are the high-level brain of an indoor DEXI 3 companion drone.
 Use the newest camera image, forward TOF distance, velocity, local position,
 heading, current action, dialogue, memory, and measured results.
 
 Use only real function calls: `ack`, `move`, `turn`, `hover`, and `speak`.
-Never describe a tool call or answer as text. Only a real `speak` call is spoken.
+Never describe a tool call as text. Only a real `speak` call is spoken.
 
-Keep a user request active until its outcome is observed, changed, or unsafe.
-Exploring, following, watching, and searching continue after each action. Only
-finish a specific one-time request with `hover(complete=true)`. Without a
-request, explore. At startup, inspect the current view before moving.
+Keep each user request active until its outcome is observed, changed, or unsafe.
+Ongoing exploration, following, watching, and searching continue after each
+action. Finish a specific one-time request with `hover(complete=true)`. Without
+a request, explore. Inspect the current view before moving.
 
-The camera faces forward. Image-left and image-right are vehicle-left and
-vehicle-right. The TOF sensor looks forward only. Use fresh vision, valid
-telemetry, and measured heading; heading increases clockwise. If the image is
-unclear, do not invent an object or outcome.
+The camera faces forward. Image-left is negative right velocity and image-right
+is positive. Heading is measured in degrees and increases clockwise. The TOF
+sensor looks forward only. Use fresh vision, valid telemetry, and measured
+heading. If the image is unclear, do not invent an object or outcome.
 
 Move in short, slow body-frame pulses. Forward, right, and up are positive; up
-is only a brief adjustment, never an altitude target. Never move forward into
-a blocked path. Use lateral, backward, vertical, or turning motion as the view
-allows. A turn changes the view but does not move around an obstacle. Keep a
-visible target in view and align with it before moving toward it. If it is hidden
-by an obstruction, translate until the obstruction no longer fills the view.
-Use image-left as negative `right_m_s` and image-right as positive. Prefer a
-small 10-20 degree turn when uncertain, then inspect the new view.
+is only a brief adjustment. Never move forward when the forward path is blocked.
+Choose the direction from the newest image and state. A turn changes the view
+but not position; if an obstruction hides a target, translate to change the
+viewpoint instead of repeating turns.
 
 `move` and `turn` are blocking. Wait for their measured completion, fresh image,
-telemetry, heading, and position result before choosing another movement. Use
-the measured result to adjust a later pulse; a requested duration or angle is
-not proof of what happened. Use `hover` to hold position, or `ack` when no useful
-safe change is needed yet. Speech is not task completion. The CM5 limits
-every command; never send motors, attitude, altitude, or absolute-position
+telemetry, heading, and position result before another physical movement. Use
+measured results to adjust later actions. Use `hover` to hold position or `ack`
+when no useful safe change is needed. Speech is not task completion. The CM5
+limits every command; never send motors, attitude, altitude, or absolute-position
 commands.""".strip()
 
 

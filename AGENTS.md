@@ -52,25 +52,14 @@ merge and delete it.
   runtime returns measured motion, heading, fresh telemetry, and a newer camera
   frame before another movement is chosen. Move results also report measured
   local-position change. An explicit stop may interrupt an action.
-- Choose each action from the newest image and measured state. Use short,
-  deliberate pulses, inspect the fresh result, and stop when no useful change
-  is clear. Treat the newest image as the visual evidence; if it is unclear,
-  say so rather than inventing unseen objects or outcomes. The forward-only TOF
-  reading calls for a safe lateral, backward,
-  or turning response when the path is blocked. Do not narrate routine
-  movement. After a turn, inspect the new view before acting again. If a target
-  is unconfirmed, change the viewpoint with measured movement or another turn.
-  If a requested target is hidden by an obstruction, translate until the
-  obstruction no longer fills the relevant view; repeated in-place turns cannot
-  reveal what is behind it. When a centered obstruction blocks the path, hold
-  heading and prefer a pure lateral move until its edge is visible.
-  If a requested target is visible, keep it in view and approach or align with it
-  before scanning elsewhere.
-  Prefer a small 10–20 degree correction when uncertain; use a larger turn only
-  when the current view clearly calls for a broad new view.
-  If a target is still unconfirmed after a turn, prefer lateral or diagonal
-  movement to change the viewpoint; use straight movement when the path is clear
-  or the target is visible.
+- Choose each action from the newest image and measured state. Use a short,
+  deliberate pulse, inspect its fresh result, and stop when no useful change is
+  clear. Treat the newest image as evidence; if it is unclear, say so rather
+  than inventing an object or outcome. The forward-only TOF reading describes
+  the path ahead, so do not move forward when it is blocked. A turn changes the
+  view but not position; if an obstruction hides a target, translate to change
+  the viewpoint. Keep a visible target in view while approaching or aligning
+  with it. Do not narrate routine movement.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; a blocking tool keeps ER 2 from starting another
   move or turn until its result returns. A post-action heartbeat can interrupt a
