@@ -55,6 +55,8 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
+# Only a visible movement creates a new viewpoint.
+MIN_TRANSLATION_RESET_M = 0.05
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -1362,7 +1364,11 @@ class GeminiRuntime:
         """Publish one measured result to the live and persistent context."""
 
         action = self._active_action
-        if action is not None and action.kind == "move":
+        if (
+            action is not None
+            and action.kind == "move"
+            and self._meaningful_translation(action)
+        ):
             self._turns_since_translation = 0
         self._last_action_result = result
         self._recent_action_results.append(result)
@@ -1370,6 +1376,16 @@ class GeminiRuntime:
         self._speech_blocked = False
         self._record_action(result)
         self._active_action = None
+
+    @staticmethod
+    def _meaningful_translation(action: ActiveAction) -> bool:
+        """Return whether a completed move actually changed the viewpoint."""
+
+        return math.hypot(
+            action.observed_forward_m,
+            action.observed_right_m,
+            action.observed_down_m,
+        ) >= MIN_TRANSLATION_RESET_M
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
@@ -1499,7 +1515,7 @@ def _tools():
                 "before choosing another physical action. Use move with a yaw rate "
                 "when translating and turning together would make a smoother arc. "
                 f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
-                "translation, turn is unavailable "
+                "measured translation, turn is unavailable "
                 "until a translation or new dialogue."
             ),
             "behavior": "BLOCKING",
@@ -1605,7 +1621,8 @@ altitude target. Use the smallest useful relative turn. Omit the turn angle for
 a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger angle when the
 task or scene calls for a larger change of view.
 After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without translation, turn is
-unavailable until a translation or new dialogue.
+unavailable until a measured translation or new dialogue. A move that does not
+measurably translate does not reset this limit.
 After every move or turn,
 inspect the new image, heading, position, and measured result before choosing
 the next physical action. A requested duration or angle is not a measurement;
