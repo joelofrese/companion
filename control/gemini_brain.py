@@ -540,7 +540,7 @@ class GeminiRuntime:
         memory = ""
         if not self._memory_sent:
             if self.memory_store is not None:
-                memory = self.memory_store.context("experience=")
+                memory = self.memory_store.context("experience=summary")
         parts = []
         if self._bootstrap_pending:
             parts.append(f"[START] Situation: {self.situation}")
@@ -762,6 +762,7 @@ class GeminiRuntime:
                 self._record_action(f"speak: {message}")
                 print(f"Companion: {message}", flush=True)
                 self._speech_blocked = True
+                self._remember_summary(message)
                 result = {"status": "spoken"}
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
@@ -1314,7 +1315,6 @@ class GeminiRuntime:
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
         self._record_action(result)
-        self._remember_action(result)
         self._active_action = None
 
     def _record_action(self, action: str):
@@ -1323,10 +1323,15 @@ class GeminiRuntime:
             self._actions.append(action)
             self.latest_action = action
 
-    def _remember_action(self, action: str):
-        if self.memory_store is not None:
-            self.memory_store.remember(f"experience=action {action}")
-            self.experience_count += 1
+    def _remember_summary(self, summary: str):
+        summary = _model_text([summary])
+        if self.memory_store is None or not summary:
+            return
+        task = ""
+        if self._latest_user_request != self.situation:
+            task = f"task={self._latest_user_request}; "
+        self.memory_store.remember(f"experience=summary {task}{summary}")
+        self.experience_count += 1
 
     def _finish_turn(self, response_started_s):
         thought = _model_text(self._response_thoughts)
@@ -1351,8 +1356,7 @@ class GeminiRuntime:
             and summary not in ("", "none")
             and action not in summary
         ):
-            self.memory_store.remember(f"experience=summary {summary}")
-            self.experience_count += 1
+            self._remember_summary(summary)
 
 
 def _tools():
@@ -1575,6 +1579,8 @@ def _model_text(parts) -> str:
         "no tool call necessary",
         "no tool call is necessary",
     }:
+        return ""
+    if not any(character.isalnum() for character in value):
         return ""
     return value
 

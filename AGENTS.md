@@ -147,9 +147,10 @@ visual decision model remains beside Gemini.
 Set `GEMINI_API_KEY`. The brain uses one persistent ER 2 Streaming session
 with native context-window compression and session resumption for ordinary
 disconnects. A silent model turn restarts from the situation and memory. Its
-editable memory file contains only prior experience across runs. The newest
-640-pixel JPEG, telemetry, dialogue, and action results remain the live context;
-recent measured actions are retained when a fresh session is needed.
+editable memory file contains only prior high-level experience across runs.
+The newest 640-pixel JPEG, telemetry, dialogue, and action results remain the
+live context; recent measured actions are retained when a fresh session is
+needed.
 
 ## Current state
 
