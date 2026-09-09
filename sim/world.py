@@ -536,7 +536,7 @@ async def run(
         last_traced_gemini_thought = ""
         last_traced_gemini_response = ""
         last_traced_gemini_action = "stop"
-        last_traced_gemini_dialogue = 0
+        last_traced_gemini_dialogue = (0, 0)
         last_traced_gemini_latency = None
         requested_focus_answered = False
 
@@ -661,14 +661,18 @@ async def run(
                     )
                     last_traced_gemini_action = control.latest_action
                     last_traced_gemini_actions = control.action_count
-                if control.dialogue_sent_count != last_traced_gemini_dialogue:
+                dialogue_state = (
+                    control.dialogue_sent_count,
+                    control.dialogue_count,
+                )
+                if dialogue_state != last_traced_gemini_dialogue:
                     print(
                         f"[Gemini {elapsed_s:5.1f}s] dialogue sent; "
                         f"sent={control.dialogue_sent_count}; "
                         f"completed={control.dialogue_count}",
                         flush=True,
                     )
-                    last_traced_gemini_dialogue = control.dialogue_sent_count
+                    last_traced_gemini_dialogue = dialogue_state
                 if (
                     control.latest_response_latency_s is not None
                     and control.latest_response_latency_s != last_traced_gemini_latency
