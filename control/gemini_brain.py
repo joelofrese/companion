@@ -609,7 +609,7 @@ class GeminiRuntime:
         task = (
             "complete; wait for new dialogue"
             if self._request_complete
-            else "active"
+            else "active; speech and ordinary hover do not complete it"
         )
         turn_status = (
             "available"
@@ -1518,14 +1518,12 @@ def _tools():
         {
             "name": "move",
             "description": (
-                "Move slowly in the body frame for a short duration. Forward is "
-                "positive, right is positive, and up is positive. Use fresh vision, "
-                "valid telemetry, and a clear path. The range sensor looks forward "
-                "only: when forward is blocked, use another safe direction or turn. "
-                "Use vertical velocity only for a small visually clear "
-                "adjustment, never as an altitude target. Combine lateral velocity "
-                "and yaw rate for a smooth arc when useful. Inspect the next image "
-                "and measured result before choosing another action."
+                "Move slowly in the body frame for a short pulse. Forward, right, "
+                "and up are positive. Use fresh vision, valid telemetry, and a clear "
+                "path. The range sensor looks forward only, so use lateral, backward, "
+                "vertical, or turning motion when the forward path is blocked. Use "
+                "yaw rate for a smooth arc when useful. Inspect the fresh image and "
+                "measured result before choosing another physical action."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1557,7 +1555,8 @@ def _tools():
                         "description": (
                             "Vertical body velocity; positive is up and negative is "
                             f"down, from -{MAX_VERTICAL_SPEED_M_S} through "
-                            f"{MAX_VERTICAL_SPEED_M_S} m/s."
+                            f"{MAX_VERTICAL_SPEED_M_S} m/s; use only for a short "
+                            "clear adjustment, never as an altitude target."
                         ),
                         "minimum": -MAX_VERTICAL_SPEED_M_S,
                         "maximum": MAX_VERTICAL_SPEED_M_S,
@@ -1567,10 +1566,9 @@ def _tools():
                         "description": (
                             f"Optional duration from {MIN_MOVE_S} through "
                             f"{MAX_MOVE_S} seconds; omit it for the default "
-                            f"{DEFAULT_MOVE_DURATION_S}-second pulse. Inspect the "
-                            "measured result before moving again. For clear travel, "
-                            "use a useful pulse near the speed limit; use a shorter "
-                            "or slower pulse near an object."
+                            f"{DEFAULT_MOVE_DURATION_S}-second pulse. Use a useful "
+                            "pulse in open space and a shorter one near an object; "
+                            "inspect the measured result before moving again."
                         ),
                         "minimum": MIN_MOVE_S,
                         "maximum": MAX_MOVE_S,
@@ -1592,16 +1590,12 @@ def _tools():
         {
             "name": "turn",
             "description": (
-                "Apply a slow in-place yaw correction. Choose the direction from "
-                "the newest image and heading: image-left means left and image-right "
-                "means right. Choose a relative angle; the controller uses "
-                "measured heading to stop there. Inspect the new image and heading "
-                "before choosing another physical action. Use move with a yaw rate "
-                "when translating and turning together would make a smoother arc. "
-                "A turn is one observation step; after its fresh result, prefer a "
-                "short clear translation or hover before turning again unless the "
-                "new view gives a clear reason to turn. Do not repeat same-direction "
-                "turns while a target is still uncertain. "
+                "Apply a slow in-place yaw correction. Choose left or right from "
+                "the newest image and heading, then choose a relative angle. The "
+                "controller stops from measured heading. Inspect the new image and "
+                "heading before another physical action. Use move with yaw rate for "
+                "a smooth translating turn. Do not repeat turns without a useful new "
+                "view. "
                 f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
                 "meaningful translation, turn is unavailable "
                 "until a translation or new dialogue."
@@ -1636,11 +1630,11 @@ def _tools():
         {
             "name": "hover",
             "description": (
-                "Stop horizontal motion and hold position when the task is complete, "
-                "while waiting, or when the scene is unclear. Set complete=true only "
-                "when a specific user request is finished; otherwise keep the task "
-                "active while holding position. Let a normal move or turn finish; "
-                "interrupt an active action only for an explicit stop request."
+                "Stop horizontal motion and hold position when waiting or when the "
+                "scene is unclear. Set complete=true only after a specific request's "
+                "physical outcome is observed. Otherwise this is only a pause: keep "
+                "the task active and reassess the next fresh frame. Let a normal move "
+                "or turn finish; interrupt one only for an explicit stop request."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1661,21 +1655,12 @@ def _tools():
         {
             "name": "speak",
             "description": (
-                "Say one short message when the user asks or a meaningful new event "
-                "is worth sharing. Do not announce a planned movement instead of "
-                "calling move or turn; speak after the observation or action is "
-                "real. After speaking, do not call speak again until new dialogue "
-                "or a completed physical action. During open exploration, do not "
-                "narrate routine movement. A report does not end open exploration; "
-                "continue when a safe useful action is clear. After completing "
-                "the requested physical outcome, "
-                "call hover with complete=true and wait unless another physical "
-                "action is clearly needed. Do not describe an unmeasured approach "
-                "or following result as complete. For a follow request, if the "
-                "person is visible, choose a small measured turn or move toward "
-                "keeping them in view before speaking or hovering; do not ask the "
-                "person to move instead of acting. In open exploration, use ordinary "
-                "hover and keep exploring."
+                "Say one short user-facing message for a request or meaningful new "
+                "event. Do not announce planned movement instead of calling move or "
+                "turn. Speech is not completion for an ongoing task; keep acting and "
+                "reassessing. Report a physical outcome only after observing it. After "
+                "a specific request is complete, speak if useful and call hover with "
+                "complete=true. Do not narrate routine exploration."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1697,8 +1682,10 @@ Choose direct tools: `move`, `turn`, `hover`, or `speak`.
 Use `speak` for user-facing replies. Call tools directly; do not write a tool
 call or movement JSON as plain text.
 
-Treat a user request as the active task until it is complete, changed, or
-unsafe. Explore generally only when there is no specific request.
+Treat a user request as the active task until its outcome is observed, changed,
+or unsafe. A continuing request such as following, staying with, watching, or
+searching remains active after one movement, speech, or ordinary hover; reassess
+it on every fresh frame. Explore generally only when there is no specific request.
 
 The camera faces forward. Image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
