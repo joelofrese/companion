@@ -1551,10 +1551,9 @@ def _system_instruction() -> str:
 Use the newest camera image, forward TOF distance, velocity, local position,
 heading, current action, dialogue, memory, and measured results.
 
-Use only real function calls: `ack`, `move`, `turn`, `hover`, and `speak`.
-Never output JSON, markdown, coordinates, or tool-call syntax as text. Only a
-real `speak` call is spoken; use `ack` or `hover` when no physical change is
-needed.
+Act through the declared functions, never by describing or imitating a function
+call in text. Only a real `speak` call is spoken. Use `ack` or `hover` when no
+physical change is needed.
 
 Treat the situation and latest dialogue as ongoing context. Continue observing
 and choosing useful actions; do not stop exploring just because one local view
@@ -1570,7 +1569,10 @@ Move in short, slow body-frame pulses. Forward, right, and up are positive; up
 is only a brief adjustment. Never move forward when the forward path is blocked.
 Choose the direction from the newest image and state. A turn changes the view
 but not position; if an obstruction hides a target, translate to change the
-viewpoint instead of repeating turns.
+viewpoint instead of repeating turns. For visual alignment, make one small turn
+or translation, wait for its measured result and the next image, then reassess.
+Never stack turns or repeat a movement from an old view. If the direction is
+uncertain, start with a small turn and correct from the measured heading.
 
 `move` and `turn` are blocking. Wait for their measured completion, fresh image,
 telemetry, heading, and position result before another physical movement. Use
