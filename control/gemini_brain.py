@@ -1903,17 +1903,32 @@ def _finite(value) -> bool:
 def _is_explicit_stop(message: str) -> bool:
     """Recognize the short dialogue commands that may interrupt movement."""
 
+    for punctuation in ",.!?;:":
+        message = message.replace(punctuation, " ")
     message = " ".join(message.casefold().split())
-    if message.startswith("please "):
-        message = message[7:]
-    return message in {
+    for prefix in ("please ", "can you ", "could you ", "would you "):
+        if message.startswith(prefix):
+            message = message[len(prefix):]
+            break
+    if message in {
         "stop",
         "stop moving",
         "hover",
         "hold position",
         "cancel",
         "cancel movement",
-    }
+    }:
+        return True
+    if message.startswith(("stop ", "hover ", "hold position ", "cancel ")):
+        return True
+    return message.endswith((
+        " and stop",
+        " then stop",
+        " and hover",
+        " then hover",
+        " and hold position",
+        " then hold position",
+    ))
 
 
 def _resume_rejected(error: Exception) -> bool:
