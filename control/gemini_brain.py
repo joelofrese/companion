@@ -238,8 +238,15 @@ class GeminiRuntime:
         ):
             return VelocityCommand()
         if action.kind == "move":
+            forward_m_s = action.forward_m_s
+            if (
+                forward_m_s > 0.0
+                and _obstacle_is_valid(self._telemetry.obstacle_distance_m)
+                and self._telemetry.obstacle_distance_m <= OBSTACLE_STOP_M
+            ):
+                forward_m_s = 0.0
             return VelocityCommand(
-                forward_m_s=action.forward_m_s,
+                forward_m_s=forward_m_s,
                 right_m_s=action.right_m_s,
                 down_m_s=action.down_m_s,
                 yaw_rate_deg_s=action.yaw_rate_deg_s,
@@ -1886,7 +1893,16 @@ def _move_is_allowed(action: ActiveAction, distance_m: Optional[float]) -> bool:
     """Allow non-forward motion when only the forward path is blocked."""
 
     return _obstacle_is_valid(distance_m) and (
-        action.forward_m_s <= 0.0 or distance_m > OBSTACLE_STOP_M
+        action.forward_m_s <= 0.0
+        or distance_m > OBSTACLE_STOP_M
+        or any(
+            value != 0.0
+            for value in (
+                action.right_m_s,
+                action.down_m_s,
+                action.yaw_rate_deg_s,
+            )
+        )
     )
 
 

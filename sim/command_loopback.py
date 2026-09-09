@@ -202,6 +202,21 @@ async def run():
                 f"{turn_commands}"
             )
         print("CM5 in-place turn around obstacle=verified.")
+        while not forwarder.commands.empty():
+            forwarder.commands.get_nowait()
+        reconnect_sender.send(
+            VelocityCommand(forward_m_s=0.2, right_m_s=0.15)
+        )
+        await asyncio.sleep(0.1)
+        diagonal_commands = []
+        while not forwarder.commands.empty():
+            diagonal_commands.append(forwarder.commands.get_nowait())
+        if VelocityCommand(right_m_s=0.15) not in diagonal_commands:
+            raise RuntimeError(
+                "CM5 did not preserve lateral motion beside a blocked forward path: "
+                f"{diagonal_commands}"
+            )
+        print("CM5 lateral escape around obstacle=verified.")
         turn_obstacle = False
         while not forwarder.commands.empty():
             forwarder.commands.get_nowait()

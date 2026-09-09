@@ -255,6 +255,19 @@ class OnboardSafetyEnvelope:
                 and self._command.forward_m_s <= 0.0
             ):
                 return self._command
+            if any(
+                value != 0.0
+                for value in (
+                    self._command.right_m_s,
+                    self._command.down_m_s,
+                    self._command.yaw_rate_deg_s,
+                )
+            ):
+                return VelocityCommand(
+                    right_m_s=self._command.right_m_s,
+                    down_m_s=self._command.down_m_s,
+                    yaw_rate_deg_s=self._command.yaw_rate_deg_s,
+                )
             return VelocityCommand(forward_m_s=-BACKOFF_SPEED_M_S)
         return self._command
 
