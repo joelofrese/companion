@@ -34,14 +34,10 @@ merge and delete it.
 - One Gemini ER 2 Streaming session starts with one situation prompt and keeps
   deciding from the newest image, dialogue, local position, current and initial
   heading, other telemetry, memory, and action results.
-- A new user request stays active until its outcome is observed, changed, or
-  unsafe. Continuing requests such as exploring, patrolling, following, staying
-  with, watching, or searching remain active after one movement, speech, or
-  ordinary `hover`; reassess them on every fresh frame. Do not complete one
-  because one area was inspected. When a specific one-time request is complete,
-  call `hover` with `complete=true` and wait for new dialogue; movement tools
-  stay unavailable until then. Explore generally only when there is no more
-  specific request.
+- Dialogue adds context to the ongoing Gemini session. Keep observing and
+  choosing from the situation and newest dialogue; `ack` and `hover` hold
+  position without ending the session. Explore generally when no request is
+  present.
 - Gemini chooses direct `ack`, `move`, `turn`, `hover`, or `speak` tools. `ack`
   holds position while waiting for the next fresh frame. Text or JSON action
   descriptions never move the vehicle.
@@ -172,9 +168,8 @@ are retained when a fresh session is needed.
 - ER 2 chooses `ack`, movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
-  heading feedback for calibration. Hover can pause an active task without
-  ending it; completed specific requests use `complete=true` and wait in hover
-  for new dialogue.
+  heading feedback for calibration. Hover only holds position; the session keeps
+  deciding from fresh state and dialogue.
 - Native ER 2 thinking is currently set minimal for timely closed-loop task planning;
   measured action feedback keeps each next choice grounded.
 - Completed measured movement and turn results are saved as experience for

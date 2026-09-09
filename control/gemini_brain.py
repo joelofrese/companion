@@ -112,8 +112,6 @@ class GeminiRuntime:
         self._dialogue_in_flight: Optional[str] = None
         self._dialogue_send_complete = False
         self._latest_user_request: Optional[str] = None
-        self._speech_blocked = False
-        self._request_complete = False
         self._active_action: Optional[ActiveAction] = None
         self._initial_heading_rad: Optional[float] = None
         self._action_finished_at_s: Optional[float] = None
@@ -178,8 +176,6 @@ class GeminiRuntime:
             return
         message = message.strip()
         self._latest_user_request = message
-        self._speech_blocked = False
-        self._request_complete = False
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -362,10 +358,6 @@ class GeminiRuntime:
                                 elif (
                                     response_started_s is not None
                                     and self._active_action is None
-                                    and not (
-                                        self._request_complete
-                                        and not self._dialogue
-                                    )
                                     and (
                                         time.monotonic()
                                         - (
@@ -488,8 +480,6 @@ class GeminiRuntime:
         """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
-        if self._request_complete and not self._dialogue:
-            return
         # Let a fresh state interrupt an ordinary turn after physical movement
         # finishes, but let queued dialogue wait for that turn to end. This
         # prevents an old model turn from acting on a newer request.
@@ -592,19 +582,6 @@ class GeminiRuntime:
                     + "\n".join(self._recent_action_results)
                 )
         camera = "fresh" if self._has_fresh_frame() else "stale"
-        speech = (
-            "ready"
-            if not self._speech_blocked
-            else (
-                "complete for the current dialogue; do not call speak again; "
-                "wait for new dialogue or a meaningful scene change"
-            )
-        )
-        task = (
-            "complete; wait for new dialogue"
-            if self._request_complete
-            else "active; speech and ordinary hover do not complete it"
-        )
         action_state = self._action_state_text()
         heading_from_initial = _relative_heading_number(
             self._initial_heading_rad,
@@ -614,8 +591,7 @@ class GeminiRuntime:
             f"[STATE] camera={camera}; "
             f"initial_heading_deg={_heading_number(self._initial_heading_rad)}; "
             f"heading_from_initial_deg={heading_from_initial}; "
-            f"telemetry={_telemetry_text(self._telemetry)}; "
-            f"action={action_state}; speech={speech}; task={task}"
+            f"telemetry={_telemetry_text(self._telemetry)}; action={action_state}"
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
@@ -639,13 +615,9 @@ class GeminiRuntime:
         else:
             heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
-            f"[HEARTBEAT] {heartbeat} Call ack when no safe useful change is clear; "
-            "call move, turn, hover, or speak when useful. "
-            "If a user request is present, treat it as the active task until it is "
-            "completed, changed, or unsafe; do not replace it with general exploration. "
-            "If nothing needs to change, wait for the next image or dialogue. During "
-            "open exploration, choose a small viewpoint change after the current view "
-            "has been inspected; do not invent movement or repeat a completed answer."
+            f"[HEARTBEAT] {heartbeat} Choose ack, move, turn, hover, or speak "
+            "from the newest image and state. Continue the current situation and "
+            "latest dialogue; wait when no useful safe change is clear."
         )
         if self.latest_response and not self._last_turn_used_tool:
             parts.append(
@@ -773,20 +745,11 @@ class GeminiRuntime:
                         "next active turn"
                     ),
                 }
-            elif self._request_complete:
-                result = {
-                    "status": "unavailable",
-                    "reason": (
-                        "the specific request is complete; wait for new dialogue "
-                        "and do not call another tool"
-                    ),
-                }
             else:
                 self._record_action("ack")
                 result = {
                     "status": "acknowledged",
                     "reason": "the current image and state were inspected; hold position",
-                    "task": "active; reassess on the next fresh frame",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
         elif name == "move":
@@ -794,51 +757,23 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "hover":
-            result = self._hover(args)
+            result = self._hover()
         elif name == "speak":
             message = str(args.get("message", "")).strip()
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
-            elif self._speech_blocked:
-                movement_tools = (
-                    "unavailable until new dialogue"
-                    if self._request_complete
-                    else "available now"
-                )
-                result = {
-                    "status": "already_spoken",
-                    "reason": (
-                        (
-                            "the specific dialogue request was answered; wait for "
-                            "new dialogue"
-                        )
-                        if self._request_complete
-                        else (
-                            "a response was already spoken for this dialogue; do "
-                            "not call speak again. Choose move, turn, or hover. "
-                            "Speech becomes available after new dialogue or a "
-                            "completed physical action"
-                        )
-                    ),
-                    "movement_tools": movement_tools,
-                }
             else:
                 self._record_action(f"speak: {message}")
                 print(f"Companion: {message}", flush=True)
-                self._speech_blocked = True
                 self._remember_summary(message)
                 result = {
                     "status": "spoken",
-                    "task": (
-                        "active; call hover with complete=true when the request "
-                        "is complete"
-                    ),
                 }
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
         if result.get("status") in ("acknowledged", "hovering", "spoken"):
             self.action_count += 1
-        if result.get("status") in ("rejected", "unavailable", "already_spoken"):
+        if result.get("status") in ("rejected", "unavailable"):
             reason = str(result.get("reason", "")).strip()
             action = f"{name} {result['status']}"
             if reason:
@@ -846,34 +781,15 @@ class GeminiRuntime:
             self._record_action(action)
         return result
 
-    def _hover(self, args: dict) -> dict:
-        complete = args.get("complete", False)
-        if not isinstance(complete, bool):
-            return {
-                "status": "rejected",
-                "reason": "complete must be true or false when provided",
-            }
+    def _hover(self) -> dict:
         busy = self._busy_response()
         if busy is not None:
             return busy
         if not self._stop_requested:
-            specific_request = self._latest_user_request is not None
-            completed = complete and specific_request
-            if completed:
-                self._request_complete = True
-            self._record_action("hover (complete)" if completed else "hover")
+            self._record_action("hover")
             return {
                 "status": "already_hovering",
                 "reason": "the vehicle is already holding position",
-                "task": (
-                    "complete; wait for new dialogue"
-                    if self._request_complete
-                    else (
-                        "open exploration remains active; complete=true has no effect"
-                        if complete
-                        else "active; holding position is not completion"
-                    )
-                ),
                 "telemetry": _telemetry_text(self._telemetry),
             }
         self._stop_requested = False
@@ -883,7 +799,6 @@ class GeminiRuntime:
             "status": "hovering",
             "cancelled_action": cancelled or "none",
             "cancelled_result": self._last_action_result if cancelled else "none",
-            "task": "active; reassess after the explicit stop",
             "heading_deg": _heading_value(self._telemetry.heading_rad),
             "telemetry": _telemetry_text(self._telemetry),
         }
@@ -1066,16 +981,6 @@ class GeminiRuntime:
                     "movement_tools": "unavailable until the new dialogue is processed",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-            if self._request_complete:
-                return {
-                    "status": "unavailable",
-                    "reason": (
-                        "the specific dialogue request was answered; wait for "
-                        "new dialogue before moving or turning"
-                    ),
-                    "movement_tools": "unavailable until new dialogue",
-                    "telemetry": _telemetry_text(self._telemetry),
-                }
             if self._stop_requested:
                 return {
                     "status": "unavailable",
@@ -1180,12 +1085,7 @@ class GeminiRuntime:
                 state = self._last_action_result
             else:
                 state = "none"
-            movement = (
-                "movement tools unavailable until new dialogue"
-                if self._request_complete
-                else "movement tools available"
-            )
-            return f"{state}; {movement}"
+            return f"{state}; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
@@ -1439,7 +1339,6 @@ class GeminiRuntime:
         self._last_action_result = result
         self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
-        self._speech_blocked = False
         if (
             self.memory_store is not None
             and action.completion is not None
@@ -1508,8 +1407,7 @@ def _tools():
             "name": "ack",
             "description": (
                 "Acknowledge the newest image and telemetry and hold position. "
-                "Use this when no safe useful action is needed yet; it keeps an "
-                "active task open. After a task is complete, wait for dialogue."
+                "Use this when no safe useful action is needed yet."
             ),
             "behavior": "BLOCKING",
             "parameters": {"type": "OBJECT", "properties": {}},
@@ -1627,34 +1525,21 @@ def _tools():
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position when waiting or when the "
-                "scene is unclear. Set complete=true only after a specific one-time "
-                "request's outcome is observed. Otherwise keep the task active. "
-                "Let a normal move or turn finish; interrupt one only for an "
-                "explicit stop request."
+                "scene is unclear. Let a normal move or turn finish; interrupt one "
+                "only for an explicit stop request."
             ),
             "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
-                "properties": {
-                    "complete": {
-                        "type": "BOOLEAN",
-                        "description": (
-                            "Set true only when a specific one-time user request "
-                            "is finished. Omit it or set false when pausing or "
-                            "reassessing. Ongoing requests remain active."
-                        ),
-                    }
-                },
+                "properties": {},
             },
         },
         {
             "name": "speak",
             "description": (
                 "Call this function to say one short user-facing message; a text "
-                "response is not spoken. Speech does not complete an ongoing task. "
-                "Report physical outcomes only after observing them. After a "
-                "specific request is complete, speak if useful and call hover with "
-                "complete=true. Do not narrate routine movement."
+                "response is not spoken. Report physical outcomes only after "
+                "observing them. Do not narrate routine movement."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1676,10 +1561,10 @@ heading, current action, dialogue, memory, and measured results.
 Use only real function calls: `ack`, `move`, `turn`, `hover`, and `speak`.
 Never describe a tool call as text. Only a real `speak` call is spoken.
 
-Keep each user request active until its outcome is observed, changed, or unsafe.
-Ongoing exploration, following, watching, and searching continue after each
-action. Finish a specific one-time request with `hover(complete=true)`. Without
-a request, explore. Inspect the current view before moving.
+Treat the situation and latest dialogue as ongoing context. Continue observing
+and choosing useful actions; do not stop exploring just because one local view
+or action is complete. Without a request, explore. Inspect the current view
+before moving.
 
 The camera faces forward. Image-left is negative right velocity and image-right
 is positive. Heading is measured in degrees and increases clockwise. The TOF
@@ -1695,7 +1580,7 @@ viewpoint instead of repeating turns.
 `move` and `turn` are blocking. Wait for their measured completion, fresh image,
 telemetry, heading, and position result before another physical movement. Use
 measured results to adjust later actions. Use `hover` to hold position or `ack`
-when no useful safe change is needed. Speech is not task completion. The CM5
+when no useful safe change is needed. The CM5
 limits every command; never send motors, attitude, altitude, or absolute-position
 commands.""".strip()
 
