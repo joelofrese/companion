@@ -23,9 +23,9 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "minimal"
 # ER 2 Streaming accepts at most one JPEG per second.
 VIDEO_PERIOD_S = 1.0
-# Give every ER 2 turn enough time for slow reasoning. The vehicle hovers while
-# a turn is quiet; connection errors still reconnect immediately.
-RESPONSE_TIMEOUT_S = 60.0
+# Do not spend most of a short flight waiting on a silent turn. The vehicle
+# hovers while a turn is quiet; connection errors still reconnect immediately.
+RESPONSE_TIMEOUT_S = 30.0
 # Give a completed action a short chance to produce its next turn before one
 # recovery heartbeat interrupts a quiet turn.
 IDLE_NUDGE_DELAY_S = 2.0
@@ -111,7 +111,6 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._dialogue_in_flight: Optional[str] = None
         self._dialogue_send_complete = False
-        self._latest_user_request: Optional[str] = None
         self._active_action: Optional[ActiveAction] = None
         self._initial_heading_rad: Optional[float] = None
         self._action_finished_at_s: Optional[float] = None
@@ -175,7 +174,6 @@ class GeminiRuntime:
         if not isinstance(message, str) or not message.strip():
             return
         message = message.strip()
-        self._latest_user_request = message
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -595,8 +593,6 @@ class GeminiRuntime:
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
-        elif self._latest_user_request is not None:
-            parts.append(f"[TASK] Active user request: {self._latest_user_request}")
         if memory:
             parts.append(
                 "[MEMORY] Prior experience; verify it against the current image "
@@ -1360,10 +1356,7 @@ class GeminiRuntime:
         summary = _model_text([summary])
         if self.memory_store is None or not summary:
             return
-        task = ""
-        if self._latest_user_request is not None:
-            task = f"task={self._latest_user_request}; "
-        self.memory_store.remember(f"experience=summary {task}{summary}")
+        self.memory_store.remember(f"experience=summary {summary}")
         self.experience_count += 1
 
     def _finish_turn(self, response_started_s):
