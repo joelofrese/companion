@@ -35,12 +35,13 @@ merge and delete it.
   deciding from the newest image, dialogue, local position, current and initial
   heading, other telemetry, memory, and action results.
 - A new user request stays active until its outcome is observed, changed, or
-  unsafe. Continuing requests such as following, staying with, watching, or
-  searching remain active after one movement, speech, or ordinary `hover`;
-  reassess them on every fresh frame. When a specific request is complete, call
-  `hover` with `complete=true` and wait for new dialogue; movement tools stay
-  unavailable until then. In open exploration, `complete=true` has no effect.
-  Explore generally only when there is no more specific request.
+  unsafe. Continuing requests such as exploring, patrolling, following, staying
+  with, watching, or searching remain active after one movement, speech, or
+  ordinary `hover`; reassess them on every fresh frame. Do not complete one
+  because one area was inspected. When a specific one-time request is complete,
+  call `hover` with `complete=true` and wait for new dialogue; movement tools
+  stay unavailable until then. Explore generally only when there is no more
+  specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
