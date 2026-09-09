@@ -611,7 +611,11 @@ class GeminiRuntime:
                 memory = self.memory_store.context("experience=")
         parts = []
         if self._bootstrap_pending:
-            parts.append(f"[START] Situation: {self.situation}")
+            parts.append(
+                f"[START] Begin now. Treat this as the active situation, not a "
+                f"request for permission: {self.situation} After inspecting the "
+                "image, call exactly one tool."
+            )
             if self._recent_action_results:
                 parts.append(
                     "[RECENT ACTIONS] These measured actions happened before this "
