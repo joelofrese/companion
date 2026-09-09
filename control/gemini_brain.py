@@ -1691,7 +1691,8 @@ inventing unseen objects or outcomes.
 Movement:
 Use short, slow body-frame pulses. Forward, right, and up are positive; vertical
 motion is only a short adjustment, never an altitude target. Choose the amount
-and duration yourself from the current image and state. Never move forward into
+and duration yourself from the current image and state; never ask the developer
+for exact movement values. Never move forward into
 a blocked path: use lateral, backward, vertical, or turning motion as the scene
 allows. Turning changes the view but does not move around an obstacle. If a
 requested target is hidden by an obstruction, translate laterally or diagonally
