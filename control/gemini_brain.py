@@ -104,7 +104,6 @@ class GeminiRuntime:
         self._latest_frame = None
         self._latest_frame_at_s: Optional[float] = None
         self._last_frame_sent_at_s: Optional[float] = None
-        self._frame_count = 0
         self._telemetry = Telemetry()
         self._dialogue = deque()
         self._dialogue_in_flight: Optional[str] = None
@@ -206,7 +205,6 @@ class GeminiRuntime:
         if frame is not None:
             self._latest_frame = frame
             self._latest_frame_at_s = time.monotonic()
-            self._frame_count += 1
             self._frame_ready.set()
         self._telemetry = telemetry
         self._refresh_action()
