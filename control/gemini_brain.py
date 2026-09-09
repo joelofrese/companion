@@ -55,6 +55,7 @@ ACTION_SAFETY_HOLD_S = 0.5
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
+POST_ACTION_FRAME_TIMEOUT_S = VIDEO_PERIOD_S + 0.5
 
 
 @dataclass
@@ -913,11 +914,31 @@ class GeminiRuntime:
         """Return the measured result required by a blocking robotics tool."""
 
         await action.done.wait()
+        finished_at_s = self._action_finished_at_s
+        if finished_at_s is not None:
+            try:
+                await asyncio.wait_for(
+                    self._wait_for_post_action_frame(finished_at_s),
+                    timeout=POST_ACTION_FRAME_TIMEOUT_S,
+                )
+            except asyncio.TimeoutError:
+                pass
         return action.completion or {
             "status": "cancelled",
             "action": self._action_label(action),
             "reason": "the action ended without a result",
         }
+
+    async def _wait_for_post_action_frame(self, finished_at_s: float):
+        """Wait until Gemini has received a camera frame after the action."""
+
+        while not self._closed.is_set():
+            if (
+                self._last_frame_sent_at_s is not None
+                and self._last_frame_sent_at_s > finished_at_s
+            ):
+                return
+            await asyncio.sleep(0.05)
 
     def _busy_response(self):
         self._refresh_action()
