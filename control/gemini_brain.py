@@ -557,8 +557,7 @@ class GeminiRuntime:
             if self._recent_action_results:
                 parts.append(
                     "[RECENT ACTIONS] These measured actions happened before this "
-                    "session. Use them as context with the current image and state; "
-                    "do not repeat a scan without a new reason:\n"
+                    "session. Use them as context with the current image and state:\n"
                     + "\n".join(self._recent_action_results)
                 )
         camera = "fresh" if self._has_fresh_frame() else "stale"
