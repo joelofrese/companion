@@ -35,9 +35,10 @@ merge and delete it.
   deciding from the newest image, dialogue, local position, heading, other
   telemetry, memory, and action results.
 - A new user request stays active until it is completed, changed, or unsafe.
-  Speaking alone does not end it. When complete, call `hover` and wait for new
-  dialogue; movement tools stay unavailable until then. Explore generally only
-  when there is no more specific request.
+  Speaking alone or an ordinary `hover` does not end it. When complete, call
+  `hover` with `complete=true` and wait for new dialogue; movement tools stay
+  unavailable until then. Explore generally only when there is no more specific
+  request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
@@ -162,7 +163,8 @@ needed.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
   heading feedback for calibration. Live state exposes the three-turn viewpoint
-  budget, and completed specific requests wait in hover for new dialogue.
+  budget. Hover can pause an active task without ending it; completed specific
+  requests use `complete=true` and wait in hover for new dialogue.
 - Native ER 2 thinking is currently set low for timely closed-loop control;
   latency and decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware

@@ -725,36 +725,7 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "hover":
-            busy = (
-                self._busy_response()
-                if self._active_action is not None
-                else None
-            )
-            if busy is not None:
-                result = busy
-            elif not self._stop_requested:
-                self._request_complete = (
-                    self._latest_user_request != self.situation
-                )
-                self._record_action("hover")
-                result = {
-                    "status": "already_hovering",
-                    "reason": "the vehicle is already holding position",
-                    "telemetry": _telemetry_text(self._telemetry),
-                }
-            else:
-                self._stop_requested = False
-                cancelled = self._cancel_action("hover")
-                self._record_action("hover")
-                result = {
-                    "status": "hovering",
-                    "cancelled_action": cancelled or "none",
-                    "cancelled_result": (
-                        self._last_action_result if cancelled else "none"
-                    ),
-                    "heading_deg": _heading_value(self._telemetry.heading_rad),
-                    "telemetry": _telemetry_text(self._telemetry),
-                }
+            result = self._hover(args)
         elif name == "speak":
             message = str(args.get("message", "")).strip()
             if not message:
@@ -789,7 +760,10 @@ class GeminiRuntime:
                 self._remember_summary(message)
                 result = {
                     "status": "spoken",
-                    "task": "active; call hover when the request is complete",
+                    "task": (
+                        "active; call hover with complete=true when the request "
+                        "is complete"
+                    ),
                 }
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
@@ -802,6 +776,42 @@ class GeminiRuntime:
                 action += f": {reason}"
             self._record_action(action)
         return result
+
+    def _hover(self, args: dict) -> dict:
+        complete = args.get("complete", False)
+        if not isinstance(complete, bool):
+            return {
+                "status": "rejected",
+                "reason": "complete must be true or false when provided",
+            }
+        busy = self._busy_response() if self._active_action is not None else None
+        if busy is not None:
+            return busy
+        if not self._stop_requested:
+            if complete and self._latest_user_request != self.situation:
+                self._request_complete = True
+            self._record_action("hover (complete)" if complete else "hover")
+            return {
+                "status": "already_hovering",
+                "reason": "the vehicle is already holding position",
+                "task": (
+                    "complete; wait for new dialogue"
+                    if self._request_complete
+                    else "active; holding position is not completion"
+                ),
+                "telemetry": _telemetry_text(self._telemetry),
+            }
+        self._stop_requested = False
+        cancelled = self._cancel_action("hover")
+        self._record_action("hover")
+        return {
+            "status": "hovering",
+            "cancelled_action": cancelled or "none",
+            "cancelled_result": self._last_action_result if cancelled else "none",
+            "task": "active; reassess after the explicit stop",
+            "heading_deg": _heading_value(self._telemetry.heading_rad),
+            "telemetry": _telemetry_text(self._telemetry),
+        }
 
     async def _move(self, args: dict) -> dict:
         forward_m_s = _number_between(
@@ -1523,12 +1533,25 @@ def _tools():
             "name": "hover",
             "description": (
                 "Stop horizontal motion and hold position when the task is complete, "
-                "while waiting, or when the scene is unclear. Let a normal move or "
-                "turn finish; interrupt an active action only for an explicit stop "
-                "request."
+                "while waiting, or when the scene is unclear. Set complete=true only "
+                "when a specific user request is finished; otherwise keep the task "
+                "active while holding position. Let a normal move or turn finish; "
+                "interrupt an active action only for an explicit stop request."
             ),
             "behavior": "BLOCKING",
-            "parameters": {"type": "OBJECT", "properties": {}},
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "complete": {
+                        "type": "BOOLEAN",
+                        "description": (
+                            "Set true only when the current specific user request "
+                            "is finished. Omit it or set false when pausing, "
+                            "waiting, or reassessing."
+                        ),
+                    }
+                },
+            },
         },
         {
             "name": "speak",
@@ -1541,7 +1564,8 @@ def _tools():
                 "narrate routine movement. A report does not end open exploration; "
                 "continue when a safe useful action is clear. After answering a "
                 "specific request, "
-                "hover and wait unless another physical action is clearly needed."
+                "call hover with complete=true and wait unless another physical "
+                "action is clearly needed."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1589,10 +1613,11 @@ use the returned numeric requested and observed translation or angle, together
 with current telemetry, to know what happened and adjust the next pulse. When a
 requested subject is centered, stop turning and reassess. When
 no safe useful change is clear, hover or wait. After completing a specific
-request, speak if useful and call hover to wait for new dialogue; speaking alone
-does not end the task. In open exploration, a spoken update does not end
-exploration; continue when a safe useful action is clear. Do not invent
-movement or narrate routine motion.
+request, speak if useful and call `hover` with `complete=true` to wait for new
+dialogue; speaking or an ordinary hover does not end the task. In open
+exploration, a spoken update or ordinary hover does not end exploration; continue
+when a safe useful action is clear. Do not invent movement or narrate routine
+motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
