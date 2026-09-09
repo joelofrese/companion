@@ -26,6 +26,9 @@ VIDEO_PERIOD_S = 1.0
 # Do not spend most of a short flight waiting on a silent turn. The vehicle
 # hovers while a turn is quiet; connection errors still reconnect immediately.
 RESPONSE_TIMEOUT_S = 20.0
+# After a tool result, recover a silent continuation sooner so one stalled turn
+# does not consume the rest of a short task.
+POST_ACTION_RESPONSE_TIMEOUT_S = 8.0
 # Give a completed action a short chance to produce its next turn before one
 # recovery heartbeat interrupts a quiet turn.
 IDLE_NUDGE_DELAY_S = 2.0
@@ -110,6 +113,7 @@ class GeminiRuntime:
         self._last_frame_sent_at_s: Optional[float] = None
         self._telemetry = Telemetry()
         self._dialogue = deque()
+        self._last_dialogue = ""
         self._dialogue_in_flight: Optional[str] = None
         self._dialogue_send_complete = False
         self._active_action: Optional[ActiveAction] = None
@@ -144,6 +148,7 @@ class GeminiRuntime:
         self._last_model_activity_s: Optional[float] = None
         self._response_in_flight = False
         self._heartbeat_nudge_sent = False
+        self._text_only_turns = 0
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -177,6 +182,7 @@ class GeminiRuntime:
         if not isinstance(message, str) or not message.strip():
             return
         message = message.strip()
+        self._last_dialogue = message
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -358,17 +364,7 @@ class GeminiRuntime:
                                         break
                                 elif (
                                     response_started_s is not None
-                                    and self._active_action is None
-                                    and (
-                                        time.monotonic()
-                                        - (
-                                            self._last_model_activity_s
-                                            or response_started_s
-                                        )
-                                        > (
-                                            RESPONSE_TIMEOUT_S
-                                        )
-                                    )
+                                    and self._response_is_stalled(response_started_s)
                                 ):
                                     print(
                                         "Gemini response stalled; reconnecting the session.",
@@ -583,6 +579,11 @@ class GeminiRuntime:
                     "session. Use them as context with the current image and state:\n"
                     + "\n".join(self._recent_action_results)
                 )
+            if self._last_dialogue and not dialogue:
+                parts.append(
+                    "[ONGOING DIALOGUE] Continue the latest user request after "
+                    "this fresh session reconnect:\n" + self._last_dialogue
+                )
         camera = "fresh" if self._has_fresh_frame() else "stale"
         action_state = self._action_state_text()
         heading_from_initial = _relative_heading_number(
@@ -630,6 +631,22 @@ class GeminiRuntime:
         return (
             self._latest_frame_at_s is not None
             and time.monotonic() - self._latest_frame_at_s <= MAX_FRAME_AGE_S
+        )
+
+    def _response_is_stalled(self, response_started_s: float) -> bool:
+        """Return whether the current turn should be recovered."""
+
+        if self._active_action is not None:
+            return False
+        now = time.monotonic()
+        if (
+            self._action_finished_at_s is not None
+            and self._action_finished_at_s >= response_started_s
+        ):
+            return now - self._action_finished_at_s > POST_ACTION_RESPONSE_TIMEOUT_S
+        return (
+            now - (self._last_model_activity_s or response_started_s)
+            > RESPONSE_TIMEOUT_S
         )
 
     async def _receive(self, session, types, response_started_s):
@@ -1387,6 +1404,20 @@ class GeminiRuntime:
         self.latest_response = response
         self.latest_action = action
         self._last_turn_used_tool = action != "none"
+        if self._last_turn_used_tool:
+            self._text_only_turns = 0
+        else:
+            self._text_only_turns += 1
+            if self._text_only_turns >= 2:
+                print(
+                    "Gemini returned text without a tool twice; restarting the session.",
+                    flush=True,
+                )
+                self._session_handle = None
+                self._memory_sent = False
+                self._bootstrap_pending = True
+                self._reconnect_requested = True
+                self._text_only_turns = 0
         summary = thought or response
         if not summary and action != "ack":
             summary = action
@@ -1569,8 +1600,9 @@ Use the newest camera image, forward TOF distance, velocity, local position,
 heading, current action, dialogue, memory, and measured results.
 
 Act through the declared functions, never by describing or imitating a function
-call in text. Only a real `speak` call is spoken. Use `ack` or `hover` when no
-physical change is needed.
+call in text. JSON or Markdown that describes an action is not a command and
+wastes a turn; call the matching function directly. Only a real `speak` call is
+spoken. Use `ack` or `hover` when no physical change is needed.
 
 Treat the situation and latest dialogue as ongoing context. Continue observing
 and choosing useful actions; do not stop exploring just because one local view
