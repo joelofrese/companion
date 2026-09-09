@@ -22,11 +22,14 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "low"
 # ER 2 Streaming accepts at most one JPEG per second.
 VIDEO_PERIOD_S = 1.0
-# Allow a slow first ER2 decision to start normally.
-INITIAL_RESPONSE_TIMEOUT_S = 30.0
-# Give later ER2 decisions enough time to finish a slow streamed response. A
-# connection error still reconnects immediately, while silence gets this bound.
-RESPONSE_TIMEOUT_S = 60.0
+# ER 2 can take tens of seconds to make a first decision. Keep a bounded
+# timeout without treating that normal latency as a failed session.
+INITIAL_RESPONSE_TIMEOUT_S = 60.0
+# A connection error still reconnects immediately; silence gets this bound.
+RESPONSE_TIMEOUT_S = 90.0
+# Give a completed action time to produce its next turn before one recovery
+# heartbeat interrupts a turn that may simply be slow.
+IDLE_NUDGE_DELAY_S = 10.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -145,6 +148,7 @@ class GeminiRuntime:
         self._reconnect_requested = False
         self._last_model_activity_s: Optional[float] = None
         self._response_in_flight = False
+        self._heartbeat_nudge_sent = False
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -284,6 +288,7 @@ class GeminiRuntime:
                     self._dialogue_in_flight = None
                     self._dialogue_send_complete = False
                 self._response_in_flight = False
+                self._heartbeat_nudge_sent = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -482,16 +487,12 @@ class GeminiRuntime:
         await self._send_frame(session, types)
         if self._request_complete and not self._dialogue:
             return
-        # Keep frames continuous, but let the current model or blocking tool
-        # cycle finish. State text interrupts reasoning; dialogue may interrupt
-        # ordinary model output but waits while a physical tool owns the turn.
+        # Let dialogue interrupt an ordinary model turn, but never interrupt a
+        # physical tool or a dialogue that is already being answered.
         if self._response_in_flight:
-            if (
-                self._active_action is None
-                and self._dialogue
-                and self._dialogue_in_flight is None
-            ):
-                # A blocking robotics tool owns the model turn until it returns.
+            if self._active_action is not None or self._dialogue_in_flight is not None:
+                return
+            if self._dialogue:
                 action_result = self._last_action_result
                 await self._send_dialogue(session, self._dialogue[0])
                 if action_result and self._last_action_result == action_result:
@@ -500,14 +501,40 @@ class GeminiRuntime:
                     self._memory_sent = True
                 if self._bootstrap_pending:
                     self._bootstrap_pending = False
+                return
+            if (
+                self.action_count == 0
+                or self._heartbeat_nudge_sent
+                or self._last_model_activity_s is None
+                or time.monotonic() - self._last_model_activity_s < IDLE_NUDGE_DELAY_S
+            ):
+                return
+            # One recovery prompt is enough to restart a turn that stopped
+            # after a tool result. Repeated prompts would starve slow thinking.
+            self._heartbeat_nudge_sent = True
+            async with self._send_lock:
+                try:
+                    await session.send_realtime_input(
+                        text=self._heartbeat_text("")
+                    )
+                except Exception:
+                    self._heartbeat_nudge_sent = False
+                    raise
             return
+        # Video alone does not start a Live API reasoning turn. Send one text
+        # heartbeat per turn, then let ER 2 finish or interrupt it itself.
         dialogue = (
             self._dialogue[0]
-            if self._dialogue and self._dialogue_in_flight is None
+            if (
+                self._dialogue
+                and self._dialogue_in_flight is None
+                and self._active_action is None
+            )
             else ""
         )
         action_result = self._last_action_result
         self._response_in_flight = True
+        self._heartbeat_nudge_sent = False
         if dialogue:
             await self._send_dialogue(session, dialogue)
         else:
@@ -1539,7 +1566,8 @@ def _tools():
                 "when translating and turning together would make a smoother arc. "
                 "A turn is one observation step; after its fresh result, prefer a "
                 "short clear translation or hover before turning again unless the "
-                "new view gives a reason to turn. "
+                "new view gives a clear reason to turn. Do not repeat same-direction "
+                "turns while a target is still uncertain. "
                 f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
                 "measured translation, turn is unavailable "
                 "until a translation or new dialogue."
@@ -1640,8 +1668,9 @@ vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
 valid TOF, and valid telemetry. Never move forward into a blocked path. When
 forward is blocked, choose another safe direction or turn. Turning changes the
 view but does not move around an obstacle. If a requested target remains
-unconfirmed after a turn, prefer a small clear lateral or diagonal move to
-change the viewpoint before turning again; do not keep scanning in place.
+unconfirmed after a turn, use one small turn, then prefer a small clear lateral
+or diagonal move to change the viewpoint instead of repeating same-direction
+turns.
 Report a target as found only when it is clearly visible in the newest image;
 otherwise keep looking or say it is not confirmed.
 Heading is in degrees; increasing heading is a right, clockwise turn. Use the
@@ -1655,7 +1684,8 @@ a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger angle when the
 task or scene calls for a larger change of view.
 A turn is one observation step, not a plan to rotate repeatedly. After its fresh
 image and heading result, prefer a short clear translation or hover before
-turning again unless the new view gives a reason to turn.
+turning again unless the new view gives a clear reason to turn. Do not repeat
+same-direction turns while a target is still uncertain.
 After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without translation, turn is
 unavailable until a measured translation or new dialogue. A move that does not
 measurably translate does not reset this limit.
@@ -1668,7 +1698,9 @@ requested subject is centered, stop turning and reassess. Seeing or reporting
 a target is not the same as completing a physical request. For a request to
 find, approach, follow, or inspect something, keep checking the newest image
 and measured state until the requested outcome is reached or it cannot be
-safely confirmed. When no safe useful change is clear, hover or wait. For
+safely confirmed. When an active physical task has a safe small movement to
+try, act rather than wait for another command; use the measured result to
+refine the next action. When no safe useful change is clear, hover or wait. For
 following, staying near, or approaching a person, an observation or spoken
 acknowledgment alone is not progress: use measured movement when the person is
 not yet near or the request is not yet achieved, then reassess as the person

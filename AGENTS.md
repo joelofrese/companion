@@ -58,10 +58,12 @@ merge and delete it.
   viewpoint. After three in-place turns without a measured translation,
   translate or wait for new dialogue before turning again; an ineffective move
   does not reset this limit.
-- Camera frames stream once per second. Heartbeats continue sending frames while
-  a physical action runs, but the blocking tool keeps ER 2 from choosing another
-  action until its result returns. Dialogue waits for that result unless it is an
-  explicit stop; a bounded timeout restarts a stalled session.
+- Camera frames stream once per second, including while a physical action runs.
+  Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
+  blocking tool keeps ER 2 from starting another move or turn until its result
+  returns. One delayed recovery heartbeat can restart a quiet post-action turn.
+  Dialogue waits for a physical result unless it is an explicit stop; a bounded
+  timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
   rejects unsafe commands, stops positive forward motion at a close obstacle,
   and is the final vehicle-side authority. PX4 stabilizes the vehicle and
