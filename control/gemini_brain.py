@@ -40,7 +40,7 @@ MAX_RIGHT_SPEED_M_S = 0.20
 MAX_VERTICAL_SPEED_M_S = 0.20
 # The model asks for a relative angle; the runtime stops from measured heading.
 MIN_TURN_DEG = 5.0
-MAX_TURN_DEG = 30.0
+MAX_TURN_DEG = 90.0
 # A turn without an angle is a small controller-like correction.
 DEFAULT_TURN_DEG = 15.0
 # Keep the yaw rate slow while making one visual correction useful.
