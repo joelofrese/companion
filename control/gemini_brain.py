@@ -29,8 +29,9 @@ INITIAL_RESPONSE_TIMEOUT_S = 60.0
 # Dialogue can start a fresh thought after flight is already underway. Give it
 # the same time as the initial thought instead of dropping a slow reply.
 DIALOGUE_RESPONSE_TIMEOUT_S = 60.0
-# Reconnect a quiet post-start response after this bounded wait.
-RESPONSE_TIMEOUT_S = 20.0
+# Reconnect a quiet post-start response quickly so text-only output does not
+# consume most of a short flight.
+RESPONSE_TIMEOUT_S = 8.0
 # Give a completed action a short chance to produce its next turn before one
 # recovery heartbeat interrupts a quiet turn.
 IDLE_NUDGE_DELAY_S = 2.0
@@ -1508,6 +1509,7 @@ class GeminiRuntime:
         if (
             self.memory_store is not None
             and summary not in ("", "none")
+            and action not in ("none", "ack")
             and action not in summary
         ):
             self._remember_summary(summary)
