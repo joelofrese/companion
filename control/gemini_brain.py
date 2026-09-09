@@ -117,6 +117,7 @@ class GeminiRuntime:
         self._speech_blocked = False
         self._request_complete = False
         self._active_action: Optional[ActiveAction] = None
+        self._initial_heading_rad: Optional[float] = None
         self._turns_since_translation = 0
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
@@ -216,6 +217,11 @@ class GeminiRuntime:
             self._latest_frame_at_s = time.monotonic()
             self._frame_ready.set()
         self._telemetry = telemetry
+        if (
+            self._initial_heading_rad is None
+            and _finite(telemetry.heading_rad)
+        ):
+            self._initial_heading_rad = telemetry.heading_rad
         self._refresh_action()
         if not self._has_fresh_frame():
             self._cancel_action("camera frame stale")
@@ -474,6 +480,8 @@ class GeminiRuntime:
         """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
+        if self._request_complete and not self._dialogue:
+            return
         # Keep frames continuous, but let the current model or blocking tool
         # cycle finish. State text interrupts reasoning; dialogue may interrupt
         # ordinary model output but waits while a physical tool owns the turn.
@@ -579,6 +587,7 @@ class GeminiRuntime:
             f"[STATE] camera={camera}; "
             f"in_place_turns={self._turns_since_translation}/"
             f"{MAX_TURNS_WITHOUT_TRANSLATION}; turn={turn_status}; "
+            f"initial_heading_deg={_heading_number(self._initial_heading_rad)}; "
             f"telemetry={_telemetry_text(self._telemetry)}; "
             f"action={action_state}; speech={speech}; task={task}"
         )
@@ -1615,6 +1624,10 @@ obstacle, make a small clear lateral or diagonal move to find a new viewpoint
 instead of turning in place repeatedly. Report a target as found only when it is
 clearly visible in the newest image; otherwise keep looking or say it is not
 confirmed.
+Heading is in degrees; increasing heading is a right, clockwise turn. Use the
+initial heading reference in the live state when a user refers to the original
+direction. Compare current heading with that reference and use measured heading
+changes, not elapsed time or remembered turn counts, to choose corrections.
 Use short, slow body-frame pulses. Body-frame up is positive and down is
 negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for

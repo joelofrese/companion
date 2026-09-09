@@ -32,8 +32,8 @@ merge and delete it.
 ## Control
 
 - One Gemini ER 2 Streaming session starts with one situation prompt and keeps
-  deciding from the newest image, dialogue, local position, heading, other
-  telemetry, memory, and action results.
+  deciding from the newest image, dialogue, local position, current and initial
+  heading, other telemetry, memory, and action results.
 - A new user request stays active until it is completed, changed, or unsafe.
   Speaking alone or an ordinary `hover` does not end it. When complete, call
   `hover` with `complete=true` and wait for new dialogue; movement tools stay
