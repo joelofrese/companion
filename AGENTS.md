@@ -184,8 +184,8 @@ are retained when a fresh session is needed.
   heading feedback for calibration. Hover can pause an active task without
   ending it; completed specific requests use `complete=true` and wait in hover
   for new dialogue.
-- Native ER 2 thinking is currently set medium for more deliberate closed-loop
-  task planning; latency and decisions remain variable.
+- Native ER 2 thinking is currently set low for timely closed-loop task planning;
+  measured action feedback keeps each next choice grounded.
 - Completed measured movement and turn results are saved as experience for
   later ER 2 sessions to use as calibration.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
