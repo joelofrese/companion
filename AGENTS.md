@@ -35,7 +35,9 @@ merge and delete it.
   deciding from the newest image, dialogue, local position, heading, other
   telemetry, memory, and action results.
 - A new user request is the active task until it is completed, changed, or
-  unsafe. Explore generally only when there is no more specific request.
+  unsafe. After completing and answering a specific request, hover and wait
+  for new dialogue unless another physical action is clearly necessary. Explore
+  generally only when there is no more specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
@@ -49,8 +51,8 @@ merge and delete it.
   deliberate pulses, inspect the fresh result, and stop when no useful change
   is clear. The forward-only TOF reading calls for a safe lateral, backward,
   or turning response when the path is blocked. Do not narrate routine
-  movement. After repeated in-place turns without a translation, translate or
-  wait for new dialogue before turning again.
+  movement. After three in-place turns without a translation, translate or wait
+  for new dialogue before turning again.
 - Camera frames stream once per second. Heartbeats continue sending frames while
   a physical action runs, but the blocking tool keeps ER 2 from choosing another
   action until its result returns. Dialogue waits for that result unless it is an
@@ -158,7 +160,8 @@ recent measured actions are retained when a fresh session is needed.
 - ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
-  heading feedback for calibration.
+  heading feedback for calibration. Live state exposes the three-turn viewpoint
+  budget, and completed specific requests wait in hover for new dialogue.
 - Native ER 2 thinking is currently set low for timely closed-loop control;
   latency and decisions remain variable.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware

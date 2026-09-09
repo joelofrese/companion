@@ -559,9 +559,17 @@ class GeminiRuntime:
                 "wait for new dialogue or a meaningful scene change"
             )
         )
+        turn_status = (
+            "available"
+            if self._turns_since_translation < MAX_TURNS_WITHOUT_TRANSLATION
+            else "unavailable until translation or new dialogue"
+        )
         action_state = self._action_state_text()
         parts.append(
-            f"[STATE] camera={camera}; telemetry={_telemetry_text(self._telemetry)}; "
+            f"[STATE] camera={camera}; "
+            f"in_place_turns={self._turns_since_translation}/"
+            f"{MAX_TURNS_WITHOUT_TRANSLATION}; turn={turn_status}; "
+            f"telemetry={_telemetry_text(self._telemetry)}; "
             f"action={action_state}; speech={speech}"
         )
         if dialogue:
@@ -1429,7 +1437,10 @@ def _tools():
                 "means right. Choose a relative angle; the controller uses "
                 "measured heading to stop there. Inspect the new image and heading "
                 "before choosing another physical action. Use move with a yaw rate "
-                "when translating and turning together would make a smoother arc."
+                "when translating and turning together would make a smoother arc. "
+                f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
+                "translation, turn is unavailable "
+                "until a translation or new dialogue."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1477,7 +1488,8 @@ def _tools():
                 "calling move or turn; speak after the observation or action is "
                 "real. After speaking, do not call speak again until new dialogue "
                 "or a completed physical action. During open exploration, do not "
-                "narrate routine movement."
+                "narrate routine movement. After answering a specific request, "
+                "hover and wait unless another physical action is clearly needed."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1512,14 +1524,17 @@ negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for
 a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger angle when the
 task or scene calls for a larger change of view.
+After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without translation, turn is
+unavailable until a translation or new dialogue.
 After every move or turn,
 inspect the new image, heading, position, and measured result before choosing
 the next physical action. A requested duration or angle is not a measurement;
 use the returned numeric requested and observed translation or angle, together
 with current telemetry, to know what happened and adjust the next pulse. When a
 requested subject is centered, stop turning and reassess. When
-no safe useful change is clear, hover or wait; do not invent movement or
-narrate routine motion.
+no safe useful change is clear, hover or wait. After completing and answering a
+specific request, hover and wait for new dialogue unless another physical action
+is clearly needed. Do not invent movement or narrate routine motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
