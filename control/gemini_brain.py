@@ -987,9 +987,10 @@ class GeminiRuntime:
             return {
                 "status": "unavailable",
                 "reason": (
-                    "after an in-place turn, make a measured translation before "
-                    "turning in place again"
+                    "after this in-place turn, translate to get a new viewpoint "
+                    "before turning in place again"
                 ),
+                "next_action": "call move or hover, not turn",
                 "turn_tools": "unavailable until a meaningful translation",
                 "telemetry": _telemetry_text(self._telemetry),
             }
@@ -1587,7 +1588,7 @@ def _tools():
                 "only for a clear visual reason; do not repeat broad scans. "
                 "Inspect the new image and heading before another physical action. "
                 "Use move with yaw rate for a smooth translating turn. Before another "
-                "in-place turn, use a measured translation to change the viewpoint."
+                "in-place turn, make a measured translation to change the viewpoint."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1707,7 +1708,7 @@ is visible.
 Choose a useful relative turn from the current view and measured heading. For routine
 exploration or uncertainty, use a small 10-20 degree turn. Use the maximum only for
 a clear visual reason; do not repeat broad scans. Inspect
-the new view before another action. Before another in-place turn, use a measured
+the new view before another action. Before another in-place turn, make a measured
 translation to change the viewpoint. For follow or stay-with requests, act to
 keep a visible person in view rather than waiting or speaking readiness.
 

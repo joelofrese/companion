@@ -206,7 +206,11 @@ async def run(
 
         nonlocal offboard_started
         if stack is not None:
-            await stack.stop()
+            try:
+                await stack.stop()
+            except BaseException:
+                # PX4 may already be gone when the runner is interrupted.
+                pass
         mind_stop.set()
         if mind_task is not None and not mind_task.done():
             await mind_task
