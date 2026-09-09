@@ -53,14 +53,16 @@ merge and delete it.
   local-position change. An explicit stop may interrupt an action.
 - Choose each action from the newest image and measured state. Use short,
   deliberate pulses, inspect the fresh result, and stop when no useful change
-  is clear. The forward-only TOF reading calls for a safe lateral, backward,
+  is clear. Treat the newest image as the visual evidence; if it is unclear,
+  say so rather than inventing unseen objects or outcomes. The forward-only TOF
+  reading calls for a safe lateral, backward,
   or turning response when the path is blocked. Do not narrate routine
   movement. After a turn, use the new view before turning again; when a target
   remains unconfirmed, prefer a small lateral or diagonal move to change the
   viewpoint. If an obstruction still fills the view, continue measured lateral
   or diagonal movement before turning again. Choose the smallest useful turn,
-  usually 10–20 degrees; use a larger turn only for a clear reorientation and
-  do not repeat wide scans. After two in-place turns without a meaningful
+  usually 10–20 degrees. Use 30 degrees or more only for a clear reorientation,
+  and do not repeat wide scans. After two in-place turns without a meaningful
   translation, use a lateral or diagonal translation (or wait for new dialogue)
   before turning again; an ineffective move does not reset this limit.
 - Camera frames stream once per second, including while a physical action runs.

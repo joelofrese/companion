@@ -1696,7 +1696,8 @@ The camera faces forward; image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move with fresh vision, valid
 TOF, and valid telemetry. Heading is in degrees, increasing clockwise; use the
 measured heading and the initial heading reference, not elapsed time or remembered
-turn counts. Report a target only when it is visible in the newest image.
+turn counts. Treat the newest image as the visual evidence; if it is unclear,
+say so rather than inventing unseen objects or outcomes.
 
 Movement:
 Use short, slow body-frame pulses. Forward, right, and up are positive; vertical
@@ -1707,9 +1708,9 @@ allows. Turning changes the view but does not move around an obstacle. If a
 target is hidden, translate laterally or diagonally to change the viewpoint; if
 the obstruction still fills the view, continue measured lateral or diagonal
 movement before turning again.
-Choose the smallest useful relative turn, usually 10-20 degrees, and inspect its
-new view before turning again. Use a larger turn only for a clear reorientation;
-do not repeat wide scans. After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns
+Choose the smallest useful relative turn, usually 10-20 degrees. Use 30 degrees
+or more only for a clear reorientation, and inspect its new view before turning
+again; do not repeat wide scans. After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns
 without meaningful translation, translate before turning again; an ineffective
 move does not reset that limit. If a person is visible for a follow or stay-with
 request, act to keep them in view rather than waiting or speaking readiness.
