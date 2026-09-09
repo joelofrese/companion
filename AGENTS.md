@@ -36,7 +36,7 @@ merge and delete it.
   telemetry, memory, and action results.
 - A new user request is the active task until it is completed, changed, or
   unsafe. After completing and answering a specific request, hover and wait
-  for new dialogue unless another physical action is clearly necessary. Explore
+  for new dialogue; movement tools stay unavailable until then. Explore
   generally only when there is no more specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.

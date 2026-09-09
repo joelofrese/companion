@@ -112,6 +112,7 @@ class GeminiRuntime:
         self._dialogue_send_complete = False
         self._latest_user_request = self.situation
         self._speech_blocked = False
+        self._request_complete = False
         self._active_action: Optional[ActiveAction] = None
         self._turns_since_translation = 0
         self._action_finished_at_s: Optional[float] = None
@@ -175,6 +176,7 @@ class GeminiRuntime:
         message = message.strip()
         self._latest_user_request = message
         self._speech_blocked = False
+        self._request_complete = False
         self._turns_since_translation = 0
         if _is_explicit_stop(message):
             self._stop_requested = True
@@ -559,6 +561,11 @@ class GeminiRuntime:
                 "wait for new dialogue or a meaningful scene change"
             )
         )
+        task = (
+            "complete; wait for new dialogue"
+            if self._request_complete
+            else "active"
+        )
         turn_status = (
             "available"
             if self._turns_since_translation < MAX_TURNS_WITHOUT_TRANSLATION
@@ -570,7 +577,7 @@ class GeminiRuntime:
             f"in_place_turns={self._turns_since_translation}/"
             f"{MAX_TURNS_WITHOUT_TRANSLATION}; turn={turn_status}; "
             f"telemetry={_telemetry_text(self._telemetry)}; "
-            f"action={action_state}; speech={speech}"
+            f"action={action_state}; speech={speech}; task={task}"
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
@@ -748,22 +755,43 @@ class GeminiRuntime:
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
             elif self._speech_blocked:
+                movement_tools = (
+                    "unavailable until new dialogue"
+                    if self._request_complete
+                    else "available now"
+                )
                 result = {
                     "status": "already_spoken",
                     "reason": (
-                        "a response was already spoken for this dialogue; do not "
-                        "call speak again. Choose move, turn, or hover. "
-                        "Speech becomes available after new dialogue or a completed "
-                        "physical action"
+                        (
+                            "the specific dialogue request was answered; wait for "
+                            "new dialogue"
+                        )
+                        if self._request_complete
+                        else (
+                            "a response was already spoken for this dialogue; do "
+                            "not call speak again. Choose move, turn, or hover. "
+                            "Speech becomes available after new dialogue or a "
+                            "completed physical action"
+                        )
                     ),
-                    "movement_tools": "available now",
+                    "movement_tools": movement_tools,
                 }
             else:
+                specific_request = self._latest_user_request != self.situation
                 self._record_action(f"speak: {message}")
                 print(f"Companion: {message}", flush=True)
                 self._speech_blocked = True
+                self._request_complete = specific_request
                 self._remember_summary(message)
-                result = {"status": "spoken"}
+                result = {
+                    "status": "spoken",
+                    "task": (
+                        "complete; wait for new dialogue"
+                        if specific_request
+                        else "still open"
+                    ),
+                }
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
         if result.get("status") in ("hovering", "spoken"):
@@ -953,6 +981,16 @@ class GeminiRuntime:
         self._refresh_action()
         action = self._active_action
         if action is None:
+            if self._request_complete:
+                return {
+                    "status": "unavailable",
+                    "reason": (
+                        "the specific dialogue request was answered; wait for "
+                        "new dialogue before moving or turning"
+                    ),
+                    "movement_tools": "unavailable until new dialogue",
+                    "telemetry": _telemetry_text(self._telemetry),
+                }
             if self._stop_requested:
                 return {
                     "status": "unavailable",
@@ -1057,7 +1095,12 @@ class GeminiRuntime:
                 state = self._last_action_result
             else:
                 state = "none"
-            return f"{state}; movement tools available"
+            movement = (
+                "movement tools unavailable until new dialogue"
+                if self._request_complete
+                else "movement tools available"
+            )
+            return f"{state}; {movement}"
         details = [
             f"{self._action_label(action)}; {action.phase}",
             f"remaining={max(0.0, action.deadline_s - time.monotonic()):.1f}s",
@@ -1537,8 +1580,9 @@ use the returned numeric requested and observed translation or angle, together
 with current telemetry, to know what happened and adjust the next pulse. When a
 requested subject is centered, stop turning and reassess. When
 no safe useful change is clear, hover or wait. After completing and answering a
-specific request, hover and wait for new dialogue unless another physical action
-is clearly needed. Do not invent movement or narrate routine motion.
+specific request, hover and wait for new dialogue. The runtime keeps move and
+turn unavailable after that answer until new dialogue arrives. Do not invent
+movement or narrate routine motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
