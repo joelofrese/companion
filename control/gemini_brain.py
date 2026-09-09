@@ -40,6 +40,8 @@ MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 90.0
 # A turn without an angle is a small controller-like correction.
 DEFAULT_TURN_DEG = 15.0
+# Require a new viewpoint before allowing an unbounded in-place scan.
+MAX_TURNS_WITHOUT_TRANSLATION = 3
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -111,6 +113,7 @@ class GeminiRuntime:
         self._latest_user_request = self.situation
         self._speech_blocked = False
         self._active_action: Optional[ActiveAction] = None
+        self._turns_since_translation = 0
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -172,6 +175,7 @@ class GeminiRuntime:
         message = message.strip()
         self._latest_user_request = message
         self._speech_blocked = False
+        self._turns_since_translation = 0
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -873,6 +877,16 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
+        if self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION:
+            return {
+                "status": "unavailable",
+                "reason": (
+                    "the in-place turn limit is reached; translate to reset the "
+                    "view, or wait for new dialogue, before turning again"
+                ),
+                "turn_tools": "unavailable until a translation or new dialogue",
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         now = time.monotonic()
         angle_deg = float(angle_deg)
         duration_s = angle_deg / TURN_RATE_DEG_S
@@ -890,6 +904,7 @@ class GeminiRuntime:
             last_update_s=now,
         )
         self._active_action = action
+        self._turns_since_translation += 1
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1283,6 +1298,9 @@ class GeminiRuntime:
     def _save_action_result(self, result: str):
         """Publish one measured result to the live and persistent context."""
 
+        action = self._active_action
+        if action is not None and action.kind == "move":
+            self._turns_since_translation = 0
         self._last_action_result = result
         self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
@@ -1498,7 +1516,8 @@ After every move or turn,
 inspect the new image, heading, position, and measured result before choosing
 the next physical action. A requested duration or angle is not a measurement;
 use the returned numeric requested and observed translation or angle, together
-with current telemetry, to know what happened and adjust the next pulse. When
+with current telemetry, to know what happened and adjust the next pulse. When a
+requested subject is centered, stop turning and reassess. When
 no safe useful change is clear, hover or wait; do not invent movement or
 narrate routine motion.
 
