@@ -1910,6 +1910,10 @@ def _is_explicit_stop(message: str) -> bool:
         if message.startswith(prefix):
             message = message[len(prefix):]
             break
+    for ending in (" now", " immediately"):
+        if message.endswith(ending):
+            message = message[:-len(ending)]
+            break
     if message in {
         "stop",
         "stop moving",
@@ -1921,6 +1925,11 @@ def _is_explicit_stop(message: str) -> bool:
         return True
     if message.startswith(("stop ", "hover ", "hold position ", "cancel ")):
         return True
+    if not any(
+        phrase in message
+        for phrase in ("tell me", "what do you see", "describe", "report")
+    ):
+        return False
     return message.endswith((
         " and stop",
         " then stop",
