@@ -1605,11 +1605,12 @@ def _tools():
                 "real. After speaking, do not call speak again until new dialogue "
                 "or a completed physical action. During open exploration, do not "
                 "narrate routine movement. A report does not end open exploration; "
-                "continue when a safe useful action is clear. After answering a "
-                "specific request, "
+                "continue when a safe useful action is clear. After completing "
+                "the requested physical outcome, "
                 "call hover with complete=true and wait unless another physical "
-                "action is clearly needed. In open exploration, use ordinary hover "
-                "and keep exploring."
+                "action is clearly needed. Do not describe an unmeasured approach "
+                "or following result as complete. In open exploration, use ordinary "
+                "hover and keep exploring."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1663,10 +1664,18 @@ inspect the new image, heading, position, and measured result before choosing
 the next physical action. A requested duration or angle is not a measurement;
 use the returned numeric requested and observed translation or angle, together
 with current telemetry, to know what happened and adjust the next pulse. When a
-requested subject is centered, stop turning and reassess. When
-no safe useful change is clear, hover or wait. After completing a specific
-request, speak if useful and call `hover` with `complete=true` to wait for new
-dialogue; speaking or an ordinary hover does not end the task. In open
+requested subject is centered, stop turning and reassess. Seeing or reporting
+a target is not the same as completing a physical request. For a request to
+find, approach, follow, or inspect something, keep checking the newest image
+and measured state until the requested outcome is reached or it cannot be
+safely confirmed. When no safe useful change is clear, hover or wait. For
+following, staying near, or approaching a person, an observation or spoken
+acknowledgment alone is not progress: use measured movement when the person is
+not yet near or the request is not yet achieved, then reassess as the person
+moves. Do not claim that physical result without observing it. After
+completing a specific request, speak if useful and call `hover` with
+`complete=true` to wait for new dialogue; speaking or an ordinary hover does
+not end the task. In open
 exploration, a spoken update or ordinary hover does not end exploration; continue
 when a safe useful action is clear. Do not invent movement or narrate routine
 motion.

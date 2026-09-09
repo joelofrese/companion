@@ -34,7 +34,8 @@ merge and delete it.
 - One Gemini ER 2 Streaming session starts with one situation prompt and keeps
   deciding from the newest image, dialogue, local position, current and initial
   heading, other telemetry, memory, and action results.
-- A new user request stays active until it is completed, changed, or unsafe.
+- A new user request stays active until its requested outcome is reached,
+  changed, or unsafe. Seeing or reporting something alone is not completion.
   Speaking alone or an ordinary `hover` does not end it. When complete, call
   `hover` with `complete=true` and wait for new dialogue; movement tools stay
   unavailable until then. In open exploration, `complete=true` has no effect.
