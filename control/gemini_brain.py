@@ -31,9 +31,9 @@ INITIAL_RESPONSE_TIMEOUT_S = 60.0
 DIALOGUE_RESPONSE_TIMEOUT_S = 60.0
 # Reconnect a quiet post-start response after this bounded wait.
 RESPONSE_TIMEOUT_S = 20.0
-# Give a completed action time to produce its next turn before one recovery
-# heartbeat interrupts a turn that may simply be slow.
-IDLE_NUDGE_DELAY_S = 10.0
+# Give a completed action a short chance to produce its next turn before one
+# recovery heartbeat interrupts a quiet turn.
+IDLE_NUDGE_DELAY_S = 2.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -60,8 +60,6 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
-# A small measured shift is enough to create a new viewpoint.
-MIN_TRANSLATION_RESET_M = 0.05
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -123,7 +121,6 @@ class GeminiRuntime:
         self._request_complete = False
         self._active_action: Optional[ActiveAction] = None
         self._initial_heading_rad: Optional[float] = None
-        self._turn_needs_translation = False
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -187,7 +184,6 @@ class GeminiRuntime:
         self._latest_user_request = message
         self._speech_blocked = False
         self._request_complete = False
-        self._turn_needs_translation = False
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -514,8 +510,7 @@ class GeminiRuntime:
                     self._bootstrap_pending = False
                 return
             if (
-                self.action_count == 0
-                or self._heartbeat_nudge_sent
+                self._heartbeat_nudge_sent
                 or self._last_model_activity_s is None
                 or time.monotonic() - self._last_model_activity_s < IDLE_NUDGE_DELAY_S
             ):
@@ -616,18 +611,12 @@ class GeminiRuntime:
             else "active; speech and ordinary hover do not complete it"
         )
         action_state = self._action_state_text()
-        turn_status = (
-            "unavailable until a measured translation or new dialogue"
-            if self._turn_needs_translation
-            else "available"
-        )
         heading_from_initial = _relative_heading_number(
             self._initial_heading_rad,
             self._telemetry.heading_rad,
         )
         parts.append(
             f"[STATE] camera={camera}; "
-            f"turn={turn_status}; "
             f"initial_heading_deg={_heading_number(self._initial_heading_rad)}; "
             f"heading_from_initial_deg={heading_from_initial}; "
             f"telemetry={_telemetry_text(self._telemetry)}; "
@@ -996,17 +985,6 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
-        if self._turn_needs_translation:
-            return {
-                "status": "unavailable",
-                "reason": (
-                    "after this in-place turn, translate to get a new viewpoint "
-                    "before turning in place again"
-                ),
-                "next_action": "call move or hover, not turn",
-                "turn_tools": "unavailable until a meaningful translation",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         now = time.monotonic()
         angle_deg = float(angle_deg)
         duration_s = angle_deg / TURN_RATE_DEG_S
@@ -1024,7 +1002,6 @@ class GeminiRuntime:
             last_update_s=now,
         )
         self._active_action = action
-        self._turn_needs_translation = True
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1434,12 +1411,6 @@ class GeminiRuntime:
         """Publish one measured result to the live and persistent context."""
 
         action = self._active_action
-        if (
-            action is not None
-            and action.kind == "move"
-            and self._meaningful_translation(action)
-        ):
-            self._turn_needs_translation = False
         self._last_action_result = result
         self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
@@ -1454,16 +1425,6 @@ class GeminiRuntime:
             self.experience_count += 1
         self._record_action(result)
         self._active_action = None
-
-    @staticmethod
-    def _meaningful_translation(action: ActiveAction) -> bool:
-        """Return whether a completed move actually changed the viewpoint."""
-
-        return math.hypot(
-            action.observed_forward_m,
-            action.observed_right_m,
-            action.observed_down_m,
-        ) >= MIN_TRANSLATION_RESET_M
 
     def _record_action(self, action: str):
         action = " ".join(str(action).split())
@@ -1527,7 +1488,9 @@ def _tools():
                 "diagonal pulse to change the viewpoint; use straight motion when "
                 "the path is clear or the target is visible. If a centered "
                 "obstruction hides a requested target, hold heading and prefer a "
-                "pure lateral pulse until its edge is visible."
+                "pure lateral pulse until its edge is visible. If the requested "
+                "outcome is visible or the target is near, stop and report it "
+                "instead of repeating forward motion."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1600,8 +1563,7 @@ def _tools():
                 "or uncertainty, use a small 10-20 degree turn. Use the maximum "
                 "only for a clear visual reason; do not repeat broad scans. "
                 "Inspect the new image and heading before another physical action. "
-                "Use move with yaw rate for a smooth translating turn. Before another "
-                "in-place turn, make a measured translation to change the viewpoint."
+                "Use move with yaw rate for a smooth translating turn."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1716,7 +1678,8 @@ until the obstruction no longer fills the relevant view; repeated in-place turns
 cannot reveal what is behind it. When a centered obstruction blocks the path,
 hold heading and prefer a pure lateral move until its edge is visible.
 If a requested target is visible, keep it in view and approach or align with it
-before scanning elsewhere.
+before scanning elsewhere. When the requested outcome is visibly true, stop and
+report it rather than repeating the same movement.
 In open space, prefer a translating pulse with a small yaw rate for a smooth scan
 when useful; use an in-place turn when holding position helps inspect the view.
 For a visible target, correct its horizontal position with lateral translation:
@@ -1728,10 +1691,9 @@ to change the viewpoint; use straight movement when the path is clear or the tar
 is visible.
 Choose a useful relative turn from the current view and measured heading. For routine
 exploration or uncertainty, use a small 10-20 degree turn. Use the maximum only for
-a clear visual reason; do not repeat broad scans. Inspect
-the new view before another action. Before another in-place turn, make a measured
-translation to change the viewpoint. For follow or stay-with requests, act to
-keep a visible person in view rather than waiting or speaking readiness.
+a clear visual reason; do not repeat broad scans. Inspect the new view before another
+action. For follow or stay-with requests, act to keep a visible person in view rather
+than waiting or speaking readiness.
 
 Action results:
 Move and turn are blocking physical actions. The runtime keeps sending frames
@@ -1740,7 +1702,9 @@ and a fresh frame before another movement is chosen. Requested duration and angl
 are intent, not proof. Use measured motion and heading to calibrate later
 pulses. If another pulse has the same purpose, change its speed or duration
 when the measured displacement differed; repeat a pulse only when the newest
-image still calls for it. When no safe useful change is clear, hover or wait.
+image still calls for it. Once the image and measured state show the requested
+outcome, stop, speak if useful, and complete the request. When no safe useful
+change is clear, hover or wait.
 Speak briefly for dialogue or a meaningful event, not for routine movement. The
 CM5 limits every command; never send motors, attitude, altitude, or
 absolute-position commands.""".strip()

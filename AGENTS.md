@@ -58,9 +58,7 @@ merge and delete it.
   reading calls for a safe lateral, backward,
   or turning response when the path is blocked. Do not narrate routine
   movement. After a turn, inspect the new view before acting again. If a target
-  is unconfirmed, change the viewpoint with a measured translation. Before
-  another in-place turn, make a measured translation; straight movement remains
-  available after a turn.
+  is unconfirmed, change the viewpoint with measured movement or another turn.
   If a requested target is hidden by an obstruction, translate until the
   obstruction no longer fills the relevant view; repeated in-place turns cannot
   reveal what is behind it. When a centered obstruction blocks the path, hold
@@ -75,7 +73,7 @@ merge and delete it.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
   blocking tool keeps ER 2 from starting another move or turn until its result
-  returns. One delayed recovery heartbeat can restart a quiet post-action turn.
+  returns. One short recovery heartbeat can restart a quiet post-action turn.
   Dialogue waits for a physical result unless it is an explicit stop; a bounded
   timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
