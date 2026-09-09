@@ -615,7 +615,7 @@ class GeminiRuntime:
         )
         action_state = self._action_state_text()
         turn_status = (
-            "unavailable until translation or new dialogue"
+            "unavailable until a measured translation or new dialogue"
             if self._turn_needs_translation
             else "available"
         )
@@ -932,22 +932,6 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
-        if (
-            self._turn_needs_translation
-            and forward_m_s > 0.0
-            and right_m_s == 0.0
-            and up_m_s == 0.0
-            and yaw_rate_deg_s == 0.0
-        ):
-            return {
-                "status": "unavailable",
-                "reason": (
-                    "after an in-place turn, change the viewpoint with a "
-                    "lateral or diagonal move before moving straight ahead"
-                ),
-                "movement_tools": "use right_m_s or combine it with forward_m_s",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
         now = time.monotonic()
         action = ActiveAction(
             "move",
@@ -1003,8 +987,8 @@ class GeminiRuntime:
             return {
                 "status": "unavailable",
                 "reason": (
-                    "change the viewpoint with a measured translation before "
-                    "turning again"
+                    "after an in-place turn, make a measured translation before "
+                    "turning in place again"
                 ),
                 "turn_tools": "unavailable until a meaningful translation",
                 "telemetry": _telemetry_text(self._telemetry),
@@ -1597,9 +1581,8 @@ def _tools():
                 "the newest image and heading, then choose a relative angle. The "
                 "controller stops from measured heading. Inspect the new image and "
                 "heading before another physical action. Use move with yaw rate for "
-                "a smooth translating turn. Do not repeat turns without a useful new "
-                "view. After an in-place turn, use a measured lateral or diagonal "
-                "translation before moving straight or turning again."
+                "a smooth translating turn. Before another in-place turn, use a "
+                "measured translation to change the viewpoint."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1712,12 +1695,10 @@ cannot reveal what is behind it. When a centered obstruction blocks the path,
 hold heading and prefer a pure lateral move until its edge is visible.
 If a requested target is visible, keep it in view and approach or align with it
 before scanning elsewhere.
-Choose the smallest useful relative turn, usually 10-20 degrees. Use a larger
-turn only when the new view clearly requires it, and inspect that view before
-turning again; do not repeat wide scans. After an in-place turn, use a measured
-lateral or diagonal translation before moving straight or turning again; an
-ineffective move does not reset this rule. For follow or stay-with requests, act
-to keep a visible person in view rather than waiting or speaking readiness.
+Choose a useful relative turn from the current view and measured heading. Inspect
+the new view before another action. Before another in-place turn, use a measured
+translation to change the viewpoint. For follow or stay-with requests, act to
+keep a visible person in view rather than waiting or speaking readiness.
 
 Action results:
 Move and turn are blocking physical actions. The runtime keeps sending frames
