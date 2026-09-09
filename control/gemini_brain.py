@@ -32,6 +32,7 @@ INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
 MAX_MOVE_S = 1.0
+DEFAULT_MOVE_DURATION_S = 0.8
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MAX_VERTICAL_SPEED_M_S = 0.20
@@ -822,7 +823,9 @@ class GeminiRuntime:
                 -MAX_VERTICAL_SPEED_M_S,
                 MAX_VERTICAL_SPEED_M_S,
             )
-        duration_s = _number_between(args, "duration_s", MIN_MOVE_S, MAX_MOVE_S)
+        duration_s = DEFAULT_MOVE_DURATION_S
+        if "duration_s" in args:
+            duration_s = _number_between(args, "duration_s", MIN_MOVE_S, MAX_MOVE_S)
         yaw_rate_deg_s = 0.0
         if "yaw_rate_deg_s" in args:
             yaw_rate_deg_s = _number_between(
@@ -1456,8 +1459,10 @@ def _tools():
                     "duration_s": {
                         "type": "NUMBER",
                         "description": (
-                            f"A duration from {MIN_MOVE_S} through {MAX_MOVE_S} "
-                            "seconds. Use a short pulse and inspect the result."
+                            f"Optional duration from {MIN_MOVE_S} through "
+                            f"{MAX_MOVE_S} seconds; omit it for the default "
+                            f"{DEFAULT_MOVE_DURATION_S}-second pulse. Inspect the "
+                            "measured result before moving again."
                         ),
                         "minimum": MIN_MOVE_S,
                         "maximum": MAX_MOVE_S,
@@ -1473,7 +1478,7 @@ def _tools():
                         "maximum": TURN_RATE_DEG_S,
                     },
                 },
-                "required": ["forward_m_s", "right_m_s", "duration_s"],
+                "required": ["forward_m_s", "right_m_s"],
             },
         },
         {
@@ -1587,8 +1592,9 @@ movement or narrate routine motion.
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
 before another movement is chosen, although frames continue while an action
-runs. A requested duration or angle is intent, not proof. Do not ask the
-developer for exact timing. Speak only for a user request, meaningful new
+runs. A requested duration or angle is intent, not proof. Choose movement
+amounts yourself from the image and telemetry; do not ask the developer for
+exact movement amounts or timing. Speak only for a user request, meaningful new
 observation, event, or safety state. The CM5 limits every physical command;
 the brain never sends motors, attitude, altitude, or absolute position.""".strip()
 
