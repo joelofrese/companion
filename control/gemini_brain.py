@@ -19,7 +19,7 @@ from control.velocity import VelocityCommand, ned_to_body
 
 DEFAULT_MODEL = "gemini-robotics-er-2-streaming-preview"
 DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
-THINKING_LEVEL = "low"
+THINKING_LEVEL = "medium"
 # ER 2 Streaming accepts at most one JPEG per second.
 VIDEO_PERIOD_S = 1.0
 # ER 2 can take tens of seconds to make a first decision. Keep a bounded
@@ -44,8 +44,6 @@ MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 90.0
 # A turn without an angle is a small controller-like correction.
 DEFAULT_TURN_DEG = 15.0
-# Require a new viewpoint before allowing another in-place scan.
-MAX_TURNS_WITHOUT_TRANSLATION = 2
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -121,7 +119,7 @@ class GeminiRuntime:
         self._request_complete = False
         self._active_action: Optional[ActiveAction] = None
         self._initial_heading_rad: Optional[float] = None
-        self._turns_since_translation = 0
+        self._turn_needs_translation = False
         self._action_finished_at_s: Optional[float] = None
         self._stop_requested = False
         self._last_action_result = ""
@@ -185,7 +183,7 @@ class GeminiRuntime:
         self._latest_user_request = message
         self._speech_blocked = False
         self._request_complete = False
-        self._turns_since_translation = 0
+        self._turn_needs_translation = False
         if _is_explicit_stop(message):
             self._stop_requested = True
             self._cancel_action("explicit stop request")
@@ -611,20 +609,19 @@ class GeminiRuntime:
             if self._request_complete
             else "active; speech and ordinary hover do not complete it"
         )
-        turn_status = (
-            "available"
-            if self._turns_since_translation < MAX_TURNS_WITHOUT_TRANSLATION
-            else "unavailable until translation or new dialogue"
-        )
         action_state = self._action_state_text()
+        turn_status = (
+            "unavailable until translation or new dialogue"
+            if self._turn_needs_translation
+            else "available"
+        )
         heading_from_initial = _relative_heading_number(
             self._initial_heading_rad,
             self._telemetry.heading_rad,
         )
         parts.append(
             f"[STATE] camera={camera}; "
-            f"in_place_turns={self._turns_since_translation}/"
-            f"{MAX_TURNS_WITHOUT_TRANSLATION}; turn={turn_status}; "
+            f"turn={turn_status}; "
             f"initial_heading_deg={_heading_number(self._initial_heading_rad)}; "
             f"heading_from_initial_deg={heading_from_initial}; "
             f"telemetry={_telemetry_text(self._telemetry)}; "
@@ -931,7 +928,7 @@ class GeminiRuntime:
         if observation is not None:
             return observation
         if (
-            self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION
+            self._turn_needs_translation
             and forward_m_s > 0.0
             and right_m_s == 0.0
             and up_m_s == 0.0
@@ -940,9 +937,8 @@ class GeminiRuntime:
             return {
                 "status": "unavailable",
                 "reason": (
-                    f"after {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns, "
-                    "change the viewpoint with a "
-                    "lateral or diagonal move before moving straight forward"
+                    "after an in-place turn, change the viewpoint with a "
+                    "lateral or diagonal move before moving straight ahead"
                 ),
                 "movement_tools": "use right_m_s or combine it with forward_m_s",
                 "telemetry": _telemetry_text(self._telemetry),
@@ -998,14 +994,14 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
-        if self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION:
+        if self._turn_needs_translation:
             return {
                 "status": "unavailable",
                 "reason": (
-                    "the in-place turn limit is reached; use a small lateral or "
-                    "diagonal move to create a new viewpoint before turning again"
+                    "change the viewpoint with a measured translation before "
+                    "turning again"
                 ),
-                "turn_tools": "unavailable until a translation or new dialogue",
+                "turn_tools": "unavailable until a meaningful translation",
                 "telemetry": _telemetry_text(self._telemetry),
             }
         now = time.monotonic()
@@ -1025,7 +1021,7 @@ class GeminiRuntime:
             last_update_s=now,
         )
         self._active_action = action
-        self._turns_since_translation += 1
+        self._turn_needs_translation = True
         self._last_action_result = ""
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1440,7 +1436,7 @@ class GeminiRuntime:
             and action.kind == "move"
             and self._meaningful_translation(action)
         ):
-            self._turns_since_translation = 0
+            self._turn_needs_translation = False
         self._last_action_result = result
         self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
@@ -1523,7 +1519,9 @@ def _tools():
                 "path. The range sensor looks forward only, so use lateral, backward, "
                 "vertical, or turning motion when the forward path is blocked. Use "
                 "yaw rate for a smooth arc when useful. Inspect the fresh image and "
-                "measured result before choosing another physical action."
+                "measured result before choosing another physical action. If a "
+                "centered obstruction hides a requested target, hold heading and "
+                "prefer a pure lateral pulse until its edge is visible."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1595,10 +1593,8 @@ def _tools():
                 "controller stops from measured heading. Inspect the new image and "
                 "heading before another physical action. Use move with yaw rate for "
                 "a smooth translating turn. Do not repeat turns without a useful new "
-                "view. "
-                f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
-                "meaningful translation, turn is unavailable "
-                "until a translation or new dialogue."
+                "view. After an in-place turn, use a measured lateral or diagonal "
+                "translation before moving straight or turning again."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1695,9 +1691,9 @@ Observe before acting:
 The camera faces forward; image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move with fresh vision, valid
 TOF, and valid telemetry. Heading is in degrees, increasing clockwise; use the
-measured heading and the initial heading reference, not elapsed time or remembered
-turn counts. Treat the newest image as the visual evidence; if it is unclear,
-say so rather than inventing unseen objects or outcomes.
+measured heading and the initial heading reference, not elapsed time. Treat the
+newest image as the visual evidence; if it is unclear, say so rather than
+inventing unseen objects or outcomes.
 
 Movement:
 Use short, slow body-frame pulses. Forward, right, and up are positive; vertical
@@ -1705,16 +1701,17 @@ motion is only a short adjustment, never an altitude target. Choose the amount
 and duration yourself from the current image and state. Never move forward into
 a blocked path: use lateral, backward, vertical, or turning motion as the scene
 allows. Turning changes the view but does not move around an obstacle. If a
-target is hidden, translate laterally or diagonally to change the viewpoint; if
-the obstruction still fills the view, continue measured lateral or diagonal
-movement before turning again.
+requested target is hidden by an obstruction, translate laterally or diagonally
+until the obstruction no longer fills the relevant view; repeated in-place turns
+cannot reveal what is behind it. When a centered obstruction blocks the path,
+hold heading and prefer a pure lateral move until its edge is visible.
 If a requested target is visible, keep it in view and approach or align with it
 before scanning elsewhere.
 Choose the smallest useful relative turn, usually 10-20 degrees. Use 30 degrees
 or more only for a clear reorientation, and inspect its new view before turning
-again; do not repeat wide scans. After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns
-without meaningful translation, translate before turning again; an ineffective
-move does not reset that limit. If a person is visible for a follow or stay-with
+again; do not repeat wide scans. After an in-place turn, use a measured lateral or
+diagonal translation before moving straight or turning again; an ineffective move
+does not reset this rule. If a person is visible for a follow or stay-with
 request, act to keep them in view rather than waiting or speaking readiness.
 
 Action results:

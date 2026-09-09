@@ -62,9 +62,13 @@ merge and delete it.
   viewpoint. If an obstruction still fills the view, continue measured lateral
   or diagonal movement before turning again. Choose the smallest useful turn,
   usually 10–20 degrees. Use 30 degrees or more only for a clear reorientation,
-  and do not repeat wide scans. After two in-place turns without a meaningful
-  translation, use a lateral or diagonal translation (or wait for new dialogue)
-  before turning again; an ineffective move does not reset this limit.
+  and do not repeat wide scans. After an in-place turn, use a measured lateral or
+  diagonal translation before moving straight or turning again; an ineffective
+  move does not reset this rule.
+  If a requested target is hidden by an obstruction, translate until the
+  obstruction no longer fills the relevant view; repeated in-place turns cannot
+  reveal what is behind it. When a centered obstruction blocks the path, hold
+  heading and prefer a pure lateral move until its edge is visible.
   If a requested target is visible, keep it in view and approach or align with it
   before scanning elsewhere.
 - Camera frames stream once per second, including while a physical action runs.
@@ -177,11 +181,11 @@ are retained when a fresh session is needed.
 - ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
-  heading feedback for calibration. Live state exposes the two-turn viewpoint
-  budget. Hover can pause an active task without ending it; completed specific
-  requests use `complete=true` and wait in hover for new dialogue.
-- Native ER 2 thinking is currently set low for timely closed-loop control;
-  latency and decisions remain variable.
+  heading feedback for calibration. Hover can pause an active task without
+  ending it; completed specific requests use `complete=true` and wait in hover
+  for new dialogue.
+- Native ER 2 thinking is currently set medium for more deliberate closed-loop
+  task planning; latency and decisions remain variable.
 - Completed measured movement and turn results are saved as experience for
   later ER 2 sessions to use as calibration.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
