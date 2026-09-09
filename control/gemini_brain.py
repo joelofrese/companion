@@ -479,14 +479,15 @@ class GeminiRuntime:
 
         await self._send_frame(session, types)
         # Let a fresh state interrupt an ordinary turn after physical movement
-        # finishes, but let queued dialogue wait for that turn to end. This
-        # prevents an old model turn from acting on a newer request.
+        # finishes. Let the completed action also wake the dialogue turn that
+        # produced it; newer queued dialogue still waits for that turn to end.
         if self._response_in_flight:
-            if (
-                self._active_action is not None
-                or self._dialogue_in_flight is not None
-                or self._dialogue
-            ):
+            if self._active_action is not None:
+                return
+            if self._dialogue_in_flight is not None:
+                if not self._last_action_result:
+                    return
+            elif self._dialogue:
                 return
             if (
                 self._heartbeat_nudge_sent
