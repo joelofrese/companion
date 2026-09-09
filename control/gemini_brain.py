@@ -59,6 +59,7 @@ HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
 POST_ACTION_FRAME_TIMEOUT_S = VIDEO_PERIOD_S + 0.5
+SPEECH_REPEAT_WINDOW_S = 5.0
 
 
 @dataclass
@@ -117,6 +118,8 @@ class GeminiRuntime:
         self._stop_requested = False
         self._last_action_result = ""
         self._recent_action_results = deque(maxlen=3)
+        self._last_spoken_message = ""
+        self._last_spoken_at_s: Optional[float] = None
         self.latest_thought = ""
         self.latest_response = ""
         self.latest_action = "stop"
@@ -759,7 +762,20 @@ class GeminiRuntime:
             message = str(args.get("message", "")).strip()
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
+            elif (
+                message == self._last_spoken_message
+                and self._last_spoken_at_s is not None
+                and time.monotonic() - self._last_spoken_at_s
+                < SPEECH_REPEAT_WINDOW_S
+            ):
+                self._record_action(f"speak already spoken: {message}")
+                result = {
+                    "status": "already_spoken",
+                    "reason": "the same message was spoken moments ago",
+                }
             else:
+                self._last_spoken_message = message
+                self._last_spoken_at_s = time.monotonic()
                 self._record_action(f"speak: {message}")
                 print(f"Companion: {message}", flush=True)
                 self._remember_summary(message)
