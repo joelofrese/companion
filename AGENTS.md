@@ -42,8 +42,9 @@ merge and delete it.
   call `hover` with `complete=true` and wait for new dialogue; movement tools
   stay unavailable until then. Explore generally only when there is no more
   specific request.
-- Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
-  action descriptions never move the vehicle.
+- Gemini chooses direct `ack`, `move`, `turn`, `hover`, or `speak` tools. `ack`
+  holds position while waiting for the next fresh frame. Text or JSON action
+  descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
   a small yaw rate for a smooth arc. `turn` accepts a relative angle and settles
   from heading.
@@ -73,7 +74,8 @@ merge and delete it.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
   blocking tool keeps ER 2 from starting another move or turn until its result
-  returns. One short recovery heartbeat can restart a quiet post-action turn.
+  returns. A post-action heartbeat can interrupt a quiet turn while keeping the
+  active request.
   Dialogue waits for a physical result unless it is an explicit stop; a bounded
   timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
@@ -179,7 +181,7 @@ are retained when a fresh session is needed.
   decisions, dialogue, memory, movement, and simulated TOF safety. Gazebo
   camera frames preserve the vehicle's left/right view, so ER 2 can make small
   visual corrections; exact target completion remains exploratory.
-- ER 2 chooses movement, turn, hover, or speech tools.
+- ER 2 chooses `ack`, movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
   heading feedback for calibration. Hover can pause an active task without

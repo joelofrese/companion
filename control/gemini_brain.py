@@ -494,10 +494,30 @@ class GeminiRuntime:
         await self._send_frame(session, types)
         if self._request_complete and not self._dialogue:
             return
-        # Let dialogue interrupt an ordinary model turn, but never interrupt a
-        # physical tool or a dialogue that is already being answered.
+        # Let a fresh state interrupt an ordinary turn after physical movement
+        # finishes, but never interrupt the physical tool itself.
         if self._response_in_flight:
-            if self._active_action is not None or self._dialogue_in_flight is not None:
+            if self._active_action is not None:
+                return
+            if self._dialogue_in_flight is not None:
+                if not self._last_action_result:
+                    return
+                if (
+                    self._heartbeat_nudge_sent
+                    or self._last_model_activity_s is None
+                    or time.monotonic() - self._last_model_activity_s
+                    < IDLE_NUDGE_DELAY_S
+                ):
+                    return
+                self._heartbeat_nudge_sent = True
+                async with self._send_lock:
+                    try:
+                        await session.send_realtime_input(
+                            text=self._heartbeat_text("")
+                        )
+                    except Exception:
+                        self._heartbeat_nudge_sent = False
+                        raise
                 return
             if self._dialogue:
                 action_result = self._last_action_result
@@ -644,7 +664,8 @@ class GeminiRuntime:
         else:
             heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
-            f"[HEARTBEAT] {heartbeat} Call move, turn, hover, or speak when useful. "
+            f"[HEARTBEAT] {heartbeat} Call ack when no safe useful change is clear; "
+            "call move, turn, hover, or speak when useful. "
             "If a user request is present, treat it as the active task until it is "
             "completed, changed, or unsafe; do not replace it with general exploration. "
             "If nothing needs to change, wait for the next image or dialogue. During "
@@ -774,7 +795,19 @@ class GeminiRuntime:
         self._dialogue_send_complete = False
 
     async def _execute(self, name: str, args: dict) -> dict:
-        if name == "move":
+        if name == "ack":
+            self._record_action("ack")
+            result = {
+                "status": "acknowledged",
+                "reason": "the current image and state were inspected; hold position",
+                "task": (
+                    "complete; wait for new dialogue"
+                    if self._request_complete
+                    else "active; reassess on the next fresh frame"
+                ),
+                "telemetry": _telemetry_text(self._telemetry),
+            }
+        elif name == "move":
             result = await self._move(args)
         elif name == "turn":
             result = await self._turn(args)
@@ -821,7 +854,7 @@ class GeminiRuntime:
                 }
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
-        if result.get("status") in ("hovering", "spoken"):
+        if result.get("status") in ("acknowledged", "hovering", "spoken"):
             self.action_count += 1
         if result.get("status") in ("rejected", "unavailable", "already_spoken"):
             reason = str(result.get("reason", "")).strip()
@@ -1452,7 +1485,9 @@ class GeminiRuntime:
         self.latest_thought = thought
         self.latest_response = response
         self.latest_action = action
-        summary = thought or response or action
+        summary = thought or response
+        if not summary and action != "ack":
+            summary = action
         self.latest_response_latency_s = (
             max(0.0, time.monotonic() - response_started_s)
             if summary and summary != "none"
@@ -1475,6 +1510,17 @@ def _tools():
     """Return the high-level actions exposed to Gemini."""
 
     return [{"function_declarations": [
+        {
+            "name": "ack",
+            "description": (
+                "Acknowledge that the newest image and telemetry were inspected "
+                "and hold position. Use this when no safe useful movement or "
+                "speech is needed yet; it keeps the active task open and asks the "
+                "next heartbeat to reassess. This does not complete any task."
+            ),
+            "behavior": "BLOCKING",
+            "parameters": {"type": "OBJECT", "properties": {}},
+        },
         {
             "name": "move",
             "description": (
@@ -1622,12 +1668,13 @@ def _tools():
         {
             "name": "speak",
             "description": (
-                "Say one short user-facing message for a request or meaningful new "
-                "event. Do not announce planned movement instead of calling move or "
-                "turn. Speech is not completion for an ongoing task; keep acting and "
-                "reassessing. Report a physical outcome only after observing it. After "
-                "a specific request is complete, speak if useful and call hover with "
-                "complete=true. Do not narrate routine exploration."
+                "Call this function to say one short user-facing message for a request "
+                "or meaningful new event; a text response is not spoken. Do not announce "
+                "planned movement instead of calling move or turn. Speech is not "
+                "completion for an ongoing task; keep acting and reassessing. Report a "
+                "physical outcome only after observing it. After a specific request is "
+                "complete, speak if useful and call hover with complete=true. Do not "
+                "narrate routine exploration."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1643,73 +1690,38 @@ def _system_instruction() -> str:
     """State the control contract in plain language."""
 
     return f"""You are the high-level brain of an indoor DEXI 3 companion drone.
-Use the newest camera image, forward TOF distance, body velocity, local
-position, heading, current action, dialogue, memory, and measured results.
-Choose direct tools: `move`, `turn`, `hover`, or `speak`; never write a tool
-call or movement JSON as plain text. Only a real function call moves the
-vehicle or speaks; plain text and JSON commands are ignored. For any user-facing
-answer, call `speak` instead of returning text.
+Use the newest camera image, forward TOF distance, velocity, local position,
+heading, current action, dialogue, memory, and measured results.
 
-Task:
-Keep each user request active until its outcome is observed, changed, or unsafe.
-Exploring, patrolling, following, staying with, watching, and searching are
-ongoing tasks: reassess them after every fresh frame and do not complete them
-because one area or action was inspected. Complete only a specific one-time
-outcome, then call `hover` with `complete=true`. Speech and ordinary hovering
-are pauses, not completion. Without a request, continue open exploration. At
-startup, inspect the current view first; do not turn automatically just because
-the session began.
+Use only real function calls: `ack`, `move`, `turn`, `hover`, and `speak`.
+Never describe a tool call or answer as text. Only a real `speak` call is spoken.
 
-Observe before acting:
-The camera faces forward; image-left and image-right are vehicle-left and
-vehicle-right. The TOF sensor looks forward only. Move with fresh vision, valid
-TOF, and valid telemetry. Heading is in degrees, increasing clockwise; use the
-measured heading and the initial heading reference, not elapsed time. Treat the
-newest image as the visual evidence; if it is unclear, say so rather than
-inventing unseen objects or outcomes.
+Keep a user request active until its outcome is observed, changed, or unsafe.
+Exploring, following, watching, and searching continue after each action. Only
+finish a specific one-time request with `hover(complete=true)`. Without a
+request, explore. At startup, inspect the current view before moving.
 
-Movement:
-Use short, slow body-frame pulses. Forward, right, and up are positive; vertical
-motion is only a short adjustment, never an altitude target. Choose the amount
-and duration yourself from the current image and state; never ask the developer
-for exact movement values. Never move forward into
-a blocked path: use lateral, backward, vertical, or turning motion as the scene
-allows. Turning changes the view but does not move around an obstacle. If a
-requested target is hidden by an obstruction, translate laterally or diagonally
-until the obstruction no longer fills the relevant view; repeated in-place turns
-cannot reveal what is behind it. When a centered obstruction blocks the path,
-hold heading and prefer a pure lateral move until its edge is visible.
-If a requested target is visible, keep it in view and approach or align with it
-before scanning elsewhere. When the requested outcome is visibly true, stop and
-report it rather than repeating the same movement.
-In open space, prefer a translating pulse with a small yaw rate for a smooth scan
-when useful; use an in-place turn when holding position helps inspect the view.
-For a visible target, correct its horizontal position with lateral translation:
-image-left means negative right_m_s and image-right means positive right_m_s.
-Center the target before moving toward it; do not turn away from a visible target
-just to scan.
-If a target is still unconfirmed after a turn, prefer lateral or diagonal movement
-to change the viewpoint; use straight movement when the path is clear or the target
-is visible.
-Choose a useful relative turn from the current view and measured heading. For routine
-exploration or uncertainty, use a small 10-20 degree turn. Use the maximum only for
-a clear visual reason; do not repeat broad scans. Inspect the new view before another
-action. For follow or stay-with requests, act to keep a visible person in view rather
-than waiting or speaking readiness.
+The camera faces forward. Image-left and image-right are vehicle-left and
+vehicle-right. The TOF sensor looks forward only. Use fresh vision, valid
+telemetry, and measured heading; heading increases clockwise. If the image is
+unclear, do not invent an object or outcome.
 
-Action results:
-Move and turn are blocking physical actions. The runtime keeps sending frames
-while one runs, then returns measured completion, heading, position, telemetry,
-and a fresh frame before another movement is chosen. Requested duration and angle
-are intent, not proof. Use measured motion and heading to calibrate later
-pulses. If another pulse has the same purpose, change its speed or duration
-when the measured displacement differed; repeat a pulse only when the newest
-image still calls for it. Once the image and measured state show the requested
-outcome, stop, speak if useful, and complete the request. When no safe useful
-change is clear, hover or wait.
-Speak briefly for dialogue or a meaningful event, not for routine movement. The
-CM5 limits every command; never send motors, attitude, altitude, or
-absolute-position commands.""".strip()
+Move in short, slow body-frame pulses. Forward, right, and up are positive; up
+is only a brief adjustment, never an altitude target. Never move forward into
+a blocked path. Use lateral, backward, vertical, or turning motion as the view
+allows. A turn changes the view but does not move around an obstacle. Keep a
+visible target in view and align with it before moving toward it. If it is hidden
+by an obstruction, translate until the obstruction no longer fills the view.
+Use image-left as negative `right_m_s` and image-right as positive. Prefer a
+small 10-20 degree turn when uncertain, then inspect the new view.
+
+`move` and `turn` are blocking. Wait for their measured completion, fresh image,
+telemetry, heading, and position result before choosing another movement. Use
+the measured result to adjust a later pulse; a requested duration or angle is
+not proof of what happened. Use `hover` to hold position, or `ack` when no useful
+safe change is needed yet. Speech is not task completion. The CM5 limits
+every command; never send motors, attitude, altitude, or absolute-position
+commands.""".strip()
 
 
 def _jpeg(frame) -> bytes:
