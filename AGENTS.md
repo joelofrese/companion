@@ -154,10 +154,10 @@ visual decision model remains beside Gemini.
 Set `GEMINI_API_KEY`. The brain uses one persistent ER 2 Streaming session
 with native context-window compression and session resumption for ordinary
 disconnects. A silent model turn restarts from the situation and memory. Its
-editable memory file contains only prior high-level experience across runs.
-The newest 640-pixel JPEG, telemetry, dialogue, and action results remain the
-live context; recent measured actions are retained when a fresh session is
-needed.
+editable memory file contains prior high-level experience and completed
+measured action results across runs. The newest 640-pixel JPEG, telemetry,
+dialogue, and action results remain the live context; recent measured actions
+are retained when a fresh session is needed.
 
 ## Current state
 
@@ -173,6 +173,8 @@ needed.
   requests use `complete=true` and wait in hover for new dialogue.
 - Native ER 2 thinking is currently set low for timely closed-loop control;
   latency and decisions remain variable.
+- Completed measured movement and turn results are saved as experience for
+  later ER 2 sessions to use as calibration.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
   behavior remains unverified. DEXI 3 has no lidar.
 

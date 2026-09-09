@@ -587,7 +587,7 @@ class GeminiRuntime:
         memory = ""
         if not self._memory_sent:
             if self.memory_store is not None:
-                memory = self.memory_store.context("experience=summary")
+                memory = self.memory_store.context("experience=")
         parts = []
         if self._bootstrap_pending:
             parts.append(f"[START] Situation: {self.situation}")
@@ -1445,6 +1445,14 @@ class GeminiRuntime:
         self._recent_action_results.append(result)
         self._action_finished_at_s = time.monotonic()
         self._speech_blocked = False
+        if (
+            self.memory_store is not None
+            and action.completion is not None
+            and action.completion.get("status")
+            in ("completed", "timed out before target")
+        ):
+            self.memory_store.remember(f"experience=action {result}")
+            self.experience_count += 1
         self._record_action(result)
         self._active_action = None
 
