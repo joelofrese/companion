@@ -1332,16 +1332,13 @@ def _tools():
             "name": "move",
             "description": (
                 "Move slowly in the body frame for a short duration. Forward is "
-                "positive, right is positive, and up is positive. Use a clear path "
-                "and valid range reading. Positive forward motion needs a clear path. "
-                "The range sensor looks forward only: when forward is blocked, use a "
-                "visible side opening or move backward instead of pressing forward. "
-                "If a nearby obstacle hides the requested target, sidestep through "
-                "a visible opening before turning to search. "
+                "positive, right is positive, and up is positive. Use fresh vision, "
+                "valid telemetry, and a clear path. The range sensor looks forward "
+                "only: when forward is blocked, use another safe direction or turn. "
                 "Use vertical velocity only for a small visually clear "
                 "adjustment, never as an altitude target. Combine lateral velocity "
                 "and yaw rate for a smooth arc when useful. Inspect the next image "
-                "and measured result after the move."
+                "and measured result before choosing another action."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1407,11 +1404,8 @@ def _tools():
                 "the newest image and heading: image-left means left and image-right "
                 "means right. Choose a relative angle; the controller uses "
                 "measured heading to stop there. Inspect the new image and heading "
-                "before choosing another correction. Use move with a yaw rate when "
-                "translating and turning together would make a smoother arc. During "
-                "open exploration, prefer a short clear translation or hover after "
-                "one view-changing turn. Do not call turn twice in succession "
-                "unless the new image gives a specific reason."
+                "before choosing another physical action. Use move with a yaw rate "
+                "when translating and turning together would make a smoother arc."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1482,31 +1476,24 @@ Use `speak` for user-facing replies. Call tools directly; do not write a tool
 call or movement JSON as plain text.
 
 Treat a user request as the active task until it is complete, changed, or
-unsafe. Explore generally only when there is no specific request. For a find
-or identify task, once the target is clearly visible, speak once and call
-`hover`. Treat that task as complete; do not approach or keep scanning unless
-the request asks you to.
+unsafe. Explore generally only when there is no specific request.
 
 The camera faces forward. Image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
-valid TOF, and valid telemetry. Never move forward into a blocked path. If a
-nearby obstacle hides a target, sidestep through a visible opening before
-turning to search; if a large nearby object fills the view, move toward a
-visible edge before turning again. Turning changes the view but does not move
-around an obstacle.
+valid TOF, and valid telemetry. Never move forward into a blocked path. When
+forward is blocked, choose another safe direction or turn. Turning changes the
+view but does not move around an obstacle.
 Use short, slow body-frame pulses. Body-frame up is positive and down is
 negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for
-a normal {DEFAULT_TURN_DEG:.0f}-degree correction. Use a larger angle only when
-a visible target or clear route calls for it, not just to scan. Do not call
-`turn` twice in succession unless the newest image gives a specific reason.
-If a visual search is not resolving after a turn, prefer a small clear
-translation to change viewpoint before turning again; do not spend the task
-rotating in place.
+a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger angle when the
+task or scene calls for a larger change of view.
 After every move or turn,
 inspect the new image, heading, position, and measured result before choosing
-the next physical action. When no safe useful change is clear, hover or wait;
-do not invent movement or narrate routine motion.
+the next physical action. A requested duration or angle is not a measurement;
+use the returned result and current telemetry to know what happened. When no
+safe useful change is clear, hover or wait; do not invent movement or narrate
+routine motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
