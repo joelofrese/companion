@@ -129,6 +129,7 @@ class GeminiRuntime:
         self.latest_response = ""
         self.latest_action = "stop"
         self.latest_response_latency_s: Optional[float] = None
+        self._last_turn_used_tool = False
         self.action_count = 0
         self.dialogue_sent_count = 0
         self.dialogue_count = 0
@@ -672,6 +673,11 @@ class GeminiRuntime:
             "open exploration, choose a small viewpoint change after the current view "
             "has been inspected; do not invent movement or repeat a completed answer."
         )
+        if self.latest_response and not self._last_turn_used_tool:
+            parts.append(
+                "[NO EFFECT] The previous model turn was text only; it did not "
+                "move or speak. Call a real tool directly if an action is needed."
+            )
         return "\n".join(parts)
 
     def _has_fresh_frame(self) -> bool:
@@ -1485,6 +1491,7 @@ class GeminiRuntime:
         self.latest_thought = thought
         self.latest_response = response
         self.latest_action = action
+        self._last_turn_used_tool = action != "none"
         summary = thought or response
         if not summary and action != "ack":
             summary = action
