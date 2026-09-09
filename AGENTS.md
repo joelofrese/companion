@@ -55,9 +55,9 @@ merge and delete it.
   or turning response when the path is blocked. Do not narrate routine
   movement. After a turn, use the new view before turning again; when a target
   remains unconfirmed, prefer a small lateral or diagonal move to change the
-  viewpoint. After three in-place turns without a measured translation,
-  translate or wait for new dialogue before turning again; an ineffective move
-  does not reset this limit.
+  viewpoint. After two in-place turns without a meaningful translation, use a
+  lateral or diagonal translation (or wait for new dialogue) before turning
+  again; an ineffective move does not reset this limit.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
   blocking tool keeps ER 2 from starting another move or turn until its result
@@ -168,7 +168,7 @@ needed.
 - ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
-  heading feedback for calibration. Live state exposes the three-turn viewpoint
+  heading feedback for calibration. Live state exposes the two-turn viewpoint
   budget. Hover can pause an active task without ending it; completed specific
   requests use `complete=true` and wait in hover for new dialogue.
 - Native ER 2 thinking is currently set low for timely closed-loop control;

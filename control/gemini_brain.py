@@ -34,8 +34,8 @@ START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
 MIN_MOVE_S = 0.2
-MAX_MOVE_S = 1.0
-DEFAULT_MOVE_DURATION_S = 0.8
+MAX_MOVE_S = 2.0
+DEFAULT_MOVE_DURATION_S = 1.0
 MAX_FORWARD_SPEED_M_S = 0.25
 MAX_RIGHT_SPEED_M_S = 0.20
 MAX_VERTICAL_SPEED_M_S = 0.20
@@ -44,8 +44,8 @@ MIN_TURN_DEG = 5.0
 MAX_TURN_DEG = 90.0
 # A turn without an angle is a small controller-like correction.
 DEFAULT_TURN_DEG = 15.0
-# Require a new viewpoint before allowing an unbounded in-place scan.
-MAX_TURNS_WITHOUT_TRANSLATION = 3
+# Require a new viewpoint before allowing another in-place scan.
+MAX_TURNS_WITHOUT_TRANSLATION = 2
 # Keep the yaw rate slow while making one visual correction useful.
 TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
@@ -58,8 +58,8 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
-# Only a visible movement creates a new viewpoint.
-MIN_TRANSLATION_RESET_M = 0.05
+# Only a meaningful movement creates a new viewpoint.
+MIN_TRANSLATION_RESET_M = 0.15
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -923,6 +923,23 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
+        if (
+            self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION
+            and forward_m_s > 0.0
+            and right_m_s == 0.0
+            and up_m_s == 0.0
+            and yaw_rate_deg_s == 0.0
+        ):
+            return {
+                "status": "unavailable",
+                "reason": (
+                    f"after {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns, "
+                    "change the viewpoint with a "
+                    "lateral or diagonal move before moving straight forward"
+                ),
+                "movement_tools": "use right_m_s or combine it with forward_m_s",
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         now = time.monotonic()
         action = ActiveAction(
             "move",
@@ -1536,7 +1553,9 @@ def _tools():
                             f"Optional duration from {MIN_MOVE_S} through "
                             f"{MAX_MOVE_S} seconds; omit it for the default "
                             f"{DEFAULT_MOVE_DURATION_S}-second pulse. Inspect the "
-                            "measured result before moving again."
+                            "measured result before moving again. For clear travel, "
+                            "use a useful pulse near the speed limit; use a shorter "
+                            "or slower pulse near an object."
                         ),
                         "minimum": MIN_MOVE_S,
                         "maximum": MAX_MOVE_S,
@@ -1569,7 +1588,7 @@ def _tools():
                 "new view gives a clear reason to turn. Do not repeat same-direction "
                 "turns while a target is still uncertain. "
                 f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
-                "measured translation, turn is unavailable "
+                "meaningful translation, turn is unavailable "
                 "until a translation or new dialogue."
             ),
             "behavior": "BLOCKING",
@@ -1673,23 +1692,30 @@ forward is blocked, choose another safe direction or turn. Turning changes the
 view but does not move around an obstacle. If a requested target remains
 unconfirmed after a turn, use one small turn, then prefer a small clear lateral
 or diagonal move to change the viewpoint instead of repeating same-direction
-turns.
+turns. If an obstacle hides the target, move around it laterally; turning alone
+cannot reveal what is behind it. After two in-place turns, the next viewpoint
+change must include a lateral or diagonal translation, not a straight-forward
+pulse.
 Report a target as found only when it is clearly visible in the newest image;
 otherwise keep looking or say it is not confirmed.
 Heading is in degrees; increasing heading is a right, clockwise turn. Use the
 initial heading reference in the live state when a user refers to the original
 direction. Compare current heading with that reference and use measured heading
 changes, not elapsed time or remembered turn counts, to choose corrections.
-Use short, slow body-frame pulses. Body-frame up is positive and down is
-negative; use vertical velocity only for a short clear adjustment, never as an
-altitude target. Use the smallest useful relative turn. Omit the turn angle for
+Use short, slow body-frame pulses. For clear travel, use a useful pulse near
+the speed limit; use a shorter or slower pulse near an object. Body-frame up is
+positive and down is negative; use vertical velocity only for a short clear
+adjustment, never as an altitude target. Use the smallest useful relative turn.
+Omit the turn angle for
 a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger angle when the
 task or scene calls for a larger change of view.
-A turn is one observation step, not a plan to rotate repeatedly. After its fresh
+A turn is one observation step, not a plan to rotate repeatedly. For a deliberate
+scan, one 30 to 45 degree turn is more useful than many 15 degree corrections.
+After its fresh
 image and heading result, prefer a short clear translation or hover before
 turning again unless the new view gives a clear reason to turn. Do not repeat
 same-direction turns while a target is still uncertain.
-After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without translation, turn is
+After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without meaningful translation, turn is
 unavailable until a measured translation or new dialogue. A move that does not
 measurably translate does not reset this limit.
 After every move or turn,
