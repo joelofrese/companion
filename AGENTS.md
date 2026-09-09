@@ -52,9 +52,11 @@ merge and delete it.
   deliberate pulses, inspect the fresh result, and stop when no useful change
   is clear. The forward-only TOF reading calls for a safe lateral, backward,
   or turning response when the path is blocked. Do not narrate routine
-  movement. After three in-place turns without a measured translation, translate
-  or wait for new dialogue before turning again; an ineffective move does not
-  reset this limit.
+  movement. After a turn, use the new view before turning again; when a target
+  remains unconfirmed, prefer a small lateral or diagonal move to change the
+  viewpoint. After three in-place turns without a measured translation,
+  translate or wait for new dialogue before turning again; an ineffective move
+  does not reset this limit.
 - Camera frames stream once per second. Heartbeats continue sending frames while
   a physical action runs, but the blocking tool keeps ER 2 from choosing another
   action until its result returns. Dialogue waits for that result unless it is an

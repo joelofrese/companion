@@ -583,11 +583,16 @@ class GeminiRuntime:
             else "unavailable until translation or new dialogue"
         )
         action_state = self._action_state_text()
+        heading_from_initial = _relative_heading_number(
+            self._initial_heading_rad,
+            self._telemetry.heading_rad,
+        )
         parts.append(
             f"[STATE] camera={camera}; "
             f"in_place_turns={self._turns_since_translation}/"
             f"{MAX_TURNS_WITHOUT_TRANSLATION}; turn={turn_status}; "
             f"initial_heading_deg={_heading_number(self._initial_heading_rad)}; "
+            f"heading_from_initial_deg={heading_from_initial}; "
             f"telemetry={_telemetry_text(self._telemetry)}; "
             f"action={action_state}; speech={speech}; task={task}"
         )
@@ -1532,6 +1537,9 @@ def _tools():
                 "measured heading to stop there. Inspect the new image and heading "
                 "before choosing another physical action. Use move with a yaw rate "
                 "when translating and turning together would make a smoother arc. "
+                "A turn is one observation step; after its fresh result, prefer a "
+                "short clear translation or hover before turning again unless the "
+                "new view gives a reason to turn. "
                 f"After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without "
                 "measured translation, turn is unavailable "
                 "until a translation or new dialogue."
@@ -1630,11 +1638,11 @@ The camera faces forward. Image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
 valid TOF, and valid telemetry. Never move forward into a blocked path. When
 forward is blocked, choose another safe direction or turn. Turning changes the
-view but does not move around an obstacle. If a target stays hidden behind an
-obstacle, make a small clear lateral or diagonal move to find a new viewpoint
-instead of turning in place repeatedly. Report a target as found only when it is
-clearly visible in the newest image; otherwise keep looking or say it is not
-confirmed.
+view but does not move around an obstacle. If a requested target remains
+unconfirmed after a turn, prefer a small clear lateral or diagonal move to
+change the viewpoint before turning again; do not keep scanning in place.
+Report a target as found only when it is clearly visible in the newest image;
+otherwise keep looking or say it is not confirmed.
 Heading is in degrees; increasing heading is a right, clockwise turn. Use the
 initial heading reference in the live state when a user refers to the original
 direction. Compare current heading with that reference and use measured heading
@@ -1644,6 +1652,9 @@ negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for
 a normal {DEFAULT_TURN_DEG:.0f}-degree correction; use a larger angle when the
 task or scene calls for a larger change of view.
+A turn is one observation step, not a plan to rotate repeatedly. After its fresh
+image and heading result, prefer a short clear translation or hover before
+turning again unless the new view gives a reason to turn.
 After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without translation, turn is
 unavailable until a measured translation or new dialogue. A move that does not
 measurably translate does not reset this limit.
@@ -1823,6 +1834,14 @@ def _heading_value(value):
     """Return a numeric heading for structured tool feedback."""
 
     return math.degrees(value) if _finite(value) else None
+
+
+def _relative_heading_number(start, current) -> str:
+    """Format the signed heading change from a reference heading."""
+
+    if not _finite(start) or not _finite(current):
+        return "?"
+    return f"{math.degrees(_angle_delta_rad(start, current)):.1f}"
 
 
 def _finite(value) -> bool:
