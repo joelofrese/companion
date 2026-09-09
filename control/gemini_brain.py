@@ -25,7 +25,7 @@ THINKING_LEVEL = "minimal"
 VIDEO_PERIOD_S = 1.0
 # Do not spend most of a short flight waiting on a silent turn. The vehicle
 # hovers while a turn is quiet; connection errors still reconnect immediately.
-RESPONSE_TIMEOUT_S = 30.0
+RESPONSE_TIMEOUT_S = 20.0
 # Give a completed action a short chance to produce its next turn before one
 # recovery heartbeat interrupts a quiet turn.
 IDLE_NUDGE_DELAY_S = 2.0
