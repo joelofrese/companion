@@ -212,32 +212,20 @@ class GeminiRuntime:
             self._cancel_action("camera frame stale")
             return VelocityCommand()
         action = self._active_action
-        if any(
-            value is None or not math.isfinite(value)
-            for value in (
-                telemetry.forward_velocity_m_s,
-                telemetry.right_velocity_m_s,
-                telemetry.down_velocity_m_s,
-            )
+        if (
+            action is None
+            or action.phase != "running"
+            or self._action_is_blocked(action)
         ):
-            return VelocityCommand()
-        if action is None or action.phase != "running":
             return VelocityCommand()
         if action.kind == "move":
-            if _move_is_allowed(action, telemetry.obstacle_distance_m):
-                return VelocityCommand(
-                    forward_m_s=action.forward_m_s,
-                    right_m_s=action.right_m_s,
-                    down_m_s=action.down_m_s,
-                    yaw_rate_deg_s=action.yaw_rate_deg_s,
-                )
-            return VelocityCommand()
-        if (
-            action.kind == "turn"
-            and action.phase == "running"
-            and _finite(telemetry.heading_rad)
-            and _obstacle_is_valid(telemetry.obstacle_distance_m)
-        ):
+            return VelocityCommand(
+                forward_m_s=action.forward_m_s,
+                right_m_s=action.right_m_s,
+                down_m_s=action.down_m_s,
+                yaw_rate_deg_s=action.yaw_rate_deg_s,
+            )
+        if action.kind == "turn":
             yaw_rate = self._turn_rate(action)
             if action.direction == "left":
                 yaw_rate = -yaw_rate
@@ -1107,7 +1095,7 @@ class GeminiRuntime:
                         action.stable_since_s is not None
                         and now - action.stable_since_s >= ACTION_STABLE_S
                     ):
-                        self._complete_action("completed", actual)
+                        self._finish_action("completed", actual)
                         return
         if (
             action.kind == "move"
@@ -1130,9 +1118,9 @@ class GeminiRuntime:
                     if math.radians(actual) >= completion_rad
                     else "timed out before target"
                 )
-                self._complete_action(status, actual)
+                self._finish_action(status, actual)
             else:
-                self._complete_action("completed")
+                self._finish_action("completed")
 
     def _record_translation(self, action: ActiveAction, now: float):
         if action.kind != "move":
@@ -1206,9 +1194,6 @@ class GeminiRuntime:
             MIN_TURN_RATE_DEG_S,
             TURN_RATE_DEG_S * remaining / TURN_SLOW_THRESHOLD_DEG,
         )
-
-    def _complete_action(self, status: str, actual_heading_deg: Optional[float] = None):
-        self._finish_action(status, actual_heading_deg)
 
     def _cancel_action(self, reason: str) -> str:
         return self._finish_action(f"cancelled by {reason}")
