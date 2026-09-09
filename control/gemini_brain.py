@@ -24,9 +24,9 @@ THINKING_LEVEL = "low"
 VIDEO_PERIOD_S = 1.0
 # Allow a slow first ER2 decision to start normally.
 INITIAL_RESPONSE_TIMEOUT_S = 30.0
-# Give later ER2 decisions the same bounded time as the first decision; a slow
-# response should not be mistaken for a dead session and lose the task context.
-RESPONSE_TIMEOUT_S = 30.0
+# Give later ER2 decisions enough time to finish a slow streamed response. A
+# connection error still reconnects immediately, while silence gets this bound.
+RESPONSE_TIMEOUT_S = 60.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
