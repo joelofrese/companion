@@ -925,7 +925,7 @@ async def run(
                 )
             print(f"Initial visual focus=verified: {initial_focus}.")
         if requested_focus and gemini:
-            print(f"Scripted visual request=delivered: {dialogue_request}.")
+            print(f"Scripted visual request=delivered: {dialogue_request}")
         elif requested_focus:
             if decision.focus != requested_focus and not requested_focus_answered:
                 raise RuntimeError(
