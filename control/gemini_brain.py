@@ -1572,7 +1572,9 @@ The camera faces forward. Image-left and image-right are vehicle-left and
 vehicle-right. The TOF sensor looks forward only. Move only with fresh vision,
 valid TOF, and valid telemetry. Never move forward into a blocked path. When
 forward is blocked, choose another safe direction or turn. Turning changes the
-view but does not move around an obstacle.
+view but does not move around an obstacle. If a target stays hidden behind an
+obstacle, make a small clear lateral or diagonal move to find a new viewpoint
+instead of turning in place repeatedly.
 Use short, slow body-frame pulses. Body-frame up is positive and down is
 negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for
