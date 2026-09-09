@@ -1429,8 +1429,11 @@ class GeminiRuntime:
         self.latest_response = response
         self.latest_action = action
         summary = thought or response or action
-        now = time.monotonic()
-        self.latest_response_latency_s = max(0.0, now - response_started_s)
+        self.latest_response_latency_s = (
+            max(0.0, time.monotonic() - response_started_s)
+            if summary and summary != "none"
+            else None
+        )
         if thought:
             self.thought_count += 1
             print(f"Gemini thought: {thought}", flush=True)
