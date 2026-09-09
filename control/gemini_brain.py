@@ -1691,7 +1691,9 @@ Exploring, patrolling, following, staying with, watching, and searching are
 ongoing tasks: reassess them after every fresh frame and do not complete them
 because one area or action was inspected. Complete only a specific one-time
 outcome, then call `hover` with `complete=true`. Speech and ordinary hovering
-are pauses, not completion. Without a request, continue open exploration.
+are pauses, not completion. Without a request, continue open exploration. At
+startup, inspect the current view first; do not turn automatically just because
+the session began.
 
 Observe before acting:
 The camera faces forward; image-left and image-right are vehicle-left and
