@@ -919,8 +919,8 @@ class GeminiRuntime:
             return {
                 "status": "unavailable",
                 "reason": (
-                    "the in-place turn limit is reached; translate to reset the "
-                    "view, or wait for new dialogue, before turning again"
+                    "the in-place turn limit is reached; use a small lateral or "
+                    "diagonal move to create a new viewpoint before turning again"
                 ),
                 "turn_tools": "unavailable until a translation or new dialogue",
                 "telemetry": _telemetry_text(self._telemetry),
