@@ -1356,7 +1356,8 @@ def _tools():
                     "right_m_s": {
                         "type": "NUMBER",
                         "description": (
-                            "Right body velocity from "
+                            "Sideways body velocity: positive slides right and "
+                            "negative slides left, from "
                             f"-{MAX_RIGHT_SPEED_M_S} through "
                             f"{MAX_RIGHT_SPEED_M_S} m/s."
                         ),
