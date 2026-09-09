@@ -58,8 +58,8 @@ MOVE_SETTLE_S = 0.5
 ACTION_STABLE_S = 0.3
 # Do not resume an action after safety has held it for too long.
 ACTION_SAFETY_HOLD_S = 0.5
-# Only a meaningful movement creates a new viewpoint.
-MIN_TRANSLATION_RESET_M = 0.15
+# A ten-centimeter shift is enough to create a new viewpoint.
+MIN_TRANSLATION_RESET_M = 0.10
 HEADING_STABILITY_RAD = math.radians(2.0)
 HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
@@ -1708,6 +1708,8 @@ allows. Turning changes the view but does not move around an obstacle. If a
 target is hidden, translate laterally or diagonally to change the viewpoint; if
 the obstruction still fills the view, continue measured lateral or diagonal
 movement before turning again.
+If a requested target is visible, keep it in view and approach or align with it
+before scanning elsewhere.
 Choose the smallest useful relative turn, usually 10-20 degrees. Use 30 degrees
 or more only for a clear reorientation, and inspect its new view before turning
 again; do not repeat wide scans. After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns

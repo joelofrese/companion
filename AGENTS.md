@@ -65,6 +65,8 @@ merge and delete it.
   and do not repeat wide scans. After two in-place turns without a meaningful
   translation, use a lateral or diagonal translation (or wait for new dialogue)
   before turning again; an ineffective move does not reset this limit.
+  If a requested target is visible, keep it in view and approach or align with it
+  before scanning elsewhere.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
   blocking tool keeps ER 2 from starting another move or turn until its result
