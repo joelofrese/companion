@@ -45,12 +45,11 @@ merge and delete it.
   runtime returns measured motion, heading, fresh telemetry, and a newer camera
   frame before another movement is chosen. Move results also report measured
   local-position change. An explicit stop may interrupt an action.
-- Choose each pulse from the newest image and measured state. Use a short
-  visual correction, inspect again, and avoid repeated turning without useful
-  progress. The forward-only TOF reading calls for a visible lateral detour
-  when the path is blocked. If a nearby obstacle hides a requested target,
-  sidestep through a visible opening before turning to search. Change position
-  before declaring a requested target absent. Do not narrate routine movement.
+- Choose each action from the newest image and measured state. Use short,
+  deliberate pulses, inspect the fresh result, and stop when no useful change
+  is clear. The forward-only TOF reading calls for a safe lateral, backward,
+  or turning response when the path is blocked. Do not narrate routine
+  movement.
 - Camera frames stream once per second. Heartbeats continue sending frames while
   a physical action runs, but the blocking tool keeps ER 2 from choosing another
   action until its result returns. Dialogue waits for that result unless it is an
