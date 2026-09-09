@@ -178,9 +178,9 @@ are retained when a fresh session is needed.
 - Deterministic PX4/Gazebo missions and local UDP loopback verify the command
   path, telemetry, faults, recovery, safety, landing, and disarm.
 - Exploratory stock and companion-owned worlds exercise open-ended ER 2
-  decisions, dialogue, memory, movement, and simulated TOF safety. The objects
-  target task now uses small visual corrections and diagonal progress before
-  completing and landing.
+  decisions, dialogue, memory, movement, and simulated TOF safety. Gazebo
+  camera frames preserve the vehicle's left/right view, so ER 2 can make small
+  visual corrections; exact target completion remains exploratory.
 - ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or

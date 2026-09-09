@@ -1716,6 +1716,10 @@ cannot reveal what is behind it. When a centered obstruction blocks the path,
 hold heading and prefer a pure lateral move until its edge is visible.
 If a requested target is visible, keep it in view and approach or align with it
 before scanning elsewhere.
+For a visible target, correct its horizontal position with lateral translation:
+image-left means negative right_m_s and image-right means positive right_m_s.
+Center the target before moving toward it; do not turn away from a visible target
+just to scan.
 If a target is still unconfirmed after a turn, prefer lateral or diagonal movement
 to change the viewpoint; use straight movement when the path is clear or the target
 is visible.

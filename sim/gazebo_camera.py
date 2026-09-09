@@ -14,9 +14,9 @@ def _decode_frame(message):
     step = int(message["step"])
     image = np.frombuffer(frame, dtype=np.uint8).reshape(height, step)
     image = image[:, : width * 3]
-    # Normalize Gazebo's mirrored optical frame to the body's left/right view.
+    # Gazebo's camera frame already matches the body's left/right view.
     image = image.reshape(height, width, 3)[:, :, ::-1]
-    return np.ascontiguousarray(image[:, ::-1])
+    return np.ascontiguousarray(image)
 
 
 class GazeboCamera(GazeboTopicReader):
