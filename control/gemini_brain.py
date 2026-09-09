@@ -1540,7 +1540,9 @@ def _tools():
                 "calling move or turn; speak after the observation or action is "
                 "real. After speaking, do not call speak again until new dialogue "
                 "or a completed physical action. During open exploration, do not "
-                "narrate routine movement. After answering a specific request, "
+                "narrate routine movement. A report does not end open exploration; "
+                "continue when a safe useful action is clear. After answering a "
+                "specific request, "
                 "hover and wait unless another physical action is clearly needed."
             ),
             "behavior": "BLOCKING",
@@ -1586,8 +1588,9 @@ with current telemetry, to know what happened and adjust the next pulse. When a
 requested subject is centered, stop turning and reassess. When
 no safe useful change is clear, hover or wait. After completing and answering a
 specific request, hover and wait for new dialogue. The runtime keeps move and
-turn unavailable after that answer until new dialogue arrives. Do not invent
-movement or narrate routine motion.
+turn unavailable after that answer until new dialogue arrives. In open
+exploration, a spoken update does not end exploration; continue when a safe
+useful action is clear. Do not invent movement or narrate routine motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
