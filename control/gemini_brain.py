@@ -799,16 +799,22 @@ class GeminiRuntime:
         if busy is not None:
             return busy
         if not self._stop_requested:
-            if complete and self._latest_user_request != self.situation:
+            specific_request = self._latest_user_request != self.situation
+            completed = complete and specific_request
+            if completed:
                 self._request_complete = True
-            self._record_action("hover (complete)" if complete else "hover")
+            self._record_action("hover (complete)" if completed else "hover")
             return {
                 "status": "already_hovering",
                 "reason": "the vehicle is already holding position",
                 "task": (
                     "complete; wait for new dialogue"
                     if self._request_complete
-                    else "active; holding position is not completion"
+                    else (
+                        "open exploration remains active; complete=true has no effect"
+                        if complete
+                        else "active; holding position is not completion"
+                    )
                 ),
                 "telemetry": _telemetry_text(self._telemetry),
             }
@@ -1572,7 +1578,8 @@ def _tools():
                         "description": (
                             "Set true only when the current specific user request "
                             "is finished. Omit it or set false when pausing, "
-                            "waiting, or reassessing."
+                            "waiting, or reassessing. It has no effect during open "
+                            "exploration."
                         ),
                     }
                 },
@@ -1590,7 +1597,8 @@ def _tools():
                 "continue when a safe useful action is clear. After answering a "
                 "specific request, "
                 "call hover with complete=true and wait unless another physical "
-                "action is clearly needed."
+                "action is clearly needed. In open exploration, use ordinary hover "
+                "and keep exploring."
             ),
             "behavior": "BLOCKING",
             "parameters": {

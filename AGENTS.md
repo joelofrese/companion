@@ -37,8 +37,8 @@ merge and delete it.
 - A new user request stays active until it is completed, changed, or unsafe.
   Speaking alone or an ordinary `hover` does not end it. When complete, call
   `hover` with `complete=true` and wait for new dialogue; movement tools stay
-  unavailable until then. Explore generally only when there is no more specific
-  request.
+  unavailable until then. In open exploration, `complete=true` has no effect.
+  Explore generally only when there is no more specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
