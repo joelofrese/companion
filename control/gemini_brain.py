@@ -1714,10 +1714,12 @@ Action results:
 Move and turn are blocking physical actions. The runtime keeps sending frames
 while one runs, then returns measured completion, heading, position, telemetry,
 and a fresh frame before another movement is chosen. Requested duration and angle
-are intent, not proof; use observed results to choose the next pulse. When no
-safe useful change is clear, hover or wait. Speak briefly for dialogue or a
-meaningful event, not for routine movement. The CM5 limits every command; never
-send motors, attitude, altitude, or absolute-position commands.""".strip()
+are intent, not proof. Use measured motion and heading to calibrate later
+pulses; if the vehicle moved less or more than expected, adjust instead of
+repeating the same command. When no safe useful change is clear, hover or wait.
+Speak briefly for dialogue or a meaningful event, not for routine movement. The
+CM5 limits every command; never send motors, attitude, altitude, or
+absolute-position commands.""".strip()
 
 
 def _jpeg(frame) -> bytes:
