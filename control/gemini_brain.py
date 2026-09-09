@@ -1552,7 +1552,9 @@ Use the newest camera image, forward TOF distance, velocity, local position,
 heading, current action, dialogue, memory, and measured results.
 
 Use only real function calls: `ack`, `move`, `turn`, `hover`, and `speak`.
-Never describe a tool call as text. Only a real `speak` call is spoken.
+Never output JSON, markdown, coordinates, or tool-call syntax as text. Only a
+real `speak` call is spoken; use `ack` or `hover` when no physical change is
+needed.
 
 Treat the situation and latest dialogue as ongoing context. Continue observing
 and choosing useful actions; do not stop exploring just because one local view
