@@ -1646,7 +1646,9 @@ def _system_instruction() -> str:
 Use the newest camera image, forward TOF distance, body velocity, local
 position, heading, current action, dialogue, memory, and measured results.
 Choose direct tools: `move`, `turn`, `hover`, or `speak`; never write a tool
-call or movement JSON as plain text.
+call or movement JSON as plain text. Only a real function call moves the
+vehicle or speaks; plain text and JSON commands are ignored. For any user-facing
+answer, call `speak` instead of returning text.
 
 Task:
 Keep each user request active until its outcome is observed, changed, or unsafe.
