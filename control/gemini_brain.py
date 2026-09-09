@@ -1243,6 +1243,29 @@ class GeminiRuntime:
                 target_heading_deg=_target_heading_value(action),
                 final_heading_deg=_heading_value(self._telemetry.heading_rad),
             )
+            if actual_heading_deg is not None:
+                action.completion["observed_angle_deg"] = actual_heading_deg
+                action.completion["angle_error_deg"] = (
+                    _turn_angle_deg(action) - actual_heading_deg
+                )
+        else:
+            action.completion["requested_translation_m"] = {
+                "forward": action.forward_m_s * action.duration_s,
+                "right": action.right_m_s * action.duration_s,
+                "up": -action.down_m_s * action.duration_s,
+            }
+            action.completion["observed_translation_m"] = {
+                "forward": action.observed_forward_m,
+                "right": action.observed_right_m,
+                "up": -action.observed_down_m,
+            }
+            position_delta = self._position_delta(action)
+            if position_delta is not None:
+                action.completion["position_change_m"] = {
+                    "forward": position_delta[0],
+                    "right": position_delta[1],
+                    "down": position_delta[2],
+                }
         self._save_action_result(result)
         action.done.set()
         return label
@@ -1491,9 +1514,10 @@ task or scene calls for a larger change of view.
 After every move or turn,
 inspect the new image, heading, position, and measured result before choosing
 the next physical action. A requested duration or angle is not a measurement;
-use the returned result and current telemetry to know what happened. When no
-safe useful change is clear, hover or wait; do not invent movement or narrate
-routine motion.
+use the returned numeric requested and observed translation or angle, together
+with current telemetry, to know what happened and adjust the next pulse. When
+no safe useful change is clear, hover or wait; do not invent movement or
+narrate routine motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
