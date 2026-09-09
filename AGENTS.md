@@ -34,10 +34,10 @@ merge and delete it.
 - One Gemini ER 2 Streaming session starts with one situation prompt and keeps
   deciding from the newest image, dialogue, local position, heading, other
   telemetry, memory, and action results.
-- A new user request is the active task until it is completed, changed, or
-  unsafe. After completing and answering a specific request, hover and wait
-  for new dialogue; movement tools stay unavailable until then. Explore
-  generally only when there is no more specific request.
+- A new user request stays active until it is completed, changed, or unsafe.
+  Speaking alone does not end it. When complete, call `hover` and wait for new
+  dialogue; movement tools stay unavailable until then. Explore generally only
+  when there is no more specific request.
 - Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
   action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or

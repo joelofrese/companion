@@ -733,6 +733,10 @@ class GeminiRuntime:
             if busy is not None:
                 result = busy
             elif not self._stop_requested:
+                self._request_complete = (
+                    self._latest_user_request != self.situation
+                )
+                self._record_action("hover")
                 result = {
                     "status": "already_hovering",
                     "reason": "the vehicle is already holding position",
@@ -779,19 +783,13 @@ class GeminiRuntime:
                     "movement_tools": movement_tools,
                 }
             else:
-                specific_request = self._latest_user_request != self.situation
                 self._record_action(f"speak: {message}")
                 print(f"Companion: {message}", flush=True)
                 self._speech_blocked = True
-                self._request_complete = specific_request
                 self._remember_summary(message)
                 result = {
                     "status": "spoken",
-                    "task": (
-                        "complete; wait for new dialogue"
-                        if specific_request
-                        else "still open"
-                    ),
+                    "task": "active; call hover when the request is complete",
                 }
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
@@ -1574,7 +1572,9 @@ valid TOF, and valid telemetry. Never move forward into a blocked path. When
 forward is blocked, choose another safe direction or turn. Turning changes the
 view but does not move around an obstacle. If a target stays hidden behind an
 obstacle, make a small clear lateral or diagonal move to find a new viewpoint
-instead of turning in place repeatedly.
+instead of turning in place repeatedly. Report a target as found only when it is
+clearly visible in the newest image; otherwise keep looking or say it is not
+confirmed.
 Use short, slow body-frame pulses. Body-frame up is positive and down is
 negative; use vertical velocity only for a short clear adjustment, never as an
 altitude target. Use the smallest useful relative turn. Omit the turn angle for
@@ -1588,11 +1588,11 @@ the next physical action. A requested duration or angle is not a measurement;
 use the returned numeric requested and observed translation or angle, together
 with current telemetry, to know what happened and adjust the next pulse. When a
 requested subject is centered, stop turning and reassess. When
-no safe useful change is clear, hover or wait. After completing and answering a
-specific request, hover and wait for new dialogue. The runtime keeps move and
-turn unavailable after that answer until new dialogue arrives. In open
-exploration, a spoken update does not end exploration; continue when a safe
-useful action is clear. Do not invent movement or narrate routine motion.
+no safe useful change is clear, hover or wait. After completing a specific
+request, speak if useful and call hover to wait for new dialogue; speaking alone
+does not end the task. In open exploration, a spoken update does not end
+exploration; continue when a safe useful action is clear. Do not invent
+movement or narrate routine motion.
 
 Move and turn are blocking physical actions in this robotics session. The
 runtime returns measured completion, heading, position, and fresh telemetry
