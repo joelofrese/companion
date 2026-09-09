@@ -25,6 +25,9 @@ VIDEO_PERIOD_S = 1.0
 # ER 2 can take tens of seconds to make a first decision. Keep a bounded
 # timeout without treating that normal latency as a failed session.
 INITIAL_RESPONSE_TIMEOUT_S = 60.0
+# Dialogue can start a fresh thought after flight is already underway. Give it
+# the same time as the initial thought instead of dropping a slow reply.
+DIALOGUE_RESPONSE_TIMEOUT_S = 60.0
 # Reconnect a quiet post-start response after this bounded wait.
 RESPONSE_TIMEOUT_S = 20.0
 # Give a completed action time to produce its next turn before one recovery
@@ -377,9 +380,7 @@ class GeminiRuntime:
                                             or response_started_s
                                         )
                                         > (
-                                            INITIAL_RESPONSE_TIMEOUT_S
-                                            if self.action_count == 0
-                                            else RESPONSE_TIMEOUT_S
+                                            self._response_timeout_s()
                                         )
                                     )
                                 ):
@@ -666,6 +667,17 @@ class GeminiRuntime:
         return (
             self._latest_frame_at_s is not None
             and time.monotonic() - self._latest_frame_at_s <= MAX_FRAME_AGE_S
+        )
+
+    def _response_timeout_s(self) -> float:
+        """Allow slow initial and dialogue thoughts to finish."""
+
+        if self._dialogue_in_flight is not None:
+            return DIALOGUE_RESPONSE_TIMEOUT_S
+        return (
+            INITIAL_RESPONSE_TIMEOUT_S
+            if self.action_count == 0
+            else RESPONSE_TIMEOUT_S
         )
 
     async def _receive(self, session, types, response_started_s):

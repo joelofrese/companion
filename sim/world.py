@@ -1444,3 +1444,5 @@ if __name__ == "__main__":
     except (RuntimeError, ValueError) as error:
         print(f"simulation: {error}", file=sys.stderr)
         raise SystemExit(1)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
