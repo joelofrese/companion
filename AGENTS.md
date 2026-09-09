@@ -57,9 +57,11 @@ merge and delete it.
   or turning response when the path is blocked. Do not narrate routine
   movement. After a turn, use the new view before turning again; when a target
   remains unconfirmed, prefer a small lateral or diagonal move to change the
-  viewpoint. After two in-place turns without a meaningful translation, use a
-  lateral or diagonal translation (or wait for new dialogue) before turning
-  again; an ineffective move does not reset this limit.
+  viewpoint. If an obstruction still fills the view, continue measured lateral
+  or diagonal movement before turning again. After two in-place turns without a
+  meaningful translation, use a lateral or diagonal translation (or wait for
+  new dialogue) before turning again; an ineffective move does not reset this
+  limit.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; dialogue can interrupt ordinary output, while a
   blocking tool keeps ER 2 from starting another move or turn until its result

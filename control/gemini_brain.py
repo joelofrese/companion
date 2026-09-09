@@ -1704,7 +1704,9 @@ motion is only a short adjustment, never an altitude target. Choose the amount
 and duration yourself from the current image and state. Never move forward into
 a blocked path: use lateral, backward, vertical, or turning motion as the scene
 allows. Turning changes the view but does not move around an obstacle. If a
-target is hidden, translate laterally or diagonally to change the viewpoint.
+target is hidden, translate laterally or diagonally to change the viewpoint; if
+the obstruction still fills the view, continue measured lateral or diagonal
+movement before turning again.
 Choose the smallest useful relative turn and inspect its new view before turning
 again. After {MAX_TURNS_WITHOUT_TRANSLATION} in-place turns without meaningful
 translation, translate before turning again; an ineffective move does not reset
