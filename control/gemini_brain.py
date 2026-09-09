@@ -113,7 +113,7 @@ class GeminiRuntime:
         self._dialogue = deque()
         self._dialogue_in_flight: Optional[str] = None
         self._dialogue_send_complete = False
-        self._latest_user_request = self.situation
+        self._latest_user_request: Optional[str] = None
         self._speech_blocked = False
         self._request_complete = False
         self._active_action: Optional[ActiveAction] = None
@@ -598,7 +598,7 @@ class GeminiRuntime:
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
-        elif self._latest_user_request != self.situation:
+        elif self._latest_user_request is not None:
             parts.append(f"[TASK] Active user request: {self._latest_user_request}")
         if memory:
             parts.append(
@@ -804,7 +804,7 @@ class GeminiRuntime:
         if busy is not None:
             return busy
         if not self._stop_requested:
-            specific_request = self._latest_user_request != self.situation
+            specific_request = self._latest_user_request is not None
             completed = complete and specific_request
             if completed:
                 self._request_complete = True
@@ -1418,7 +1418,7 @@ class GeminiRuntime:
         if self.memory_store is None or not summary:
             return
         task = ""
-        if self._latest_user_request != self.situation:
+        if self._latest_user_request is not None:
             task = f"task={self._latest_user_request}; "
         self.memory_store.remember(f"experience=summary {task}{summary}")
         self.experience_count += 1
