@@ -1637,7 +1637,10 @@ def _tools():
                 "the requested physical outcome, "
                 "call hover with complete=true and wait unless another physical "
                 "action is clearly needed. Do not describe an unmeasured approach "
-                "or following result as complete. In open exploration, use ordinary "
+                "or following result as complete. For a follow request, if the "
+                "person is visible, choose a small measured turn or move toward "
+                "keeping them in view before speaking or hovering; do not ask the "
+                "person to move instead of acting. In open exploration, use ordinary "
                 "hover and keep exploring."
             ),
             "behavior": "BLOCKING",
@@ -1701,8 +1704,12 @@ and measured state until the requested outcome is reached or it cannot be
 safely confirmed. When an active physical task has a safe small movement to
 try, act rather than wait for another command; use the measured result to
 refine the next action. When no safe useful change is clear, hover or wait. For
+a follow or stay-with request, if a person is visible, the first useful response
+is a safe small measured turn or move that keeps them in view; do not wait for
+them to start moving or ask them to move unless the user asked you to wait. For
 following, staying near, or approaching a person, an observation or spoken
-acknowledgment alone is not progress: use measured movement when the person is
+acknowledgment alone is not progress: do not speak readiness or hover instead
+of acting unless the user asked you to wait. Use measured movement when the person is
 not yet near or the request is not yet achieved, then reassess as the person
 moves. Do not claim that physical result without observing it. After
 completing a specific request, speak if useful and call `hover` with
