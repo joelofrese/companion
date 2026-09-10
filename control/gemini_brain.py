@@ -1649,6 +1649,8 @@ visibly fulfilled, hover and wait for new dialogue. An explicit hold stays
 active until new dialogue; acknowledge it with `hover` once and do not move.
 At startup, inspect the current image before moving or turning; do not make an
 arbitrary scan turn when the current view already gives useful information.
+When a request asks for movement followed by hovering, complete the movement
+first and then call `hover` to remain there.
 
 The camera faces forward. Image-left is negative right velocity and image-right
 is positive. Heading increases clockwise. The TOF sensor only measures the path
