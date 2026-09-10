@@ -241,11 +241,11 @@ class OnboardSafetyEnvelope:
             return VelocityCommand()
         if timestamp_s - self._received_at_s > self.command_timeout_s:
             return VelocityCommand()
+        if not self._command_is_safe(self._command):
+            return VelocityCommand()
         if not _finite_real(obstacle_distance_m) or obstacle_distance_m < 0.0:
             if self._is_in_place_turn(self._command):
                 return VelocityCommand(yaw_rate_deg_s=self._command.yaw_rate_deg_s)
-            return VelocityCommand()
-        if not self._command_is_safe(self._command):
             return VelocityCommand()
         if obstacle_distance_m <= OBSTACLE_STOP_M:
             if self._is_in_place_turn(self._command):
