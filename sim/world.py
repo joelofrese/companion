@@ -500,7 +500,24 @@ async def run(
                     telemetry=telemetry,
                 )
             if step.transmit:
-                sender.send(step.command_override or command)
+                elapsed_s = timestamp_s - started_at
+                fault_probe = faults and (
+                    (
+                        INVALID_SENSOR_START_S <= elapsed_s < INVALID_SENSOR_END_S
+                        and (
+                            step.obstacle_distance_m is None
+                            or not math.isfinite(step.obstacle_distance_m)
+                        )
+                    )
+                    or (
+                        STALE_SENSOR_START_S <= elapsed_s < STALE_SENSOR_END_S
+                        and not step.distance_fresh
+                    )
+                )
+                sender.send(
+                    step.command_override
+                    or (VelocityCommand(forward_m_s=0.2) if fault_probe else command)
+                )
             return command
 
         starting_intent = initial_intent if exploratory else "following"
