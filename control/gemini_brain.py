@@ -116,6 +116,8 @@ class GeminiRuntime:
         self._last_dialogue = ""
         self._dialogue_in_flight: Optional[str] = None
         self._dialogue_send_complete = False
+        self._dialogue_action_started = False
+        self._hold_after_dialogue = False
         self._active_action: Optional[ActiveAction] = None
         self._initial_heading_rad: Optional[float] = None
         self._action_finished_at_s: Optional[float] = None
@@ -186,8 +188,11 @@ class GeminiRuntime:
         message = message.strip()
         self._last_dialogue = message
         self._decision_not_before_s = None
+        self._dialogue_action_started = False
+        self._hold_after_dialogue = _requests_hold_after(message)
         if _is_explicit_stop(message):
             self._hold_requested = True
+            self._hold_after_dialogue = False
             self._cancel_action("explicit stop request")
         else:
             self._hold_requested = False
@@ -832,6 +837,9 @@ class GeminiRuntime:
         return result
 
     def _hover(self) -> dict:
+        if self._hold_after_dialogue and self._dialogue_action_started:
+            self._hold_requested = True
+            self._hold_after_dialogue = False
         if self._hold_requested:
             self._record_action("hover")
             return {
@@ -932,6 +940,7 @@ class GeminiRuntime:
         )
         self._active_action = action
         self._last_action_result = ""
+        self._dialogue_action_started = True
         self._turns_since_translation = 0
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -994,6 +1003,7 @@ class GeminiRuntime:
         )
         self._active_action = action
         self._last_action_result = ""
+        self._dialogue_action_started = True
         self._turns_since_translation += 1
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
@@ -1868,18 +1878,6 @@ def _is_explicit_stop(message: str) -> bool:
         return True
     if message.startswith(("stop ", "hover ", "hold position ", "cancel ")):
         return True
-    if any(
-        phrase in message
-        for phrase in (
-            "and hover",
-            "then hover",
-            "and hold position",
-            "then hold position",
-            "and wait",
-            "then wait",
-        )
-    ):
-        return True
     for phrase in ("do not move", "don't move", "do not turn", "don't turn"):
         index = message.find(phrase)
         if index < 0:
@@ -1904,6 +1902,25 @@ def _is_explicit_stop(message: str) -> bool:
         " and hold position",
         " then hold position",
     ))
+
+
+def _requests_hold_after(message: str) -> bool:
+    """Return whether a request asks for a hold after its other work."""
+
+    for punctuation in ",.!?;:":
+        message = message.replace(punctuation, " ")
+    message = " ".join(message.casefold().split())
+    return any(
+        phrase in message
+        for phrase in (
+            " and hover",
+            " then hover",
+            " and hold position",
+            " then hold position",
+            " and wait",
+            " then wait",
+        )
+    )
 
 
 def _resume_rejected(error: Exception) -> bool:
