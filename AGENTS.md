@@ -36,8 +36,8 @@ merge and delete it.
   heading, other telemetry, memory, and action results.
 - Dialogue adds context to the ongoing Gemini session. Keep observing and
   choosing from the situation and newest dialogue; `ack` and `hover` hold
-  position without ending the session. Explore generally when no request is
-  present.
+  position without ending the session. An explicit stop or hold stays active
+  until new dialogue. Explore generally when no request is present.
 - Gemini chooses direct `ack`, `move`, `turn`, `hover`, or `speak` tools. `ack`
   holds position while waiting for the next fresh frame. Text or JSON action
   descriptions never move the vehicle.
@@ -58,10 +58,9 @@ merge and delete it.
   with it. Do not narrate routine movement.
 - Camera frames stream once per second, including while a physical action runs.
   Text starts a reasoning turn; a blocking tool keeps ER 2 from starting another
-  move or turn until its result returns. A post-action heartbeat can interrupt a
-  quiet turn while keeping the active request. Dialogue waits for the current
-  model turn or physical action to finish; an explicit stop cancels movement.
-  A bounded timeout restarts a stalled session.
+  move or turn until its result returns. Dialogue can interrupt a quiet model
+  turn when no physical action is running; an explicit hold cancels movement and
+  keeps it held until new dialogue. A bounded timeout restarts a stalled session.
 - Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
   rejects unsafe commands, removes only positive forward motion at a close
   obstacle, and is the final vehicle-side authority. PX4 stabilizes the vehicle
@@ -168,8 +167,9 @@ remain the live context.
 - ER 2 chooses `ack`, movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
-  heading feedback for calibration. Hover only holds position; the session keeps
-  deciding from fresh state and dialogue.
+  heading feedback for calibration. Hover only holds position; an explicit hold
+  stays until new dialogue, and normal exploration keeps deciding from fresh
+  state.
 - Repeated view-only turns require a short translation before another turn, so
   an occluded target produces a new viewpoint instead of an endless spin.
 - Native ER 2 thinking is currently set minimal for timely closed-loop task planning;

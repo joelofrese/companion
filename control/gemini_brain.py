@@ -28,9 +28,6 @@ RESPONSE_TIMEOUT_S = 30.0
 # ER 2 may take about half a minute to continue after a blocking tool result.
 # The vehicle hovers while it thinks; a genuinely silent turn still recovers.
 POST_ACTION_RESPONSE_TIMEOUT_S = RESPONSE_TIMEOUT_S
-# Give a completed action a short chance to produce its next turn before one
-# recovery heartbeat interrupts a quiet turn.
-IDLE_NUDGE_DELAY_S = 2.0
 START_TIMEOUT_S = 20.0
 INITIAL_CONNECT_RETRIES = 1
 RECONNECT_DELAY_S = 1.0
@@ -64,6 +61,7 @@ HEADING_TOLERANCE_RAD = math.radians(2.0)
 MAX_FRAME_AGE_S = 1.5
 POST_ACTION_FRAME_TIMEOUT_S = VIDEO_PERIOD_S + 0.5
 SPEECH_REPEAT_WINDOW_S = 5.0
+HOLD_RECHECK_DELAY_S = 5.0
 
 
 @dataclass
@@ -120,7 +118,7 @@ class GeminiRuntime:
         self._active_action: Optional[ActiveAction] = None
         self._initial_heading_rad: Optional[float] = None
         self._action_finished_at_s: Optional[float] = None
-        self._stop_requested = False
+        self._hold_requested = False
         self._last_action_result = ""
         self._recent_action_results = deque(maxlen=3)
         self._turns_since_translation = 0
@@ -149,7 +147,8 @@ class GeminiRuntime:
         self._reconnect_requested = False
         self._last_model_activity_s: Optional[float] = None
         self._response_in_flight = False
-        self._heartbeat_nudge_sent = False
+        self._decision_not_before_s: Optional[float] = None
+        self._hold_tool_called = False
         self._text_only_turns = 0
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
@@ -185,9 +184,12 @@ class GeminiRuntime:
             return
         message = message.strip()
         self._last_dialogue = message
+        self._decision_not_before_s = None
         if _is_explicit_stop(message):
-            self._stop_requested = True
+            self._hold_requested = True
             self._cancel_action("explicit stop request")
+        else:
+            self._hold_requested = False
         if self._dialogue_in_flight is not None:
             self._dialogue.clear()
             self._dialogue_in_flight = None
@@ -199,7 +201,6 @@ class GeminiRuntime:
 
         if self._closed.is_set():
             return
-        self._stop_requested = False
         self._cancel_action("Gemini session reconnecting")
         self._reconnect_requested = True
         self._close_session()
@@ -260,7 +261,6 @@ class GeminiRuntime:
     def close(self):
         """Stop movement and end the streaming session."""
 
-        self._stop_requested = False
         self._cancel_action("brain closed")
         self._closed.set()
         self._frame_ready.set()
@@ -294,7 +294,6 @@ class GeminiRuntime:
                     self._dialogue_in_flight = None
                     self._dialogue_send_complete = False
                 self._response_in_flight = False
-                self._heartbeat_nudge_sent = False
                 try:
                     config = types.LiveConnectConfig(
                         response_modalities=["TEXT"],
@@ -479,34 +478,22 @@ class GeminiRuntime:
         """Send the current camera frame and state heartbeat."""
 
         await self._send_frame(session, types)
-        # Let a fresh state interrupt an ordinary turn after physical movement
-        # finishes. Let the completed action also wake the dialogue turn that
-        # produced it; newer queued dialogue still waits for that turn to end.
+        # Let the native Live API turn continue after a tool response. Frames
+        # keep streaming. New dialogue may interrupt a quiet turn when no
+        # physical action is running.
         if self._response_in_flight:
-            if self._active_action is not None:
-                return
-            if self._dialogue_in_flight is not None:
-                if not self._last_action_result:
-                    return
-            elif self._dialogue:
-                return
             if (
-                self._heartbeat_nudge_sent
-                or self._last_model_activity_s is None
-                or time.monotonic() - self._last_model_activity_s < IDLE_NUDGE_DELAY_S
+                self._dialogue
+                and self._dialogue_in_flight is None
+                and self._active_action is None
             ):
-                return
-            # One recovery prompt is enough to restart a turn that stopped
-            # after a tool result. Repeated prompts would starve slow thinking.
-            self._heartbeat_nudge_sent = True
-            async with self._send_lock:
-                try:
-                    await session.send_realtime_input(
-                        text=self._heartbeat_text("")
-                    )
-                except Exception:
-                    self._heartbeat_nudge_sent = False
-                    raise
+                await self._send_dialogue(session, self._dialogue[0])
+            return
+        if (
+            self._decision_not_before_s is not None
+            and time.monotonic() < self._decision_not_before_s
+            and not self._dialogue
+        ):
             return
         # Video alone does not start a Live API reasoning turn. Send one text
         # heartbeat per turn, then let ER 2 finish or interrupt it itself.
@@ -521,7 +508,7 @@ class GeminiRuntime:
         )
         action_result = self._last_action_result
         self._response_in_flight = True
-        self._heartbeat_nudge_sent = False
+        self._hold_tool_called = False
         if dialogue:
             await self._send_dialogue(session, dialogue)
         else:
@@ -761,7 +748,16 @@ class GeminiRuntime:
         self._dialogue_send_complete = False
 
     async def _execute(self, name: str, args: dict) -> dict:
-        if name == "ack":
+        if name in ("ack", "hover") and self._hold_tool_called:
+            result = {
+                "status": "unavailable",
+                "reason": (
+                    "the vehicle is already holding position; do not call another "
+                    "hold tool in this turn; wait for the next heartbeat or dialogue"
+                ),
+                "telemetry": _telemetry_text(self._telemetry),
+            }
+        elif name == "ack":
             if self._dialogue and self._dialogue_in_flight is None:
                 result = {
                     "status": "unavailable",
@@ -771,6 +767,7 @@ class GeminiRuntime:
                     ),
                 }
             else:
+                self._hold_tool_called = True
                 self._record_action("ack")
                 result = {
                     "status": "acknowledged",
@@ -782,6 +779,7 @@ class GeminiRuntime:
         elif name == "turn":
             result = await self._turn(args)
         elif name == "hover":
+            self._hold_tool_called = True
             result = self._hover()
         elif name == "speak":
             message = str(args.get("message", "")).strip()
@@ -811,6 +809,12 @@ class GeminiRuntime:
             result = {"status": "rejected", "reason": "unknown tool"}
         if result.get("status") in ("acknowledged", "hovering", "spoken"):
             self.action_count += 1
+        if result.get("status") in ("acknowledged", "already_hovering", "hovering"):
+            self._decision_not_before_s = (
+                time.monotonic() + HOLD_RECHECK_DELAY_S
+            )
+        elif name in ("move", "turn", "speak"):
+            self._decision_not_before_s = None
         if result.get("status") in ("rejected", "unavailable"):
             reason = str(result.get("reason", "")).strip()
             action = f"{name} {result['status']}"
@@ -820,24 +824,21 @@ class GeminiRuntime:
         return result
 
     def _hover(self) -> dict:
+        if self._hold_requested:
+            self._record_action("hover")
+            return {
+                "status": "hovering",
+                "reason": "the explicit hold request remains active; wait for new dialogue",
+                "heading_deg": _heading_value(self._telemetry.heading_rad),
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         busy = self._busy_response()
         if busy is not None:
             return busy
-        if not self._stop_requested:
-            self._record_action("hover")
-            return {
-                "status": "already_hovering",
-                "reason": "the vehicle is already holding position",
-                "telemetry": _telemetry_text(self._telemetry),
-            }
-        self._stop_requested = False
-        cancelled = self._cancel_action("hover")
         self._record_action("hover")
         return {
-            "status": "hovering",
-            "cancelled_action": cancelled or "none",
-            "cancelled_result": self._last_action_result if cancelled else "none",
-            "heading_deg": _heading_value(self._telemetry.heading_rad),
+            "status": "already_hovering",
+            "reason": "the vehicle is already holding position",
             "telemetry": _telemetry_text(self._telemetry),
         }
 
@@ -1034,11 +1035,14 @@ class GeminiRuntime:
                     "movement_tools": "unavailable until the new dialogue is processed",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
-            if self._stop_requested:
+            if self._hold_requested:
                 return {
                     "status": "unavailable",
-                    "reason": "an explicit stop request is active; hover before moving again",
-                    "movement_tools": "unavailable until hovering is acknowledged",
+                    "reason": (
+                        "an explicit hold request is active; wait for new dialogue "
+                        "before moving again"
+                    ),
+                    "movement_tools": "unavailable until new dialogue",
                     "telemetry": _telemetry_text(self._telemetry),
                 }
             return None
@@ -1166,7 +1170,7 @@ class GeminiRuntime:
                 "translate safely before another turn"
             )
         details.append("move and turn tools unavailable until completion")
-        details.append("hover may interrupt only for an explicit stop request")
+        details.append("hover may interrupt only for an explicit hold request")
         return "; ".join(details)
 
     def _refresh_action(self):
@@ -1601,7 +1605,7 @@ def _tools():
             "description": (
                 "Stop horizontal motion and hold position when waiting or when the "
                 "scene is unclear. Let a normal move or turn finish; interrupt one "
-                "only for an explicit stop request."
+                "only for an explicit hold request."
             ),
             "behavior": "BLOCKING",
             "parameters": {
@@ -1643,6 +1647,9 @@ and choosing useful actions; do not stop exploring just because one local view
 or action is complete. Without a request, explore. Inspect the current view
 before moving. When an explicit request is visibly fulfilled, hold position and
 wait for new dialogue instead of continuing that request.
+
+An explicit stop or hold request stays active until new dialogue. Acknowledge it
+with `hover` once, then keep holding and do not move.
 
 The camera faces forward. Image-left is negative right velocity and image-right
 is positive. Heading is measured in degrees and increases clockwise. The TOF
