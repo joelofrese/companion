@@ -789,6 +789,19 @@ class GeminiRuntime:
                     "status": "already_spoken",
                     "reason": "the same message was spoken moments ago",
                 }
+            elif (
+                self._last_spoken_at_s is not None
+                and time.monotonic() - self._last_spoken_at_s
+                < SPEECH_REPEAT_WINDOW_S
+                and not self._dialogue
+                and self._dialogue_in_flight is None
+            ):
+                self._speech_tool_called = True
+                self._record_action("speak unavailable: recent speech")
+                result = {
+                    "status": "unavailable",
+                    "reason": "stay quiet briefly after a status message",
+                }
             else:
                 self._speech_tool_called = True
                 self._last_spoken_message = message
