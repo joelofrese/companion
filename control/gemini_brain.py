@@ -150,7 +150,6 @@ class GeminiRuntime:
         self._decision_not_before_s: Optional[float] = None
         self._hold_tool_called = False
         self._speech_tool_called = False
-        self._text_only_turns = 0
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
         self._send_lock = asyncio.Lock()
@@ -1436,20 +1435,6 @@ class GeminiRuntime:
         self.latest_response = response
         self.latest_action = action
         self._last_turn_used_tool = action != "none"
-        if self._last_turn_used_tool:
-            self._text_only_turns = 0
-        else:
-            self._text_only_turns += 1
-            if self._text_only_turns >= 2:
-                print(
-                    "Gemini returned text without a tool twice; restarting the session.",
-                    flush=True,
-                )
-                self._session_handle = None
-                self._memory_sent = False
-                self._bootstrap_pending = True
-                self._reconnect_requested = True
-                self._text_only_turns = 0
         summary = thought or response
         if not summary:
             summary = action
