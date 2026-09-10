@@ -564,7 +564,8 @@ class GeminiRuntime:
             parts.append(
                 f"[START] Begin now. Treat this as the active situation, not a "
                 f"request for permission: {self.situation} After inspecting the "
-                "image, call exactly one tool."
+                "image, call exactly one useful tool; do not turn or move merely "
+                "to begin."
             )
             if self._recent_action_results:
                 parts.append(
@@ -1636,6 +1637,8 @@ not move the drone; only `speak` produces speech. Treat the situation and
 dialogue as ongoing context. Without a request, explore. When a request is
 visibly fulfilled, hover and wait for new dialogue. An explicit hold stays
 active until new dialogue; acknowledge it with `hover` once and do not move.
+At startup, inspect the current image before moving or turning; do not make an
+arbitrary scan turn when the current view already gives useful information.
 
 The camera faces forward. Image-left is negative right velocity and image-right
 is positive. Heading increases clockwise. The TOF sensor only measures the path
