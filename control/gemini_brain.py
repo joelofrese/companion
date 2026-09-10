@@ -24,7 +24,8 @@ THINKING_LEVEL = "minimal"
 # ER 2 Streaming accepts at most one JPEG per second.
 VIDEO_PERIOD_S = 1.0
 # Allow a slow ER 2 generation to finish.
-RESPONSE_TIMEOUT_S = 30.0
+# A silent turn is not useful for flight; recover before it feels stuck.
+RESPONSE_TIMEOUT_S = 15.0
 # ER 2 may take about half a minute to continue after a blocking tool result.
 # The vehicle hovers while it thinks; a genuinely silent turn still recovers.
 POST_ACTION_RESPONSE_TIMEOUT_S = RESPONSE_TIMEOUT_S
