@@ -28,6 +28,9 @@ class _BootError(RuntimeError):
     """A PX4 process failed before its shell became ready."""
 
 
+DEFAULT_SIMULATION_MEMORY = Path.home() / ".companion" / "simulation-memory.txt"
+
+
 def _read_output(process, ready, finished):
     try:
         tail = b""
@@ -370,6 +373,8 @@ def run(
             )
     if gemini and not (exploratory and (camera or depth)):
         raise RuntimeError("Gemini simulation requires exploratory camera or depth mode")
+    if exploratory and gemini and memory_path is None:
+        memory_path = DEFAULT_SIMULATION_MEMORY
     if duration_s is not None and image_path is not None:
         raise RuntimeError("simulation duration cannot use an RTP image scenario")
     if expect_person and image_path is None:

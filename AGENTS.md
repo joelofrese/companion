@@ -118,9 +118,11 @@ PYTHONPYCACHEPREFIX=/tmp/companion-pycache .venv/bin/python -m compileall -q con
 .venv/bin/python -m sim.run_world --image <image-path> --expect-person
 ```
 
-`sim.run_world` manages PX4, Gazebo, cleanup, and exploratory dialogue. Use
-`--request`, `--intent`, `--memory`, and typed dialogue to vary a run. Use
-`--trace` to see camera/telemetry state, ER 2 thought summaries when provided,
+`sim.run_world` manages PX4, Gazebo, cleanup, and exploratory dialogue. Gemini
+explorations keep separate experience in `~/.companion/simulation-memory.txt`;
+use `--memory` to choose another file. Use `--request`, `--intent`, and typed
+dialogue to vary a run. Use `--trace` to see camera/telemetry state, ER 2
+thought summaries when provided,
 responses, tool calls, latencies, and command reasons. Raw private reasoning is
 not exposed. Use `--headless` for unattended runs and `--snapshot PATH` to
 save a rendered frame.
