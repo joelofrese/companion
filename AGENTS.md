@@ -177,8 +177,9 @@ remain the live context.
   state.
 - Repeated view-only turns require a short translation before another turn, so
   an occluded target produces a new viewpoint instead of an endless spin.
-- Native ER 2 thinking is currently set minimal for timely closed-loop task planning;
-  measured action feedback keeps each next choice grounded.
+- Native ER 2 thinking is set minimal for closed-loop task planning; measured
+  action feedback keeps each next choice grounded, but response time can still
+  vary substantially.
 - Completed measured movement and turn results are saved as experience for
   later ER 2 sessions to use as calibration.
 - CM5 limits every physical command and PX4 stabilizes the vehicle. Hardware
