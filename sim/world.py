@@ -721,7 +721,7 @@ async def run(
                     and control.latest_response_latency_s != last_traced_gemini_latency
                 ):
                     print(
-                        f"[Gemini {elapsed_s:5.1f}s] model response latency="
+                        f"[Gemini {elapsed_s:5.1f}s] turn latency (including tools)="
                         f"{control.latest_response_latency_s:.2f}s; "
                         f"thought={clean(control.latest_thought)}; "
                         f"response={clean(control.latest_response)}",

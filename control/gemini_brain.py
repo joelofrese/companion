@@ -1446,6 +1446,7 @@ class GeminiRuntime:
         summary = thought or response
         if not summary:
             summary = action
+        # This spans model output, blocking tool execution, and the fresh frame.
         self.latest_response_latency_s = (
             max(0.0, time.monotonic() - response_started_s)
             if summary and summary != "none"
