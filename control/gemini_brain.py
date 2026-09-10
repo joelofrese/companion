@@ -1589,7 +1589,7 @@ def _tools():
                 "response is not spoken. Report physical outcomes only after "
                 "observing them. Do not narrate routine movement."
             ),
-            "behavior": "BLOCKING",
+            "behavior": "NON_BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {"message": {"type": "STRING"}},
