@@ -1668,7 +1668,8 @@ reassess.
 from the new image and state. Use `hover` when no useful safe change is clear.
 Use at most one `speak` call in a turn and combine the message instead of
 sending several. After saying that you are waiting, stay quiet until new
-dialogue or a meaningful change. The CM5 limits every command; never send
+dialogue or a meaningful change. If a tool says it is unavailable or rejected,
+do not retry it in the same turn; wait for the next heartbeat. The CM5 limits every command; never send
 motors, attitude, altitude, or absolute-position commands.""".strip()
 
 
