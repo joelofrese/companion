@@ -23,12 +23,11 @@ DEFAULT_SITUATION = "Explore the indoor surroundings autonomously."
 THINKING_LEVEL = "minimal"
 # ER 2 Streaming accepts at most one JPEG per second.
 VIDEO_PERIOD_S = 1.0
-# Do not spend most of a short flight waiting on a silent turn. The vehicle
-# hovers while a turn is quiet; connection errors still reconnect immediately.
-RESPONSE_TIMEOUT_S = 20.0
-# After a tool result, recover a silent continuation sooner so one stalled turn
-# does not consume the rest of a short task.
-POST_ACTION_RESPONSE_TIMEOUT_S = 8.0
+# Allow a slow ER 2 generation to finish.
+RESPONSE_TIMEOUT_S = 30.0
+# ER 2 may take about half a minute to continue after a blocking tool result.
+# The vehicle hovers while it thinks; a genuinely silent turn still recovers.
+POST_ACTION_RESPONSE_TIMEOUT_S = RESPONSE_TIMEOUT_S
 # Give a completed action a short chance to produce its next turn before one
 # recovery heartbeat interrupts a quiet turn.
 IDLE_NUDGE_DELAY_S = 2.0
@@ -50,6 +49,8 @@ DEFAULT_TURN_DEG = 15.0
 TURN_RATE_DEG_S = 12.0
 MIN_TURN_RATE_DEG_S = 1.5
 TURN_SLOW_THRESHOLD_DEG = 10.0
+# A new viewpoint requires translation after repeated view-only turns.
+MAX_TURNS_WITHOUT_TRANSLATION = 2
 MAX_IMAGE_WIDTH = 640
 # PX4 may take longer than the commanded yaw rate to settle on a heading.
 ACTION_GRACE_S = 5.0
@@ -122,6 +123,7 @@ class GeminiRuntime:
         self._stop_requested = False
         self._last_action_result = ""
         self._recent_action_results = deque(maxlen=3)
+        self._turns_since_translation = 0
         self._last_spoken_message = ""
         self._last_spoken_at_s: Optional[float] = None
         self.latest_thought = ""
@@ -598,6 +600,12 @@ class GeminiRuntime:
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
+        elif self._last_dialogue:
+            parts.append(
+                "[CURRENT REQUEST] "
+                f"{self._last_dialogue}\n"
+                "If it is already fulfilled, hold position and wait for new dialogue."
+            )
         if memory:
             parts.append(
                 "[MEMORY] Prior experience; verify it against the current image "
@@ -915,6 +923,7 @@ class GeminiRuntime:
         )
         self._active_action = action
         self._last_action_result = ""
+        self._turns_since_translation = 0
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
         return await self._wait_for_action(action)
@@ -945,6 +954,19 @@ class GeminiRuntime:
         observation = self._observation_required_response()
         if observation is not None:
             return observation
+        if self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION:
+            return {
+                "status": "unavailable",
+                "reason": (
+                    "two turns changed the view without changing position; "
+                    "use a short safe translation to create a new viewpoint "
+                    "before turning again"
+                ),
+                "movement_tools": (
+                    "move is available; turn is unavailable until translation"
+                ),
+                "telemetry": _telemetry_text(self._telemetry),
+            }
         now = time.monotonic()
         angle_deg = float(angle_deg)
         duration_s = angle_deg / TURN_RATE_DEG_S
@@ -963,6 +985,7 @@ class GeminiRuntime:
         )
         self._active_action = action
         self._last_action_result = ""
+        self._turns_since_translation += 1
         self.action_count += 1
         self._record_action(f"started {self._action_label(action)}")
         return await self._wait_for_action(action)
@@ -1115,6 +1138,12 @@ class GeminiRuntime:
                 state = self._last_action_result
             else:
                 state = "none"
+            if self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION:
+                state += (
+                    "; two turns changed the view without changing position; "
+                    "use a short safe translation to create a new viewpoint "
+                    "before turning again"
+                )
             return f"{state}; movement tools available"
         details = [
             f"{self._action_label(action)}; {action.phase}",
@@ -1131,6 +1160,11 @@ class GeminiRuntime:
                 details.append(f"target heading={target:+.1f} degrees")
         if self._action_is_blocked(action):
             details.append("paused until safety telemetry permits movement")
+        if self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION:
+            details.append(
+                "two turns changed the view without changing position; "
+                "translate safely before another turn"
+            )
         details.append("move and turn tools unavailable until completion")
         details.append("hover may interrupt only for an explicit stop request")
         return "; ".join(details)
@@ -1607,7 +1641,8 @@ spoken. Use `ack` or `hover` when no physical change is needed.
 Treat the situation and latest dialogue as ongoing context. Continue observing
 and choosing useful actions; do not stop exploring just because one local view
 or action is complete. Without a request, explore. Inspect the current view
-before moving.
+before moving. When an explicit request is visibly fulfilled, hold position and
+wait for new dialogue instead of continuing that request.
 
 The camera faces forward. Image-left is negative right velocity and image-right
 is positive. Heading is measured in degrees and increases clockwise. The TOF
@@ -1620,8 +1655,10 @@ Choose the direction from the newest image and state. A turn changes the view
 but not position; if an obstruction hides a target, translate to change the
 viewpoint instead of repeating turns. For visual alignment, make one small turn
 or translation, wait for its measured result and the next image, then reassess.
-Never stack turns or repeat a movement from an old view. If the direction is
-uncertain, start with a small turn and correct from the measured heading.
+Never stack turns or repeat a movement from an old view. If a target is hidden
+or remains unseen after one or two turns, stop rotating and translate a short,
+safe distance to create a new viewpoint before turning again. If the direction
+is uncertain, start with a small turn and correct from the measured heading.
 When approaching a visible target, center it with one small turn if needed.
 Once it is centered and the forward path is clear, keep that heading and use
 short forward pulses. Recheck the image and range after every pulse; if the
@@ -1629,8 +1666,10 @@ target leaves view, correct from the new image instead of accumulating turns.
 
 `move` and `turn` are blocking. Wait for their measured completion, fresh image,
 telemetry, heading, and position result before another physical movement. Use
-measured results to adjust later actions. Use `hover` to hold position or `ack`
-when no useful safe change is needed. The CM5
+measured results to adjust later actions. After a function response, continue the
+active request immediately; do not wait for another user message or describe a
+planned action as text. Use `hover` to hold position or `ack` when no useful safe
+change is needed. The CM5
 limits every command; never send motors, attitude, altitude, or absolute-position
 commands.""".strip()
 

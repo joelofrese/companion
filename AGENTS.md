@@ -170,6 +170,8 @@ remain the live context.
   results expose numeric measured translation or angle and local-position or
   heading feedback for calibration. Hover only holds position; the session keeps
   deciding from fresh state and dialogue.
+- Repeated view-only turns require a short translation before another turn, so
+  an occluded target produces a new viewpoint instead of an endless spin.
 - Native ER 2 thinking is currently set minimal for timely closed-loop task planning;
   measured action feedback keeps each next choice grounded.
 - Completed measured movement and turn results are saved as experience for
