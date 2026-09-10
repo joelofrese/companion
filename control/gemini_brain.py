@@ -1659,7 +1659,10 @@ wait for its measured result and a fresh image before choosing another physical
 action. Use measured heading and position to correct the next action. If a move
 barely changes the position or view, reassess before repeating the same move. If
 a requested object is already visible, do not turn just to search for it; keep
-the view and approach only when the path is clear.
+the view and approach only when the path is clear. During open exploration, do
+not repeat same-direction pulses when the newest image and position show no
+meaningful change; turn or translate laterally to inspect another area, then
+reassess.
 
 `move` and `turn` are blocking. After their result, continue the active request
 from the new image and state. Use `hover` when no useful safe change is clear.
