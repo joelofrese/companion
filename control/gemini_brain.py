@@ -757,10 +757,10 @@ class GeminiRuntime:
     async def _execute(self, name: str, args: dict) -> dict:
         if name == "hover" and self._hold_tool_called:
             result = {
-                "status": "unavailable",
+                "status": "already_hovering",
                 "reason": (
-                    "the vehicle is already holding position; do not call another "
-                    "hold tool in this turn; wait for the next heartbeat or dialogue"
+                    "the vehicle is already holding position; continue without "
+                    "another hold call"
                 ),
                 "telemetry": _telemetry_text(self._telemetry),
             }
@@ -777,8 +777,8 @@ class GeminiRuntime:
                 result = {"status": "rejected", "reason": "message is required"}
             elif self._speech_tool_called:
                 result = {
-                    "status": "unavailable",
-                    "reason": "one speak call is enough for this turn; wait for the next turn",
+                    "status": "already_spoken",
+                    "reason": "one message was already spoken; continue without another",
                 }
             elif (
                 message == self._last_spoken_message
@@ -800,10 +800,10 @@ class GeminiRuntime:
                 and self._dialogue_in_flight is None
             ):
                 self._speech_tool_called = True
-                self._record_action("speak unavailable: recent speech")
+                self._record_action("speak already spoken: recent speech")
                 result = {
-                    "status": "unavailable",
-                    "reason": "stay quiet briefly after a status message",
+                    "status": "already_spoken",
+                    "reason": "a status message was spoken recently; continue without another",
                 }
             else:
                 self._speech_tool_called = True
