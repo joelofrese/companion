@@ -1874,8 +1874,18 @@ def _is_explicit_stop(message: str) -> bool:
         "cancel movement",
     }:
         return True
-    if message.startswith(("stop ", "hover ", "hold position ", "cancel ")):
+    if message.startswith(("stop ", "hold position ", "cancel ")):
         return True
+    if message.startswith("hover "):
+        remainder = message[len("hover "):]
+        return remainder.startswith((
+            "until ",
+            "while ",
+            "and wait",
+            "and stay",
+            "here",
+            "there",
+        ))
     for phrase in ("do not move", "don't move", "do not turn", "don't turn"):
         index = message.find(phrase)
         if index < 0:
