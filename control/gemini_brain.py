@@ -1597,7 +1597,9 @@ def _tools():
             "description": (
                 "Call this function to say one short user-facing message; a text "
                 "response is not spoken. Report physical outcomes only after "
-                "observing them. Do not narrate routine movement."
+                "observing them. Do not narrate routine movement or repeat a "
+                "waiting status; after saying you are waiting, stay quiet until "
+                "new dialogue or a meaningful change."
             ),
             "behavior": "NON_BLOCKING",
             "parameters": {
@@ -1640,8 +1642,9 @@ the view and approach only when the path is clear.
 `move` and `turn` are blocking. After their result, continue the active request
 from the new image and state. Use `hover` when no useful safe change is clear.
 Use at most one `speak` call in a turn and combine the message instead of
-sending several. The CM5 limits every command; never send motors, attitude,
-altitude, or absolute-position commands.""".strip()
+sending several. After saying that you are waiting, stay quiet until new
+dialogue or a meaningful change. The CM5 limits every command; never send
+motors, attitude, altitude, or absolute-position commands.""".strip()
 
 
 def _jpeg(frame) -> bytes:
