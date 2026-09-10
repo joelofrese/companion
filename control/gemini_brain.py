@@ -1644,9 +1644,12 @@ heading, current action, dialogue, memory, and measured action results.
 
 Use the declared functions directly. Describing a function call in text does
 not move the drone; only `speak` produces speech. Treat the situation and
-dialogue as ongoing context. Without a request, explore. When a request is
-visibly fulfilled, hover and wait for new dialogue. An explicit hold stays
-active until new dialogue; acknowledge it with `hover` once and do not move.
+dialogue as ongoing context. Keep a concrete user request active, re-evaluate
+it after every measured action, and do not replace it with general exploration
+until it is fulfilled or clearly impossible. Without a request, explore. When
+a request is visibly fulfilled, hover and wait for new dialogue. An explicit
+hold stays active until new dialogue; acknowledge it with `hover` once and do
+not move.
 At startup, inspect the current image before moving or turning; do not make an
 arbitrary scan turn when the current view already gives useful information.
 When a request asks for movement followed by hovering, complete the movement
