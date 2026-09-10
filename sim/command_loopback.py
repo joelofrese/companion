@@ -47,8 +47,11 @@ async def run():
     cm5_started_at = None
     obstacle_cleared = False
     turn_obstacle = False
+    turn_sensor_missing = False
 
     def cm5_obstacle_distance():
+        if turn_sensor_missing:
+            return None
         if turn_obstacle:
             return 0.5
         if obstacle_cleared:
@@ -202,6 +205,23 @@ async def run():
                 f"{turn_commands}"
             )
         print("CM5 in-place turn around obstacle=verified.")
+        while not forwarder.commands.empty():
+            forwarder.commands.get_nowait()
+        turn_obstacle = False
+        turn_sensor_missing = True
+        reconnect_sender.send(VelocityCommand(yaw_rate_deg_s=-8.0))
+        await asyncio.sleep(0.1)
+        missing_turn_commands = []
+        while not forwarder.commands.empty():
+            missing_turn_commands.append(forwarder.commands.get_nowait())
+        if VelocityCommand(yaw_rate_deg_s=-8.0) not in missing_turn_commands:
+            raise RuntimeError(
+                "CM5 did not preserve an in-place turn with missing range: "
+                f"{missing_turn_commands}"
+            )
+        print("CM5 in-place turn with missing range=verified.")
+        turn_sensor_missing = False
+        turn_obstacle = True
         while not forwarder.commands.empty():
             forwarder.commands.get_nowait()
         reconnect_sender.send(
