@@ -1858,9 +1858,7 @@ def _finite(value) -> bool:
 def _is_explicit_stop(message: str) -> bool:
     """Recognize dialogue that explicitly asks the drone to hold position."""
 
-    for punctuation in ",.!?;:":
-        message = message.replace(punctuation, " ")
-    message = " ".join(message.casefold().split())
+    message = _normalize_dialogue(message)
     for prefix in ("please ", "can you ", "could you ", "would you "):
         if message.startswith(prefix):
             message = message[len(prefix):]
@@ -1909,9 +1907,7 @@ def _is_explicit_stop(message: str) -> bool:
 def _requests_hold_after(message: str) -> bool:
     """Return whether a request asks for a hold after its other work."""
 
-    for punctuation in ",.!?;:":
-        message = message.replace(punctuation, " ")
-    message = " ".join(message.casefold().split())
+    message = _normalize_dialogue(message)
     return any(
         phrase in message
         for phrase in (
@@ -1923,6 +1919,14 @@ def _requests_hold_after(message: str) -> bool:
             " then wait",
         )
     )
+
+
+def _normalize_dialogue(message: str) -> str:
+    """Normalize spoken dialogue for simple phrase matching."""
+
+    for punctuation in ",.!?;:":
+        message = message.replace(punctuation, " ")
+    return " ".join(message.casefold().split())
 
 
 def _resume_rejected(error: Exception) -> bool:
