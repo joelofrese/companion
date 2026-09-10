@@ -1889,19 +1889,7 @@ def _is_explicit_stop(message: str) -> bool:
             return True
     if any(phrase in message for phrase in ("stay still", "remain still")):
         return True
-    if not any(
-        phrase in message
-        for phrase in ("tell me", "what do you see", "describe", "report")
-    ):
-        return False
-    return message.endswith((
-        " and stop",
-        " then stop",
-        " and hover",
-        " then hover",
-        " and hold position",
-        " then hold position",
-    ))
+    return False
 
 
 def _requests_hold_after(message: str) -> bool:
