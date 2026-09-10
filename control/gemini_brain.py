@@ -563,9 +563,11 @@ class GeminiRuntime:
         if self._bootstrap_pending:
             parts.append(
                 f"[START] Begin now. Treat this as the active situation, not a "
-                f"request for permission: {self.situation} After inspecting the "
-                "image, call exactly one useful tool; do not turn or move merely "
-                "to begin."
+                f"request for permission: {self.situation} Inspect the initial "
+                "image while holding position. Your first tool call must be "
+                "hover; do not call move or turn first. After that inspection, "
+                "move immediately only when the situation or user request "
+                "clearly requires it."
             )
             if self._recent_action_results:
                 parts.append(
@@ -1640,8 +1642,11 @@ until it is fulfilled or clearly impossible. Without a request, explore. When
 a request is visibly fulfilled, hover and wait for new dialogue. An explicit
 hold stays active until new dialogue; acknowledge it with `hover` once and do
 not move.
-At startup, inspect the current image before moving or turning; do not make an
-arbitrary scan turn when the current view already gives useful information.
+At startup, your first tool call must be `hover` while you inspect the current
+image. Do not call `move` or `turn` first, and do not make an arbitrary scan
+turn when the current view already gives useful information. After that first
+inspection, explore or act normally; move immediately when the situation or
+user request clearly requires it.
 When a request asks for movement followed by hovering, complete the movement
 first and then call `hover` to remain there. For a compound request, complete
 each requested movement in order; do not hover between requested movements.
