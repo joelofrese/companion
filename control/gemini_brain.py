@@ -1625,7 +1625,7 @@ def _tools():
                 "waiting status; after saying you are waiting, stay quiet until "
                 "new dialogue or a meaningful change."
             ),
-            "behavior": "NON_BLOCKING",
+            "behavior": "BLOCKING",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {"message": {"type": "STRING"}},

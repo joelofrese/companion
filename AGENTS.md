@@ -47,8 +47,8 @@ merge and delete it.
   runtime returns measured motion, heading, fresh telemetry, and a newer camera
   frame before another movement is chosen. Move results also report measured
   local-position change. An explicit stop may interrupt an action.
-- Speech is non-blocking, so ER 2 can continue its conversation and choose
-  another action after speaking.
+- Speech is a blocking tool call that returns immediately; ER 2 can continue
+  its conversation and choose another action after speaking.
 - Choose each action from the newest image and measured state. Use a short,
   deliberate pulse, inspect its fresh result, and stop when no useful change is
   clear. Treat the newest image as evidence; if it is unclear, say so rather
