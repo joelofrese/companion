@@ -31,6 +31,12 @@ class _BootError(RuntimeError):
 DEFAULT_SIMULATION_MEMORY = Path.home() / ".companion" / "simulation-memory.txt"
 
 
+def _interrupt(signum, frame):
+    """Use the normal cleanup path when the runner receives SIGTERM."""
+
+    raise KeyboardInterrupt
+
+
 def _read_output(process, ready, finished):
     try:
         tail = b""
@@ -422,6 +428,7 @@ def run(
 
 
 def main(argv=None):
+    signal.signal(signal.SIGTERM, _interrupt)
     parser = argparse.ArgumentParser(description="Run a complete PX4/Gazebo companion scenario")
     parser.add_argument(
         "--px4-dir",
