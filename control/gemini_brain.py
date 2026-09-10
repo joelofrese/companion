@@ -1841,7 +1841,7 @@ def _finite(value) -> bool:
 
 
 def _is_explicit_stop(message: str) -> bool:
-    """Recognize the short dialogue commands that may interrupt movement."""
+    """Recognize dialogue that explicitly asks the drone to hold position."""
 
     for punctuation in ",.!?;:":
         message = message.replace(punctuation, " ")
@@ -1864,6 +1864,18 @@ def _is_explicit_stop(message: str) -> bool:
     }:
         return True
     if message.startswith(("stop ", "hover ", "hold position ", "cancel ")):
+        return True
+    if any(
+        phrase in message
+        for phrase in (
+            "and hover",
+            "then hover",
+            "and hold position",
+            "then hold position",
+            "and wait",
+            "then wait",
+        )
+    ):
         return True
     for phrase in ("do not move", "don't move", "do not turn", "don't turn"):
         index = message.find(phrase)
