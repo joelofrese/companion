@@ -115,6 +115,7 @@ def _run_once(
     memory_path: Optional[Path],
     snapshot_path: Optional[Path],
     dialogue_request: Optional[str],
+    dialogue_delay_s: Optional[float],
     trace: bool,
     moving_person: bool,
     headless: bool,
@@ -249,6 +250,8 @@ def _run_once(
                 scenario += ["--snapshot", str(snapshot_path)]
             if dialogue_request is not None:
                 scenario += ["--request", dialogue_request]
+            if dialogue_delay_s is not None:
+                scenario += ["--request-after", str(dialogue_delay_s)]
             if trace:
                 scenario.append("--trace")
             scenario += ["--world", world]
@@ -278,6 +281,7 @@ def run(
     memory_path: Optional[Path] = None,
     snapshot_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
+    dialogue_delay_s: Optional[float] = None,
     trace: bool = False,
     moving_person: bool = False,
     headless: bool = False,
@@ -335,6 +339,13 @@ def run(
         raise RuntimeError("brain trace requires a synthetic world scenario")
     if dialogue_request is not None and not dialogue_request.strip():
         raise RuntimeError("dialogue request must not be empty")
+    if dialogue_delay_s is not None:
+        if dialogue_request is None:
+            raise RuntimeError("request-after requires --request")
+        if not exploratory or not gemini:
+            raise RuntimeError("request-after requires an exploratory Gemini simulation")
+        if not math.isfinite(dialogue_delay_s) or dialogue_delay_s < 0.0:
+            raise RuntimeError("request-after must be zero or positive")
     if gemini and not (exploratory and (camera or depth)):
         raise RuntimeError("Gemini simulation requires exploratory camera or depth mode")
     if duration_s is not None and image_path is not None:
@@ -371,6 +382,7 @@ def run(
                 memory_path=memory_path,
                 snapshot_path=snapshot_path,
                 dialogue_request=dialogue_request,
+                dialogue_delay_s=dialogue_delay_s,
                 trace=trace,
                 moving_person=moving_person,
                 headless=headless,
@@ -452,6 +464,11 @@ def main(argv=None):
         help="send one dialogue request automatically during an exploratory run",
     )
     parser.add_argument(
+        "--request-after",
+        type=float,
+        help="send --request this many seconds after takeoff",
+    )
+    parser.add_argument(
         "--trace",
         action="store_true",
         help="print brain observations, decisions, and command reasons",
@@ -489,6 +506,7 @@ def main(argv=None):
             memory_path=args.memory.expanduser().resolve() if args.memory else None,
             snapshot_path=args.snapshot.expanduser().resolve() if args.snapshot else None,
             dialogue_request=args.request,
+            dialogue_delay_s=args.request_after,
             trace=args.trace,
             moving_person=args.moving_person,
             headless=args.headless,

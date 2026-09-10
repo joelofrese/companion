@@ -127,6 +127,9 @@ save a rendered frame.
 Camera-only runs stop because they have no range reading. `--faults` injects
 sensor, camera, command-link, brain, and Gemini reconnect faults.
 
+Use `--request-after` with `--request` to inject one dialogue request after
+takeoff in an unattended exploratory run.
+
 The companion `objects` world contains simple furniture, colored shapes, a
 mannequin, and a central obstacle. Other exploratory runs use stock Gazebo
 worlds. `--moving-person` moves the mannequin through Gazebo's pose service.

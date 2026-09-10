@@ -109,6 +109,7 @@ async def run(
     memory_path: Optional[Path] = None,
     snapshot_path: Optional[Path] = None,
     dialogue_request: Optional[str] = None,
+    dialogue_delay_s: Optional[float] = None,
     trace: bool = False,
     moving_person: bool = False,
 ):
@@ -153,6 +154,13 @@ async def run(
         raise ValueError("dialogue request requires exploratory simulation")
     if dialogue_request is not None and not dialogue_request.strip():
         raise ValueError("dialogue request must not be empty")
+    if dialogue_delay_s is not None:
+        if dialogue_request is None:
+            raise ValueError("request-after requires --request")
+        if not gemini:
+            raise ValueError("request-after requires Gemini")
+        if not math.isfinite(dialogue_delay_s) or dialogue_delay_s < 0.0:
+            raise ValueError("request-after must be zero or positive")
     requested_intent = (
         parse_intent(dialogue_request)
         if dialogue_request is not None and not gemini
@@ -166,6 +174,7 @@ async def run(
     drone = System()
     stack = None
     mind_task = None
+    dialogue_task = None
     mind_stop = asyncio.Event()
     telemetry_task = None
     attitude_task = None
@@ -218,7 +227,12 @@ async def run(
             control.close()
             if gemini:
                 await control.wait_closed()
-        for task in (telemetry_task, attitude_task, offboard_task):
+        for task in (
+            telemetry_task,
+            attitude_task,
+            offboard_task,
+            dialogue_task,
+        ):
             if task is not None and not task.done():
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
@@ -252,7 +266,7 @@ async def run(
                 memory=memory_store,
                 include_thoughts=trace,
             )
-            if dialogue_request is not None:
+            if dialogue_request is not None and dialogue_delay_s is None:
                 control.add_dialogue(dialogue_request)
             await control.start()
 
@@ -271,6 +285,17 @@ async def run(
                 interval_s=12.0,
             )
             person_motion.start()
+
+        if dialogue_request is not None and dialogue_delay_s is not None:
+            async def send_scripted_dialogue():
+                await asyncio.sleep(dialogue_delay_s)
+                control.add_dialogue(dialogue_request)
+                print(
+                    f"Scripted dialogue sent after {dialogue_delay_s:.1f}s.",
+                    flush=True,
+                )
+
+            dialogue_task = asyncio.create_task(send_scripted_dialogue())
 
         async def observe_heading():
             nonlocal current_heading_deg, initial_yaw_deg, max_heading_change_deg
@@ -1413,6 +1438,11 @@ if __name__ == "__main__":
         help="send one dialogue request automatically at the start of an exploratory run",
     )
     parser.add_argument(
+        "--request-after",
+        type=float,
+        help="send --request this many seconds after takeoff",
+    )
+    parser.add_argument(
         "--trace",
         action="store_true",
         help="print meaningful brain observations, decisions, and command reasons",
@@ -1442,6 +1472,7 @@ if __name__ == "__main__":
                 memory_path=args.memory,
                 snapshot_path=args.snapshot,
                 dialogue_request=args.request,
+                dialogue_delay_s=args.request_after,
                 trace=args.trace,
                 moving_person=args.moving_person,
             )
