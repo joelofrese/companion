@@ -1631,9 +1631,10 @@ is only a brief adjustment. Never move forward when the path is blocked. A turn
 changes the view but not position. If a target is hidden, translate to create a
 new viewpoint instead of repeating turns. Make one small movement or turn, then
 wait for its measured result and a fresh image before choosing another physical
-action. Use measured heading and position to correct the next action. If a
-requested object is already visible, do not turn just to search for it; keep the
-view and approach only when the path is clear.
+action. Use measured heading and position to correct the next action. If a move
+barely changes the position or view, reassess before repeating the same move. If
+a requested object is already visible, do not turn just to search for it; keep
+the view and approach only when the path is clear.
 
 `move` and `turn` are blocking. After their result, continue the active request
 from the new image and state. Use `hover` when no useful safe change is clear.
