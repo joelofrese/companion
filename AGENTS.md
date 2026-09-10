@@ -62,10 +62,11 @@ merge and delete it.
   move or turn until its result returns. Dialogue can interrupt a quiet model
   turn when no physical action is running; an explicit hold cancels movement and
   keeps it held until new dialogue. A bounded timeout restarts a stalled session.
-- Stale, malformed, missing, or unsafe input becomes zero motion. The CM5
-  rejects unsafe commands, removes only positive forward motion at a close
-  obstacle, and is the final vehicle-side authority. PX4 stabilizes the vehicle
-  and controls the motors.
+- Stale, malformed, missing, or unsafe input becomes zero motion; a pure
+  in-place turn may continue without forward range. The CM5 rejects unsafe
+  commands, removes only positive forward motion at a close obstacle, and is
+  the final vehicle-side authority. PX4 stabilizes the vehicle and controls
+  the motors.
 
 The brain sends only slow body-frame translation and yaw-rate commands. Vertical
 translation is a velocity pulse, never an altitude command. It never sends

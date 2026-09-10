@@ -1265,7 +1265,10 @@ class GeminiRuntime:
         action.last_update_s = now
 
     def _action_is_blocked(self, action: ActiveAction) -> bool:
-        if not _obstacle_is_valid(self._telemetry.obstacle_distance_m):
+        if (
+            not _obstacle_is_valid(self._telemetry.obstacle_distance_m)
+            and action.kind != "turn"
+        ):
             return True
         if action.kind != "turn" and not _move_is_allowed(
             action,
