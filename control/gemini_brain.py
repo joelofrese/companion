@@ -1348,17 +1348,22 @@ class GeminiRuntime:
                     _turn_angle_deg(action) - actual_heading_deg
                 )
         else:
+            position_delta = self._position_delta(action)
+            observed_translation = position_delta or (
+                action.observed_forward_m,
+                action.observed_right_m,
+                action.observed_down_m,
+            )
             action.completion["requested_translation_m"] = {
                 "forward": action.forward_m_s * action.duration_s,
                 "right": action.right_m_s * action.duration_s,
                 "up": -action.down_m_s * action.duration_s,
             }
             action.completion["observed_translation_m"] = {
-                "forward": action.observed_forward_m,
-                "right": action.observed_right_m,
-                "up": -action.observed_down_m,
+                "forward": observed_translation[0],
+                "right": observed_translation[1],
+                "up": -observed_translation[2],
             }
-            position_delta = self._position_delta(action)
             if position_delta is not None:
                 action.completion["position_change_m"] = {
                     "forward": position_delta[0],
@@ -1389,11 +1394,11 @@ class GeminiRuntime:
             final_heading = _heading_value(self._telemetry.heading_rad)
             if final_heading is not None:
                 result += f"; final heading {final_heading:+.1f} degrees"
-        if action.kind == "move":
-            result += f"; {self._translation_text(action)}"
         position_delta = self._position_delta(action)
         if position_delta is not None:
             result += f"; {self._position_text(position_delta)}"
+        elif action.kind == "move":
+            result += f"; {self._translation_text(action)}"
         return result
 
     def _save_action_result(self, result: str):
