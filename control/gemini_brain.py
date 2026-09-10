@@ -1136,10 +1136,9 @@ class GeminiRuntime:
             else:
                 state = "none"
             if self._turns_since_translation >= MAX_TURNS_WITHOUT_TRANSLATION:
-                state += (
-                    "; two turns changed the view without changing position; "
-                    "use a short safe translation to create a new viewpoint "
-                    "before turning again"
+                return (
+                    f"{state}; turn unavailable until a short safe translation "
+                    "creates a new viewpoint; move is available"
                 )
             return f"{state}; movement tools available"
         details = [
