@@ -149,6 +149,7 @@ class GeminiRuntime:
         self._response_in_flight = False
         self._decision_not_before_s: Optional[float] = None
         self._hold_tool_called = False
+        self._speech_tool_called = False
         self._text_only_turns = 0
         self._closed = asyncio.Event()
         self._frame_ready = asyncio.Event()
@@ -489,6 +490,8 @@ class GeminiRuntime:
             ):
                 await self._send_dialogue(session, self._dialogue[0])
             return
+        if self._hold_requested and not self._dialogue:
+            return
         if (
             self._decision_not_before_s is not None
             and time.monotonic() < self._decision_not_before_s
@@ -509,6 +512,7 @@ class GeminiRuntime:
         action_result = self._last_action_result
         self._response_in_flight = True
         self._hold_tool_called = False
+        self._speech_tool_called = False
         if dialogue:
             await self._send_dialogue(session, dialogue)
         else:
@@ -587,7 +591,7 @@ class GeminiRuntime:
         )
         if dialogue:
             parts.append(f"[USER] {dialogue}")
-        elif self._last_dialogue:
+        elif self._last_dialogue and self._bootstrap_pending:
             parts.append(
                 "[CURRENT REQUEST] "
                 f"{self._last_dialogue}\n"
@@ -768,18 +772,25 @@ class GeminiRuntime:
             message = str(args.get("message", "")).strip()
             if not message:
                 result = {"status": "rejected", "reason": "message is required"}
+            elif self._speech_tool_called:
+                result = {
+                    "status": "unavailable",
+                    "reason": "one speak call is enough for this turn; wait for the next turn",
+                }
             elif (
                 message == self._last_spoken_message
                 and self._last_spoken_at_s is not None
                 and time.monotonic() - self._last_spoken_at_s
                 < SPEECH_REPEAT_WINDOW_S
             ):
+                self._speech_tool_called = True
                 self._record_action(f"speak already spoken: {message}")
                 result = {
                     "status": "already_spoken",
                     "reason": "the same message was spoken moments ago",
                 }
             else:
+                self._speech_tool_called = True
                 self._last_spoken_message = message
                 self._last_spoken_at_s = time.monotonic()
                 self._record_action(f"speak: {message}")
@@ -1644,6 +1655,9 @@ When approaching a visible target, center it with one small turn if needed.
 Once it is centered and the forward path is clear, keep that heading and use
 short forward pulses. Recheck the image and range after every pulse; if the
 target leaves view, correct from the new image instead of accumulating turns.
+If a requested object or person is already clearly visible, do not turn merely
+to search again. Keep the view, make the requested short approach when the path
+is clear, or hover when the request is fulfilled.
 
 `move` and `turn` are blocking. Wait for their measured completion, fresh image,
 telemetry, heading, and position result before another physical movement. Use
@@ -1858,6 +1872,17 @@ def _is_explicit_stop(message: str) -> bool:
     }:
         return True
     if message.startswith(("stop ", "hover ", "hold position ", "cancel ")):
+        return True
+    for phrase in ("do not move", "don't move", "do not turn", "don't turn"):
+        index = message.find(phrase)
+        if index < 0:
+            continue
+        remainder = message[index + len(phrase):].lstrip()
+        if not remainder.startswith(
+            ("forward", "backward", "left", "right", "up", "down")
+        ):
+            return True
+    if any(phrase in message for phrase in ("stay still", "remain still")):
         return True
     if not any(
         phrase in message
