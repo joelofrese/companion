@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import xml.etree.ElementTree as ET
 from typing import Optional
 
 BOOT_MARKER = "pxh>"
@@ -94,6 +95,20 @@ def _validate_pose(pose: Optional[str]) -> Optional[str]:
     if not all(math.isfinite(value) for value in numbers):
         raise RuntimeError("model pose must contain finite numbers")
     return ",".join(str(value) for value in numbers)
+
+
+def _sdf_world_name(world_file: Path) -> str:
+    """Return the world name declared by one SDF file."""
+
+    try:
+        root = ET.parse(world_file).getroot()
+    except ET.ParseError as error:
+        raise RuntimeError(f"invalid Gazebo world file: {world_file}") from error
+    world = root.find("world")
+    name = world.get("name") if world is not None else None
+    if not name:
+        raise RuntimeError(f"Gazebo world has no declared name: {world_file}")
+    return name
 
 
 def _run_once(
@@ -360,6 +375,7 @@ def run(
         world_file = px4_dir / "Tools/simulation/gz/worlds" / f"{world}.sdf"
     if not world_file.is_file():
         raise RuntimeError(f"Gazebo world does not exist: {world_file}")
+    world = _sdf_world_name(world_file)
 
     for attempt in range(BOOT_RETRIES + 1):
         try:
