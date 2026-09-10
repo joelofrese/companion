@@ -1665,7 +1665,8 @@ measured results to adjust later actions. After a function response, continue th
 active request immediately; do not wait for another user message or describe a
 planned action as text. Use `hover` when no useful safe change is needed. The CM5
 limits every command; never send motors, attitude, altitude, or absolute-position
-commands.""".strip()
+commands. Use at most one `speak` call in a turn and combine the message instead
+of sending several.""".strip()
 
 
 def _jpeg(frame) -> bytes:
