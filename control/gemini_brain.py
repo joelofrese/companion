@@ -611,7 +611,7 @@ class GeminiRuntime:
         else:
             heartbeat = "Inspect the newest image and state, then choose the next tool."
         parts.append(
-            f"[HEARTBEAT] {heartbeat} Choose ack, move, turn, hover, or speak "
+            f"[HEARTBEAT] {heartbeat} Choose move, turn, hover, or speak "
             "from the newest image and state. Continue the current situation and "
             "latest dialogue; wait when no useful safe change is clear."
         )
@@ -748,7 +748,7 @@ class GeminiRuntime:
         self._dialogue_send_complete = False
 
     async def _execute(self, name: str, args: dict) -> dict:
-        if name in ("ack", "hover") and self._hold_tool_called:
+        if name == "hover" and self._hold_tool_called:
             result = {
                 "status": "unavailable",
                 "reason": (
@@ -757,23 +757,6 @@ class GeminiRuntime:
                 ),
                 "telemetry": _telemetry_text(self._telemetry),
             }
-        elif name == "ack":
-            if self._dialogue and self._dialogue_in_flight is None:
-                result = {
-                    "status": "unavailable",
-                    "reason": (
-                        "new dialogue is waiting to be processed; wait for the "
-                        "next active turn"
-                    ),
-                }
-            else:
-                self._hold_tool_called = True
-                self._record_action("ack")
-                result = {
-                    "status": "acknowledged",
-                    "reason": "the current image and state were inspected; hold position",
-                    "telemetry": _telemetry_text(self._telemetry),
-                }
         elif name == "move":
             result = await self._move(args)
         elif name == "turn":
@@ -807,9 +790,9 @@ class GeminiRuntime:
                 }
         else:
             result = {"status": "rejected", "reason": "unknown tool"}
-        if result.get("status") in ("acknowledged", "hovering", "spoken"):
+        if result.get("status") in ("already_hovering", "hovering", "spoken"):
             self.action_count += 1
-        if result.get("status") in ("acknowledged", "already_hovering", "hovering"):
+        if result.get("status") in ("already_hovering", "hovering"):
             self._decision_not_before_s = (
                 time.monotonic() + HOLD_RECHECK_DELAY_S
             )
@@ -1457,7 +1440,7 @@ class GeminiRuntime:
                 self._reconnect_requested = True
                 self._text_only_turns = 0
         summary = thought or response
-        if not summary and action != "ack":
+        if not summary:
             summary = action
         self.latest_response_latency_s = (
             max(0.0, time.monotonic() - response_started_s)
@@ -1472,7 +1455,7 @@ class GeminiRuntime:
         if (
             self.memory_store is not None
             and summary not in ("", "none")
-            and action not in ("none", "ack")
+            and action != "none"
             and action not in summary
         ):
             self._remember_summary(summary)
@@ -1482,15 +1465,6 @@ def _tools():
     """Return the high-level actions exposed to Gemini."""
 
     return [{"function_declarations": [
-        {
-            "name": "ack",
-            "description": (
-                "Acknowledge the newest image and telemetry and hold position. "
-                "Use this when no safe useful action is needed yet."
-            ),
-            "behavior": "BLOCKING",
-            "parameters": {"type": "OBJECT", "properties": {}},
-        },
         {
             "name": "move",
             "description": (
@@ -1640,7 +1614,7 @@ heading, current action, dialogue, memory, and measured results.
 Act through the declared functions, never by describing or imitating a function
 call in text. JSON or Markdown that describes an action is not a command and
 wastes a turn; call the matching function directly. Only a real `speak` call is
-spoken. Use `ack` or `hover` when no physical change is needed.
+spoken. Use `hover` when no physical change is needed.
 
 Treat the situation and latest dialogue as ongoing context. Continue observing
 and choosing useful actions; do not stop exploring just because one local view
@@ -1675,8 +1649,7 @@ target leaves view, correct from the new image instead of accumulating turns.
 telemetry, heading, and position result before another physical movement. Use
 measured results to adjust later actions. After a function response, continue the
 active request immediately; do not wait for another user message or describe a
-planned action as text. Use `hover` to hold position or `ack` when no useful safe
-change is needed. The CM5
+planned action as text. Use `hover` when no useful safe change is needed. The CM5
 limits every command; never send motors, attitude, altitude, or absolute-position
 commands.""".strip()
 

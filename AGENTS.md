@@ -35,12 +35,11 @@ merge and delete it.
   deciding from the newest image, dialogue, local position, current and initial
   heading, other telemetry, memory, and action results.
 - Dialogue adds context to the ongoing Gemini session. Keep observing and
-  choosing from the situation and newest dialogue; `ack` and `hover` hold
-  position without ending the session. An explicit stop or hold stays active
-  until new dialogue. Explore generally when no request is present.
-- Gemini chooses direct `ack`, `move`, `turn`, `hover`, or `speak` tools. `ack`
-  holds position while waiting for the next fresh frame. Text or JSON action
-  descriptions never move the vehicle.
+  choosing from the situation and newest dialogue; `hover` holds position
+  without ending the session. An explicit stop or hold stays active until new
+  dialogue. Explore generally when no request is present.
+- Gemini chooses direct `move`, `turn`, `hover`, or `speak` tools. Text or JSON
+  action descriptions never move the vehicle.
 - `move` is a short, slow body-frame pulse. It may include vertical velocity or
   a small yaw rate for a smooth arc. `turn` accepts a relative angle and settles
   from heading.
@@ -164,7 +163,7 @@ remain the live context.
   decisions, dialogue, memory, movement, and simulated TOF safety. Gazebo
   camera frames preserve the vehicle's left/right view, so ER 2 can make small
   visual corrections; exact target completion remains exploratory.
-- ER 2 chooses `ack`, movement, turn, hover, or speech tools.
+- ER 2 chooses movement, turn, hover, or speech tools.
   Physical move and turn calls block until measured completion and heading; move
   results expose numeric measured translation or angle and local-position or
   heading feedback for calibration. Hover only holds position; an explicit hold
