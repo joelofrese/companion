@@ -13,6 +13,8 @@ import time
 import xml.etree.ElementTree as ET
 from typing import Optional
 
+from sim.world_fixture import BRAIN_SHUTDOWN_START_S
+
 BOOT_MARKER = "pxh>"
 BOOT_MARKER_BYTES = BOOT_MARKER.encode()
 BOOT_TIMEOUT_S = 120.0
@@ -361,6 +363,11 @@ def run(
             raise RuntimeError("request-after requires an exploratory Gemini simulation")
         if not math.isfinite(dialogue_delay_s) or dialogue_delay_s < 0.0:
             raise RuntimeError("request-after must be zero or positive")
+        if faults and dialogue_delay_s >= BRAIN_SHUTDOWN_START_S:
+            raise RuntimeError(
+                "request-after must precede the injected brain shutdown at "
+                f"{BRAIN_SHUTDOWN_START_S:.1f} seconds"
+            )
     if gemini and not (exploratory and (camera or depth)):
         raise RuntimeError("Gemini simulation requires exploratory camera or depth mode")
     if duration_s is not None and image_path is not None:
