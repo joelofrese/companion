@@ -641,7 +641,7 @@ class GeminiRuntime:
     def _response_is_stalled(self, response_started_s: float) -> bool:
         """Return whether the current turn should be recovered."""
 
-        if self._active_action is not None:
+        if self._active_action is not None or self._hold_requested:
             return False
         now = time.monotonic()
         if (
